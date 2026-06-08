@@ -40,6 +40,21 @@ export interface JsonSchema {
 export type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
   | { type: "assistant_message"; content: string }
+  | {
+      type: "tool_approval_requested";
+      approvalId: string;
+      name: string;
+      input: unknown;
+      risk: ToolApprovalRisk;
+      reason: string;
+    }
+  | {
+      type: "tool_approval_resolved";
+      approvalId: string;
+      name: string;
+      approved: boolean;
+      reason?: string;
+    }
   | { type: "tool_started"; name: string; input: unknown }
   | { type: "tool_finished"; name: string; output: string; ok: boolean }
   | { type: "step"; index: number; maxSteps: number }
@@ -49,6 +64,22 @@ export type AgentEvent =
 export type AgentEventHandler = (event: AgentEvent) => void | Promise<void>;
 
 export type ApprovalMode = "suggest" | "workspace-write" | "full-access";
+export type ToolApprovalRisk = "workspace-write" | "shell" | "memory";
+
+export interface ToolApprovalRequest {
+  approvalId: string;
+  name: string;
+  input: unknown;
+  risk: ToolApprovalRisk;
+  reason: string;
+}
+
+export interface ToolApprovalDecision {
+  approved: boolean;
+  reason?: string;
+}
+
+export type ToolApprovalHandler = (request: ToolApprovalRequest) => Promise<ToolApprovalDecision>;
 
 export interface ApprovalPolicy {
   mode: ApprovalMode;
@@ -64,7 +95,9 @@ export interface AgentRunOptions {
   maxSteps?: number;
   policy?: ApprovalPolicy;
   model?: string;
+  chatClient?: AgentChatClient;
   onEvent?: AgentEventHandler;
+  requestToolApproval?: ToolApprovalHandler;
 }
 
 export interface AgentRunResult {
@@ -106,6 +139,11 @@ export interface DeepSeekChatResponse {
   };
 }
 
+export interface AgentChatClient {
+  model: string;
+  chat(messages: ChatMessage[], tools?: ToolDefinition[]): Promise<DeepSeekChatResponse>;
+}
+
 export interface WorkspaceContext {
   root: string;
   memoryPath: string;
@@ -125,4 +163,3 @@ export interface RuntimeTool {
   definition: ToolDefinition;
   run(input: unknown, runtime: ToolRuntime): Promise<ToolResult>;
 }
-

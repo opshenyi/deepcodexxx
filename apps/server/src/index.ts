@@ -12,10 +12,18 @@ import {
   readWorkspaceMemory,
   runDeepCodexAgent
 } from "@deepcodex/core";
-import type { AgentEvent, ApprovalMode } from "@deepcodex/core";
+import type { AgentEvent, ApprovalMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
 
 const app = express();
 const port = Number(process.env.DEEPCODEX_PORT ?? process.env.PORT ?? 17361);
+const pendingApprovals = new Map<
+  string,
+  {
+    request: ToolApprovalRequest;
+    resolve: (decision: ToolApprovalDecision) => void;
+    timeout: NodeJS.Timeout;
+  }
+>();
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -86,11 +94,38 @@ app.get("/api/sessions/:sessionId", async (req, res, next) => {
   }
 });
 
+app.post("/api/approvals/:approvalId", (req, res) => {
+  const { approvalId } = req.params;
+  if (!approvalId) {
+    res.status(400).json({ error: "approvalId is required" });
+    return;
+  }
+
+  const pending = pendingApprovals.get(approvalId);
+  if (!pending) {
+    res.status(404).json({ error: "approval request not found or already resolved" });
+    return;
+  }
+
+  pendingApprovals.delete(approvalId);
+  clearTimeout(pending.timeout);
+  const approved = Boolean(req.body?.approved);
+  const reason =
+    typeof req.body?.reason === "string" && req.body.reason.trim()
+      ? req.body.reason.trim()
+      : approved
+        ? "Approved from DeepCodex client."
+        : "Denied from DeepCodex client.";
+  pending.resolve({ approved, reason });
+  res.json({ ok: true, approvalId, approved });
+});
+
 app.post("/api/agent/run", async (req, res) => {
   const body = req.body as {
     prompt?: string;
     workspace?: string;
     mode?: ApprovalMode;
+    approvalMode?: RunApprovalMode;
     maxSteps?: number;
   };
   const prompt = String(body.prompt ?? "").trim();
@@ -132,6 +167,7 @@ app.post("/api/agent/run", async (req, res) => {
         allowFileWrite: body.mode !== "suggest",
         allowNetwork: false
       },
+      requestToolApproval: createToolApprovalHandler(body.approvalMode ?? "auto"),
       onEvent: async (event) => {
         send(event);
         await recordEvent?.(event);
@@ -162,4 +198,35 @@ function readWorkspace(value: unknown): string {
       ? value
       : process.env.DEEPCODEX_WORKSPACE || process.env.INIT_CWD || process.cwd();
   return input && input.trim() ? input : process.cwd();
+}
+
+type RunApprovalMode = "auto" | "manual" | "deny";
+
+function createToolApprovalHandler(mode: RunApprovalMode) {
+  if (mode === "auto") {
+    return undefined;
+  }
+
+  if (mode === "deny") {
+    return async (request: ToolApprovalRequest): Promise<ToolApprovalDecision> => ({
+      approved: false,
+      reason: `Denied by run approval mode for ${request.name}.`
+    });
+  }
+
+  return async (request: ToolApprovalRequest): Promise<ToolApprovalDecision> => waitForApproval(request);
+}
+
+function waitForApproval(request: ToolApprovalRequest): Promise<ToolApprovalDecision> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingApprovals.delete(request.approvalId);
+      resolve({
+        approved: false,
+        reason: "Approval timed out after 10 minutes."
+      });
+    }, 10 * 60 * 1000);
+
+    pendingApprovals.set(request.approvalId, { request, resolve, timeout });
+  });
 }

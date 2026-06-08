@@ -62,9 +62,10 @@ Recommended demo flow:
 1. Enter a workspace path such as `D:\Coding\DeepCodex`.
 2. Start in `suggest` mode for inspection-only prompts.
 3. Use `workspace-write` only on a disposable branch or sample workspace.
-4. Watch the event stream for tool starts, tool results, errors, and final answer.
-5. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-6. Use `Load sessions` to show persisted audit history for recent runs.
+4. Set `Tool approvals` to `Manual` when demonstrating write, shell, or memory safety gates.
+5. Watch the event stream for approvals, tool starts, tool results, errors, and final answer.
+6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+7. Use `Load sessions` to show persisted audit history for recent runs.
 
 ## Desktop Client
 
@@ -117,7 +118,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest "
 Run a bounded write-mode task on a disposable workspace:
 
 ```powershell
-node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --max-steps 12 "Make a small documentation improvement and summarize the change."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --max-steps 12 "Make a small documentation improvement and summarize the change."
 ```
 
 Approval modes:
@@ -128,6 +129,14 @@ Approval modes:
 | `workspace-write` | Enabled inside workspace guardrails. | Enabled, with dangerous command patterns requiring `full-access`. | Local development tasks on a trusted workspace. |
 | `full-access` | Enabled inside workspace guardrails. | Enabled with fewer command-pattern restrictions. | Controlled demos only; use disposable workspaces. |
 
+Tool approval modes:
+
+| Mode | Behavior | Intended use |
+| --- | --- | --- |
+| `auto` | Mutating tool calls run after policy checks. | Fast demos in disposable workspaces. |
+| `prompt` / Web `Manual` | Write, edit, shell, and memory mutation tools pause until approved or denied. | Safety-focused demos. |
+| `deny` | Mutating tool calls are rejected after the approval event is recorded. | Dry runs that prove mutation cannot proceed. |
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check |
@@ -136,4 +145,5 @@ Approval modes:
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
+| Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Workspace context creates `.deepcodex` for memory. | Use a disposable workspace for strict demos. |

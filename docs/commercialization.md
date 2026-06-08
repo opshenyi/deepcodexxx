@@ -20,13 +20,13 @@ Primary audiences:
 | --- | --- | --- | --- | --- |
 | Agent loop | DeepSeek-compatible chat completions loop with tool calls and bounded steps. | `packages/core` agent, DeepSeek client, and tool registry. | Demo-ready. | Add retry policy, cost controls, and persisted run records. |
 | Provider setup | Environment-driven DeepSeek API key, base URL, and model. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry, per-workspace model policy, and token budget enforcement. |
-| Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs; `suggest` mode previews without applying. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add per-tool approval queue and richer file type handling. |
-| Execution transparency | Server sends event-stream updates for session, step, tool start, tool result, final answer, and errors. Sessions are persisted locally for audit review. | Local HTTP API, Web event timeline, and session store. | Demo-ready. | Add session replay UI, exportable audit logs, and structured observability. |
+| Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs; `suggest` mode previews without applying. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add richer file type handling and stronger binary/large-file behavior. |
+| Execution transparency | Server sends event-stream updates for session, approval request, approval decision, tool start, tool result, final answer, and errors. Sessions are persisted locally for audit review. | Local HTTP API, Web event timeline, and session store. | Demo-ready. | Add session replay UI, exportable audit logs, and structured observability. |
 | Web client | Browser console for workspace path, execution mode, prompt, event stream, memory, and final output. | `apps/web`. | Demo-ready. | Add saved sessions, diff viewer, and configurable server URL. |
 | Desktop client | Electron shell that hosts the Web experience after server and Web are available. | `apps/desktop`, `npm run dev:desktop`. | Demo-ready for local development. | Add packaged installers, signing, auto-update policy, and OS-specific QA. |
 | CLI client | `doctor`, `ask`, and `memory` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, JSON output, and non-interactive CI mode. |
 | Workspace safety | Path resolution prevents file tools from escaping the workspace; `.git`, `node_modules`, and `references/agents` are denied. | `workspace.ts`, safety tests. | MVP-ready. | Add OS-level sandboxing for shell, approval queues, and security regression tests. |
-| Approval modes | `suggest`, `workspace-write`, and `full-access` control file and shell behavior. | CLI options and server request policy. | Demo-ready with documented limits. | Make approvals interactive instead of preselected for the full run. |
+| Approval modes | `suggest`, `workspace-write`, and `full-access` control file and shell behavior. Tool approval mode can be `auto`, `manual`, or `deny`; manual pauses write, shell, and memory tools. | CLI options, server request policy, Web approval queue. | Demo-ready with documented limits. | Add richer approval audit metadata and team policy profiles. |
 | Memory | Workspace memory persists under `.deepcodex/memory.md` and can be read from Web, CLI, and server API. | `memory` tool and `/api/memory`. | Demo-ready. | Add memory review, redaction, retention policy, and strict read-only mode behavior. |
 | Reference research | Reference agent survey documents studied projects and clean-room constraints. | `docs/reference-agents.md`. | Ready for interview review. | Add a formal license review before external distribution. |
 
@@ -35,7 +35,7 @@ Primary audiences:
 | Package | Purpose | Current state | Release requirement |
 | --- | --- | --- | --- |
 | Interview artifact | Demonstrate architecture, product surface, safety model, and roadmap. | Ready after checklist passes. | Keep docs current, run tests, and prepare a short demo path. |
-| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible after interactive approval work. | Add better approvals, session replay UI, and documented data handling. |
+| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible for controlled local trials. | Add approval audit metadata, session replay UI, shell isolation, and documented data handling. |
 | Hosted product | Multi-user service with managed workspaces and auth. | Future work. | Add tenancy, RBAC, audit logs, secrets management, and infrastructure isolation. |
 
 ## Demo Narrative

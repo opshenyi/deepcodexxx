@@ -11,6 +11,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
+- Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
 - Reference repositories documented for architecture study.
@@ -32,15 +33,15 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history and diff-producing tools; still needs interactive per-tool approvals. |
+| Local pilot | Close, but still controlled. | Has local audit history, diff-producing tools, and manual approvals; still needs stricter read-only behavior and sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
 ## Next Commercial Milestones
 
-- Add explicit human approval queues for each write or shell command.
 - Add session replay UI on top of persisted local session history.
 - Add strict read-only mode that avoids workspace memory writes.
+- Add richer approval audit metadata, including actor, decision latency, and file hashes.
 - Add configurable denied paths and file-size limits.
 - Add model pricing controls, token accounting, and budget limits.
 - Add packaged desktop installers and signed releases.

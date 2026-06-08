@@ -5,13 +5,14 @@ import { Command } from "commander";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
+  createSessionRecorder,
   createWorkspaceContext,
   listSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
   runDeepCodexAgent
 } from "@deepcodex/core";
-import type { AgentEvent } from "@deepcodex/core";
+import type { AgentEvent, ApprovalPolicy, SessionEventRecorder, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
 
 const program = new Command();
 
@@ -25,29 +26,39 @@ program
   .argument("<prompt...>", "Task for the coding agent")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
+  .option("--approval <mode>", "auto, prompt, or deny", "auto")
   .option("--max-steps <number>", "Maximum agent loop count", "12")
-  .action(async (promptParts: string[], options: { workspace: string; mode: string; maxSteps: string }) => {
-    await runDeepCodexAgent({
-      prompt: promptParts.join(" "),
-      workspace: options.workspace,
-      maxSteps: Number(options.maxSteps),
-      policy: {
-        mode: parseMode(options.mode),
-        allowFileWrite: options.mode !== "suggest",
-        allowShell: options.mode !== "suggest",
-        allowNetwork: false
-      },
-      onEvent: printEvent
-    });
-  });
+  .action(
+    async (promptParts: string[], options: { workspace: string; mode: string; approval: string; maxSteps: string }) => {
+      const approvalMode = parseCliApprovalMode(options.approval);
+      const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
+      try {
+        const policy = createPolicy(options.mode);
+        const workspace = await createWorkspaceContext(options.workspace, policy);
+        const recorder = createSessionRecorder(workspace);
+        await runDeepCodexAgent({
+          prompt: promptParts.join(" "),
+          workspace: workspace.root,
+          maxSteps: Number(options.maxSteps),
+          policy,
+          requestToolApproval: createCliApprovalHandler(approvalMode, rl),
+          onEvent: createCliEventHandler(recorder)
+        });
+      } finally {
+        rl?.close();
+      }
+    }
+  );
 
 program
   .command("chat")
   .description("Start an interactive DeepCodex session.")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
-  .action(async (options: { workspace: string; mode: string }) => {
+  .option("--approval <mode>", "auto, prompt, or deny", "auto")
+  .action(async (options: { workspace: string; mode: string; approval: string }) => {
     const rl = createInterface({ input, output });
+    const approvalMode = parseCliApprovalMode(options.approval);
     console.log(chalk.gray("DeepCodex interactive session. Submit an empty line to exit."));
     try {
       while (true) {
@@ -55,17 +66,16 @@ program
         if (!prompt) {
           break;
         }
+        const policy = createPolicy(options.mode);
+        const workspace = await createWorkspaceContext(options.workspace, policy);
+        const recorder = createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt,
-          workspace: options.workspace,
+          workspace: workspace.root,
           maxSteps: 12,
-          policy: {
-            mode: parseMode(options.mode),
-            allowFileWrite: options.mode !== "suggest",
-            allowShell: options.mode !== "suggest",
-            allowNetwork: false
-          },
-          onEvent: printEvent
+          policy,
+          requestToolApproval: createCliApprovalHandler(approvalMode, rl),
+          onEvent: createCliEventHandler(recorder)
         });
       }
     } finally {
@@ -154,6 +164,17 @@ function printEvent(event: AgentEvent): void {
     case "assistant_message":
       console.log(event.content);
       break;
+    case "tool_approval_requested":
+      console.log(chalk.yellow(`approval requested ${event.name} (${event.risk})`));
+      console.log(event.reason);
+      break;
+    case "tool_approval_resolved":
+      console.log(
+        event.approved
+          ? chalk.green(`approval granted ${event.name}`)
+          : chalk.red(`approval denied ${event.name}: ${event.reason ?? "No reason provided."}`)
+      );
+      break;
     case "tool_started":
       console.log(chalk.cyan(`tool ${event.name}`));
       break;
@@ -175,4 +196,74 @@ function parseMode(value: string): "suggest" | "workspace-write" | "full-access"
     return value;
   }
   throw new Error("mode must be suggest, workspace-write, or full-access");
+}
+
+function createPolicy(mode: string): ApprovalPolicy {
+  return {
+    mode: parseMode(mode),
+    allowFileWrite: mode !== "suggest",
+    allowShell: mode !== "suggest",
+    allowNetwork: false
+  };
+}
+
+type CliApprovalMode = "auto" | "prompt" | "deny";
+
+function parseCliApprovalMode(value: string): CliApprovalMode {
+  if (value === "auto" || value === "prompt" || value === "deny") {
+    return value;
+  }
+  throw new Error("approval must be auto, prompt, or deny");
+}
+
+function createCliApprovalHandler(
+  mode: CliApprovalMode,
+  rl?: ReturnType<typeof createInterface>
+): ((request: ToolApprovalRequest) => Promise<ToolApprovalDecision>) | undefined {
+  if (mode === "auto") {
+    return undefined;
+  }
+
+  if (mode === "deny") {
+    return async (request) => ({
+      approved: false,
+      reason: `Denied by CLI approval mode for ${request.name}.`
+    });
+  }
+
+  return async (request) => {
+    if (!rl) {
+      return { approved: false, reason: "No interactive prompt is available." };
+    }
+    console.log(chalk.yellow("\nTool approval required"));
+    console.log(`${request.name} (${request.risk})`);
+    console.log(request.reason);
+    console.log(formatApprovalInput(request.input));
+    const answer = (await rl.question("Approve this tool call? [y/N] ")).trim().toLowerCase();
+    const approved = answer === "y" || answer === "yes";
+    return {
+      approved,
+      reason: approved ? "Approved in CLI." : "Denied in CLI."
+    };
+  };
+}
+
+function formatApprovalInput(inputValue: unknown): string {
+  if (typeof inputValue === "string") {
+    return inputValue;
+  }
+  const serialized = JSON.stringify(inputValue, null, 2);
+  return serialized ?? String(inputValue);
+}
+
+function createCliEventHandler(recorder: SessionEventRecorder) {
+  return async (event: AgentEvent) => {
+    printEvent(event);
+    try {
+      await recorder.record(event);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.gray(`session audit skipped: ${message}`));
+    }
+  };
 }

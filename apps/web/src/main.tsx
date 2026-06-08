@@ -3,17 +3,33 @@ import { createRoot, type Root } from "react-dom/client";
 import "./styles.css";
 
 type ApprovalMode = "suggest" | "workspace-write" | "full-access";
+type ToolApprovalMode = "auto" | "manual" | "deny";
 
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
   | { type: "assistant_message"; content: string }
+  | {
+      type: "tool_approval_requested";
+      approvalId: string;
+      name: string;
+      input: unknown;
+      risk: "workspace-write" | "shell" | "memory";
+      reason: string;
+    }
+  | {
+      type: "tool_approval_resolved";
+      approvalId: string;
+      name: string;
+      approved: boolean;
+      reason?: string;
+    }
   | { type: "tool_started"; name: string; input: unknown }
   | { type: "tool_finished"; name: string; output: string; ok: boolean }
   | { type: "step"; index: number; maxSteps: number }
   | { type: "final"; content: string }
   | { type: "error"; message: string };
 
-type LogKind = "Session" | "Step" | "Assistant" | "Tool" | "Final" | "Error";
+type LogKind = "Session" | "Step" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
 type LogTone = "plain" | "muted" | "good" | "bad" | "accent";
 type MemoryState = "idle" | "loading" | "ready" | "error";
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -41,6 +57,15 @@ type SessionSummary = {
   errorMessage?: string;
 };
 
+type PendingApproval = {
+  approvalId: string;
+  name: string;
+  input: unknown;
+  risk: "workspace-write" | "shell" | "memory";
+  reason: string;
+  requestedAt: string;
+};
+
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -53,6 +78,12 @@ const modeOptions: Array<{ value: ApprovalMode; label: string; detail: string }>
   { value: "suggest", label: "Suggest", detail: "Read-only planning and recommendations" },
   { value: "workspace-write", label: "Workspace write", detail: "Edits and commands inside the workspace" },
   { value: "full-access", label: "Full access", detail: "Unrestricted local execution for trusted runs" }
+];
+
+const approvalOptions: Array<{ value: ToolApprovalMode; label: string; detail: string }> = [
+  { value: "auto", label: "Auto", detail: "Run requested tools after mode checks" },
+  { value: "manual", label: "Manual", detail: "Pause write, shell, and memory tools for review" },
+  { value: "deny", label: "Deny", detail: "Reject mutating tool calls for dry runs" }
 ];
 
 const taskPresets = [
@@ -84,6 +115,7 @@ function App() {
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [prompt, setPrompt] = useState("Inspect this repository and propose the safest next implementation step.");
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
+  const [approvalMode, setApprovalMode] = useState<ToolApprovalMode>("manual");
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -92,6 +124,7 @@ function App() {
   const [memoryState, setMemoryState] = useState<MemoryState>("idle");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionState, setSessionState] = useState<LoadState>("idle");
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
 
   const status = useMemo(() => {
     if (isRunning) {
@@ -125,13 +158,14 @@ function App() {
     setIsRunning(true);
     setFinalText("");
     setItems([]);
+    setPendingApprovals([]);
     localStorage.setItem("deepcodex.workspace", workspace);
 
     try {
       const response = await fetch(`${serverUrl}/api/agent/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, workspace, mode, maxSteps: 12 })
+        body: JSON.stringify({ prompt, workspace, mode, approvalMode, maxSteps: 12 })
       });
 
       if (!response.ok) {
@@ -224,6 +258,26 @@ function App() {
     }
   }
 
+  async function resolveApproval(approvalId: string, approved: boolean) {
+    try {
+      const response = await fetch(`${serverUrl}/api/approvals/${approvalId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approved,
+          reason: approved ? "Approved in Web console." : "Denied in Web console."
+        })
+      });
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      setPendingApprovals((current) => current.filter((approval) => approval.approvalId !== approvalId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      pushItem({ kind: "Error", tone: "bad", title: "Approval response failed", meta: approvalId, body: message });
+    }
+  }
+
   function applyEventChunk(chunk: string) {
     const dataLines = chunk.split("\n").filter((entry) => entry.startsWith("data: "));
     for (const line of dataLines) {
@@ -262,6 +316,36 @@ function App() {
           title: "Assistant message",
           meta: `${event.content.length} chars`,
           body: event.content
+        });
+        break;
+      case "tool_approval_requested":
+        setPendingApprovals((current) => [
+          ...current,
+          {
+            approvalId: event.approvalId,
+            name: event.name,
+            input: event.input,
+            risk: event.risk,
+            reason: event.reason,
+            requestedAt: formatTimestamp()
+          }
+        ]);
+        pushItem({
+          kind: "Approval",
+          tone: "accent",
+          title: event.name,
+          meta: event.risk,
+          body: `${event.reason}\n\n${formatBody(event.input)}`
+        });
+        break;
+      case "tool_approval_resolved":
+        setPendingApprovals((current) => current.filter((approval) => approval.approvalId !== event.approvalId));
+        pushItem({
+          kind: "Approval",
+          tone: event.approved ? "good" : "bad",
+          title: event.name,
+          meta: event.approved ? "Approved" : "Denied",
+          body: event.reason ?? "No reason provided."
         });
         break;
       case "tool_started":
@@ -339,6 +423,27 @@ function App() {
                 className={`modeOption ${mode === option.value ? "active" : ""}`}
                 onClick={() => setMode(option.value)}
                 aria-pressed={mode === option.value}
+              >
+                <span>{option.label}</span>
+                <small>{option.detail}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panelHeading">
+            <label>Tool approvals</label>
+            <span className="fieldStatus">{approvalMode}</span>
+          </div>
+          <div className="segmented" role="group" aria-label="Tool approval mode">
+            {approvalOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`modeOption ${approvalMode === option.value ? "active" : ""}`}
+                onClick={() => setApprovalMode(option.value)}
+                aria-pressed={approvalMode === option.value}
               >
                 <span>{option.label}</span>
                 <small>{option.detail}</small>
@@ -464,6 +569,46 @@ function App() {
       </section>
 
       <aside className="rightRail" aria-label="Memory and final output">
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
+              <span className="eyebrow">Approval queue</span>
+              <h2>Pending tools</h2>
+            </div>
+            <span className={`outputStatus ${pendingApprovals.length > 0 ? "loading" : "idle"}`}>
+              {pendingApprovals.length}
+            </span>
+          </div>
+          <div className="approvalList">
+            {pendingApprovals.length === 0 ? (
+              <p className="sessionEmpty">No pending approvals.</p>
+            ) : (
+              pendingApprovals.map((approval) => (
+                <article key={approval.approvalId} className={`approvalRow ${approval.risk}`}>
+                  <div className="sessionRowHead">
+                    <strong>{approval.name}</strong>
+                    <span>{approval.risk}</span>
+                  </div>
+                  <div className="sessionRowMeta">{approval.requestedAt}</div>
+                  <p className="approvalReason">{approval.reason}</p>
+                  <pre className="approvalInput">{formatBody(approval.input)}</pre>
+                  <div className="approvalActions">
+                    <button type="button" onClick={() => resolveApproval(approval.approvalId, true)}>
+                      Approve
+                    </button>
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() => resolveApproval(approval.approvalId, false)}
+                    >
+                      Deny
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
         <section className="railPanel finalPanel">
           <div className="sectionHeader compact">
             <div>

@@ -627,6 +627,12 @@ pre {
   padding: 14px;
 }
 
+.approvalList {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
 .sessionEmpty {
   color: var(--quiet);
   font-size: 13px;
@@ -652,6 +658,47 @@ pre {
 
 .sessionRow.running {
   border-left-color: var(--brand);
+}
+
+.approvalRow {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 11px;
+}
+
+.approvalRow.shell {
+  border-left-color: var(--bad);
+}
+
+.approvalRow.memory {
+  border-left-color: var(--accent);
+}
+
+.approvalReason {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.approvalInput {
+  max-height: 160px;
+  overflow: auto;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.approvalActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .sessionRowHead {

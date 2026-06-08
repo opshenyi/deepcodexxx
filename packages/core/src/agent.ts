@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { DeepSeekClient } from "./deepseek.js";
 import { readWorkspaceMemory } from "./memory.js";
 import { createDefaultTools } from "./tools.js";
-import type { AgentEvent, AgentRunOptions, AgentRunResult, ChatMessage, RuntimeTool } from "./types.js";
+import type { AgentEvent, AgentRunOptions, AgentRunResult, ChatMessage, RuntimeTool, ToolApprovalRisk } from "./types.js";
 import { createWorkspaceContext } from "./workspace.js";
 
 const SYSTEM_PROMPT = `You are DeepCodex, a commercial coding agent powered by DeepSeek.
@@ -20,7 +20,7 @@ Operating model:
 export async function runDeepCodexAgent(options: AgentRunOptions): Promise<AgentRunResult> {
   const sessionId = options.sessionId ?? randomUUID();
   const workspace = await createWorkspaceContext(options.workspace, options.policy);
-  const client = new DeepSeekClient({ model: options.model });
+  const client = options.chatClient ?? new DeepSeekClient({ model: options.model });
   const tools = createDefaultTools();
   const events: AgentEvent[] = [];
   const emit = async (event: AgentEvent) => {
@@ -77,6 +77,41 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
         input = { raw: rawInput };
       }
 
+      if (tool && options.requestToolApproval) {
+        const risk = toolApprovalRisk(call.function.name);
+        if (risk) {
+          const approvalId = randomUUID();
+          const reason = approvalReason(call.function.name, risk);
+          const approvalRequest = {
+            approvalId,
+            name: call.function.name,
+            input,
+            risk,
+            reason
+          };
+          await emit({ type: "tool_approval_requested", ...approvalRequest });
+          const decision = await options.requestToolApproval(approvalRequest);
+          await emit({
+            type: "tool_approval_resolved",
+            approvalId,
+            name: call.function.name,
+            approved: decision.approved,
+            reason: decision.reason
+          });
+
+          if (!decision.approved) {
+            const content = `Tool call denied by approval policy: ${decision.reason ?? "No reason provided."}`;
+            await emit({ type: "tool_finished", name: call.function.name, output: content, ok: false });
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content
+            });
+            continue;
+          }
+        }
+      }
+
       await emit({ type: "tool_started", name: call.function.name, input });
       const result = tool
         ? await tool.run(input, { workspace })
@@ -99,3 +134,27 @@ function findTool(tools: RuntimeTool[], name: string): RuntimeTool | undefined {
   return tools.find((tool) => tool.definition.function.name === name);
 }
 
+export function toolApprovalRisk(toolName: string): ToolApprovalRisk | undefined {
+  switch (toolName) {
+    case "write_file":
+    case "edit_file":
+      return "workspace-write";
+    case "run_command":
+      return "shell";
+    case "append_memory":
+      return "memory";
+    default:
+      return undefined;
+  }
+}
+
+function approvalReason(toolName: string, risk: ToolApprovalRisk): string {
+  switch (risk) {
+    case "workspace-write":
+      return `${toolName} can change files in the selected workspace.`;
+    case "shell":
+      return `${toolName} can execute a local shell command with user privileges.`;
+    case "memory":
+      return `${toolName} can append persistent workspace memory.`;
+  }
+}
