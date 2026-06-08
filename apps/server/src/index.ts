@@ -116,7 +116,7 @@ app.post("/api/approvals/:approvalId", (req, res) => {
       : approved
         ? "Approved from DeepCodex client."
         : "Denied from DeepCodex client.";
-  pending.resolve({ approved, reason });
+  pending.resolve({ approved, reason, actor: readApprovalActor(req.body?.actor) });
   res.json({ ok: true, approvalId, approved });
 });
 
@@ -241,7 +241,8 @@ function createToolApprovalHandler(mode: RunApprovalMode) {
   if (mode === "deny") {
     return async (request: ToolApprovalRequest): Promise<ToolApprovalDecision> => ({
       approved: false,
-      reason: `Denied by run approval mode for ${request.name}.`
+      reason: `Denied by run approval mode for ${request.name}.`,
+      actor: "server-deny-policy"
     });
   }
 
@@ -254,10 +255,19 @@ function waitForApproval(request: ToolApprovalRequest): Promise<ToolApprovalDeci
       pendingApprovals.delete(request.approvalId);
       resolve({
         approved: false,
-        reason: "Approval timed out after 10 minutes."
+        reason: "Approval timed out after 10 minutes.",
+        actor: "server-timeout"
       });
     }, 10 * 60 * 1000);
 
     pendingApprovals.set(request.approvalId, { request, resolve, timeout });
   });
+}
+
+function readApprovalActor(value: unknown): string {
+  if (typeof value !== "string") {
+    return "web-console";
+  }
+  const actor = value.trim();
+  return actor ? actor.slice(0, 80) : "web-console";
 }

@@ -82,21 +82,28 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
         if (risk) {
           const approvalId = randomUUID();
           const reason = approvalReason(call.function.name, risk);
+          const requestedAt = new Date().toISOString();
           const approvalRequest = {
             approvalId,
             name: call.function.name,
             input,
             risk,
-            reason
+            reason,
+            requestedAt
           };
           await emit({ type: "tool_approval_requested", ...approvalRequest });
           const decision = await options.requestToolApproval(approvalRequest);
+          const resolvedAt = new Date().toISOString();
           await emit({
             type: "tool_approval_resolved",
             approvalId,
             name: call.function.name,
             approved: decision.approved,
-            reason: decision.reason
+            reason: decision.reason,
+            requestedAt,
+            resolvedAt,
+            decisionLatencyMs: Math.max(0, Date.parse(resolvedAt) - Date.parse(requestedAt)),
+            actor: decision.actor ?? "approval-handler"
           });
 
           if (!decision.approved) {

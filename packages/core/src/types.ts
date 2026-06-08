@@ -47,6 +47,7 @@ export type AgentEvent =
       input: unknown;
       risk: ToolApprovalRisk;
       reason: string;
+      requestedAt: string;
     }
   | {
       type: "tool_approval_resolved";
@@ -54,6 +55,10 @@ export type AgentEvent =
       name: string;
       approved: boolean;
       reason?: string;
+      requestedAt: string;
+      resolvedAt: string;
+      decisionLatencyMs: number;
+      actor?: string;
     }
   | { type: "tool_started"; name: string; input: unknown }
   | { type: "tool_finished"; name: string; output: string; ok: boolean }
@@ -72,11 +77,13 @@ export interface ToolApprovalRequest {
   input: unknown;
   risk: ToolApprovalRisk;
   reason: string;
+  requestedAt: string;
 }
 
 export interface ToolApprovalDecision {
   approved: boolean;
   reason?: string;
+  actor?: string;
 }
 
 export type ToolApprovalHandler = (request: ToolApprovalRequest) => Promise<ToolApprovalDecision>;

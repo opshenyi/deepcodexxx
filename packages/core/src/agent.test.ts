@@ -38,15 +38,28 @@ describe("agent approval risk", () => {
       prompt: "write a file",
       workspace: tempDir,
       chatClient: scriptedWriteClient(),
-      requestToolApproval: async () => ({ approved: false, reason: "test denial" }),
+      requestToolApproval: async (request) => {
+        expect(request.requestedAt).toEqual(expect.any(String));
+        return { approved: false, reason: "test denial", actor: "test-suite" };
+      },
       onEvent: (event) => {
         events.push(event);
       }
     });
 
-    expect(events.some((event) => event.type === "tool_approval_requested")).toBe(true);
     expect(events).toContainEqual(
-      expect.objectContaining({ type: "tool_approval_resolved", approved: false, reason: "test denial" })
+      expect.objectContaining({ type: "tool_approval_requested", requestedAt: expect.any(String) })
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "tool_approval_resolved",
+        approved: false,
+        reason: "test denial",
+        actor: "test-suite",
+        requestedAt: expect.any(String),
+        resolvedAt: expect.any(String),
+        decisionLatencyMs: expect.any(Number)
+      })
     );
     expect(events).toContainEqual(
       expect.objectContaining({ type: "tool_finished", name: "write_file", ok: false })
@@ -62,14 +75,20 @@ describe("agent approval risk", () => {
       prompt: "write a file",
       workspace: tempDir,
       chatClient: scriptedWriteClient(),
-      requestToolApproval: async () => ({ approved: true, reason: "test approval" }),
+      requestToolApproval: async () => ({ approved: true, reason: "test approval", actor: "test-suite" }),
       onEvent: (event) => {
         events.push(event);
       }
     });
 
     expect(events).toContainEqual(
-      expect.objectContaining({ type: "tool_approval_resolved", approved: true, reason: "test approval" })
+      expect.objectContaining({
+        type: "tool_approval_resolved",
+        approved: true,
+        reason: "test approval",
+        actor: "test-suite",
+        decisionLatencyMs: expect.any(Number)
+      })
     );
     expect(events).toContainEqual(expect.objectContaining({ type: "tool_started", name: "write_file" }));
     await expect(readFile(path.join(tempDir, "approval.txt"), "utf8")).resolves.toBe("approved\n");

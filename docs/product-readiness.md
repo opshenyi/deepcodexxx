@@ -13,6 +13,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Web session replay for inspecting saved event timelines from recent runs.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
+- Approval audit events include request time, decision time, decision latency, and actor.
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
@@ -43,7 +44,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add richer approval audit metadata, including actor, decision latency, and file hashes.
+- Add approval file hashes and reusable policy profiles.
 - Add exportable audit logs and retention controls.
 - Add binary-aware file handling and safer generated-asset defaults.
 - Add model pricing controls, token accounting, and budget limits.

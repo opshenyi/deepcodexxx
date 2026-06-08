@@ -15,6 +15,7 @@ type AgentEvent =
       input: unknown;
       risk: "workspace-write" | "shell" | "memory";
       reason: string;
+      requestedAt: string;
     }
   | {
       type: "tool_approval_resolved";
@@ -22,6 +23,10 @@ type AgentEvent =
       name: string;
       approved: boolean;
       reason?: string;
+      requestedAt: string;
+      resolvedAt: string;
+      decisionLatencyMs: number;
+      actor?: string;
     }
   | { type: "tool_started"; name: string; input: unknown }
   | { type: "tool_finished"; name: string; output: string; ok: boolean }
@@ -327,7 +332,8 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           approved,
-          reason: approved ? "Approved in Web console." : "Denied in Web console."
+          reason: approved ? "Approved in Web console." : "Denied in Web console.",
+          actor: "web-console"
         })
       });
       if (!response.ok) {
@@ -363,7 +369,7 @@ function App() {
             input: event.input,
             risk: event.risk,
             reason: event.reason,
-            requestedAt: formatTimestamp()
+            requestedAt: formatStoredTime(event.requestedAt)
           }
         ]);
         break;
@@ -818,8 +824,8 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         kind: "Approval",
         tone: "accent",
         title: event.name,
-        meta: event.risk,
-        body: `${event.reason}\n\n${formatBody(event.input)}`
+        meta: `${event.risk} / requested ${formatStoredTime(event.requestedAt)}`,
+        body: `${event.reason}\n\nRequested: ${formatStoredDateTime(event.requestedAt)}\n\n${formatBody(event.input)}`
       };
     case "tool_approval_resolved":
       return {
@@ -828,8 +834,10 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         kind: "Approval",
         tone: event.approved ? "good" : "bad",
         title: event.name,
-        meta: event.approved ? "Approved" : "Denied",
-        body: event.reason ?? "No reason provided."
+        meta: `${event.approved ? "Approved" : "Denied"} / ${event.actor ?? "unknown"} / ${event.decisionLatencyMs}ms`,
+        body: `${event.reason ?? "No reason provided."}\n\nRequested: ${formatStoredDateTime(
+          event.requestedAt
+        )}\nResolved: ${formatStoredDateTime(event.resolvedAt)}`
       };
     case "tool_started":
       return {
@@ -878,12 +886,18 @@ function formatTimestamp() {
   return timeFormatter.format(new Date());
 }
 
-function formatStoredTime(value: string) {
+function formatStoredTime(value?: string) {
+  if (!value) {
+    return "unknown";
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : timeFormatter.format(date);
 }
 
-function formatStoredDateTime(value: string) {
+function formatStoredDateTime(value?: string) {
+  if (!value) {
+    return "unknown";
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
 }

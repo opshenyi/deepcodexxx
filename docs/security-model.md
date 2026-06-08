@@ -7,7 +7,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Boundary | Current behavior | Commercial requirement |
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
-| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval. | Add richer approval audit metadata and shell isolation. |
+| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata. | Add approval file hashes and shell isolation. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. | Add secrets management, provider allowlists, and token accounting. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
@@ -25,8 +25,8 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Mode | Current enforcement | Recommended demo use |
 | --- | --- | --- |
 | `auto` | Mutating tools execute after workspace policy checks. | Fast demos in disposable workspaces. |
-| `manual` | `write_file`, `edit_file`, `run_command`, and `append_memory` emit an approval request and wait for Web or CLI approval before execution. | Interview demos where the reviewer wants to see safety gates. |
-| `deny` | Mutating tool calls are denied after the approval event is recorded. | Dry runs that should prove no mutation can proceed. |
+| `manual` | `write_file`, `edit_file`, `run_command`, and `append_memory` emit an approval request and wait for Web or CLI approval before execution. Approval events include request time, decision time, decision latency, and actor. | Interview demos where the reviewer wants to see safety gates. |
+| `deny` | Mutating tool calls are denied after the approval event is recorded with a policy actor. | Dry runs that should prove no mutation can proceed. |
 
 ## File Access Controls
 
@@ -87,7 +87,7 @@ Current limitations:
 The next security work should prioritize:
 
 - Binary-aware file handling and safer generated-asset defaults.
-- Richer approval audit metadata with actor, decision latency, and file hashes.
+- Approval file hashes and policy profile metadata.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

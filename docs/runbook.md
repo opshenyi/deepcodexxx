@@ -139,6 +139,8 @@ Tool approval modes:
 | `prompt` / Web `Manual` | Write, edit, shell, and memory mutation tools pause until approved or denied. | Safety-focused demos. |
 | `deny` | Mutating tool calls are rejected after the approval event is recorded. | Dry runs that prove mutation cannot proceed. |
 
+Approval audit events record request time, decision time, decision latency, and actor in the live event stream and persisted session history.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check |

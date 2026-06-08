@@ -165,14 +165,18 @@ function printEvent(event: AgentEvent): void {
       console.log(event.content);
       break;
     case "tool_approval_requested":
-      console.log(chalk.yellow(`approval requested ${event.name} (${event.risk})`));
+      console.log(chalk.yellow(`approval requested ${event.name} (${event.risk}) at ${event.requestedAt}`));
       console.log(event.reason);
       break;
     case "tool_approval_resolved":
       console.log(
         event.approved
-          ? chalk.green(`approval granted ${event.name}`)
-          : chalk.red(`approval denied ${event.name}: ${event.reason ?? "No reason provided."}`)
+          ? chalk.green(`approval granted ${event.name} by ${event.actor ?? "unknown"} in ${event.decisionLatencyMs}ms`)
+          : chalk.red(
+              `approval denied ${event.name} by ${event.actor ?? "unknown"} in ${event.decisionLatencyMs}ms: ${
+                event.reason ?? "No reason provided."
+              }`
+            )
       );
       break;
     case "tool_started":
@@ -250,13 +254,14 @@ function createCliApprovalHandler(
   if (mode === "deny") {
     return async (request) => ({
       approved: false,
-      reason: `Denied by CLI approval mode for ${request.name}.`
+      reason: `Denied by CLI approval mode for ${request.name}.`,
+      actor: "cli-deny-policy"
     });
   }
 
   return async (request) => {
     if (!rl) {
-      return { approved: false, reason: "No interactive prompt is available." };
+      return { approved: false, reason: "No interactive prompt is available.", actor: "cli-unavailable" };
     }
     console.log(chalk.yellow("\nTool approval required"));
     console.log(`${request.name} (${request.risk})`);
@@ -266,7 +271,8 @@ function createCliApprovalHandler(
     const approved = answer === "y" || answer === "yes";
     return {
       approved,
-      reason: approved ? "Approved in CLI." : "Denied in CLI."
+      reason: approved ? "Approved in CLI." : "Denied in CLI.",
+      actor: "cli-prompt"
     };
   };
 }
