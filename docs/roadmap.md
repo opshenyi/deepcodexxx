@@ -15,7 +15,7 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 | Phase | Goal | Work items | Exit criteria |
 | --- | --- | --- | --- |
 | Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, tool loop, workspace guardrails, memory, Web, Desktop, CLI, docs. | Checklist passes and limitations are documented. |
-| Phase 1: safer local agent | Make local write-mode use easier to trust. | Strict read-only mode, configurable denied paths, session replay UI, richer approval audit metadata. | User can approve each write or shell command with a visible diff or command body, and replay the decision later. |
+| Phase 1: safer local agent | Make local write-mode use easier to trust. | Configurable denied paths, session replay UI, richer approval audit metadata, shell isolation. | User can approve each write or shell command with a visible diff or command body, and replay the decision later. |
 | Phase 2: product operations | Make demos repeatable and measurable. | Structured run history, exportable audit log, token accounting, budget limits, benchmark tasks, regression evals. | A release can compare behavior across model/config changes. |
 | Phase 3: desktop release | Move beyond development Electron launch. | Packaged installers, signing, update policy, crash reporting plan, OS-specific smoke tests. | A reviewer can install and run Desktop without starting dev servers manually. |
 | Phase 4: team pilot | Support controlled internal use. | Config profiles, shared policy templates, secrets redaction, team documentation, pilot feedback loop. | A small team can run DeepCodex on approved repositories with documented support boundaries. |
@@ -28,7 +28,6 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 | Approval audit metadata | Makes manual decisions reviewable after a run. | Core, server, Web. |
 | Diff viewer UI | Lets users inspect generated diffs with better affordances. | Web, CLI. |
 | Session replay UI | Makes persisted demos and audits replayable. | Server, storage, clients. |
-| Strict read-only mode | Avoids memory writes and `.deepcodex` creation during inspection demos. | Core, workspace. |
 | Configurable denied paths | Lets teams protect build artifacts, secrets, and generated folders. | Core, config. |
 | Token and cost accounting | Makes provider use predictable. | DeepSeek client, telemetry. |
 | CLI JSON output | Enables automation and CI-style checks. | CLI. |

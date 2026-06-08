@@ -146,4 +146,4 @@ Tool approval modes:
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
-| Unexpected memory file appears. | Workspace context creates `.deepcodex` for memory. | Use a disposable workspace for strict demos. |
+| Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |

@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -73,6 +74,24 @@ describe("agent approval risk", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "tool_started", name: "write_file" }));
     await expect(readFile(path.join(tempDir, "approval.txt"), "utf8")).resolves.toBe("approved\n");
   });
+
+  it("does not create workspace state during suggest-mode inspection", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+
+    await runDeepCodexAgent({
+      prompt: "inspect only",
+      workspace: tempDir,
+      policy: {
+        mode: "suggest",
+        allowFileWrite: false,
+        allowShell: false,
+        allowNetwork: false
+      },
+      chatClient: finalOnlyClient()
+    });
+
+    expect(existsSync(path.join(tempDir, ".deepcodex"))).toBe(false);
+  });
 });
 
 function scriptedWriteClient(): AgentChatClient {
@@ -114,6 +133,26 @@ function scriptedWriteClient(): AgentChatClient {
             message: {
               role: "assistant",
               content: "done"
+            }
+          }
+        ]
+      };
+    }
+  };
+}
+
+function finalOnlyClient(): AgentChatClient {
+  return {
+    model: "test-model",
+    async chat(): Promise<DeepSeekChatResponse> {
+      return {
+        id: "test-final-only",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "inspection complete"
             }
           }
         ]

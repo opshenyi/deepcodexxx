@@ -262,6 +262,9 @@ const appendMemoryTool: RuntimeTool = {
   },
   async run(input, runtime) {
     const args = objectInput(input);
+    if (runtime.workspace.policy.allowStateWrite === false) {
+      return fail("Workspace memory writes are disabled by the current approval policy.");
+    }
     await appendWorkspaceMemory(runtime.workspace, stringValue(args.note));
     return ok("Memory updated.");
   }

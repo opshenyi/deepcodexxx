@@ -27,7 +27,7 @@ Primary audiences:
 | CLI client | `doctor`, `ask`, and `memory` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, JSON output, and non-interactive CI mode. |
 | Workspace safety | Path resolution prevents file tools from escaping the workspace; `.git`, `node_modules`, and `references/agents` are denied. | `workspace.ts`, safety tests. | MVP-ready. | Add OS-level sandboxing for shell, approval queues, and security regression tests. |
 | Approval modes | `suggest`, `workspace-write`, and `full-access` control file and shell behavior. Tool approval mode can be `auto`, `manual`, or `deny`; manual pauses write, shell, and memory tools. | CLI options, server request policy, Web approval queue. | Demo-ready with documented limits. | Add richer approval audit metadata and team policy profiles. |
-| Memory | Workspace memory persists under `.deepcodex/memory.md` and can be read from Web, CLI, and server API. | `memory` tool and `/api/memory`. | Demo-ready. | Add memory review, redaction, retention policy, and strict read-only mode behavior. |
+| Memory | Workspace memory persists under `.deepcodex/memory.md` and can be read from Web, CLI, and server API. `suggest` agent runs do not create workspace memory or session state. | `memory` tool, `/api/memory`, strict read-only tests. | Demo-ready. | Add memory review, redaction, and retention policy. |
 | Reference research | Reference agent survey documents studied projects and clean-room constraints. | `docs/reference-agents.md`. | Ready for interview review. | Add a formal license review before external distribution. |
 
 ## Product Packages

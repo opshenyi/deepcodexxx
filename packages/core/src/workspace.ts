@@ -6,7 +6,8 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   mode: "workspace-write",
   allowFileWrite: true,
   allowShell: true,
-  allowNetwork: false
+  allowNetwork: false,
+  allowStateWrite: true
 };
 
 export async function createWorkspaceContext(
@@ -19,16 +20,26 @@ export async function createWorkspaceContext(
     throw new Error(`Workspace does not exist or is not a directory: ${root}`);
   }
 
+  const selectedMode = policy.mode ?? DEFAULT_POLICY.mode;
+  const effectivePolicy = {
+    ...DEFAULT_POLICY,
+    ...policy,
+    mode: selectedMode,
+    allowStateWrite:
+      selectedMode === "suggest" && policy.allowStateWrite === undefined
+        ? false
+        : (policy.allowStateWrite ?? DEFAULT_POLICY.allowStateWrite)
+  };
+
   const memoryDir = path.join(root, ".deepcodex");
-  await mkdir(memoryDir, { recursive: true });
+  if (effectivePolicy.allowStateWrite !== false) {
+    await mkdir(memoryDir, { recursive: true });
+  }
 
   return {
     root,
     memoryPath: path.join(memoryDir, "memory.md"),
-    policy: {
-      ...DEFAULT_POLICY,
-      ...policy
-    }
+    policy: effectivePolicy
   };
 }
 
@@ -57,4 +68,3 @@ export function isDeniedWorkspacePath(relativePath: string): boolean {
     normalized.startsWith("references/agents/")
   );
 }
-

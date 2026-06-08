@@ -7,7 +7,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Boundary | Current behavior | Commercial requirement |
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
-| DeepCodex to workspace files | File tools resolve paths under one workspace root, return unified diffs for write/edit operations, and can be paused by manual tool approval. | Add stricter read-only mode and richer approval audit metadata. |
+| DeepCodex to workspace files | File tools resolve paths under one workspace root, return unified diffs for write/edit operations, and can be paused by manual tool approval. | Add richer approval audit metadata and shell isolation. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. | Add secrets management, provider allowlists, and token accounting. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
@@ -16,7 +16,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 
 | Mode | Current enforcement | Recommended demo use |
 | --- | --- | --- |
-| `suggest` | Shell commands are disabled. File write/edit tools return previews and do not apply changes. Read/search tools remain available. Workspace memory may still be created as product state. | Repository inspection, planning, and first-pass interview demo. |
+| `suggest` | Shell commands are disabled. File write/edit tools return previews and do not apply changes. Read/search tools remain available. Agent runs do not create `.deepcodex` memory or session state. | Repository inspection, planning, and first-pass interview demo. |
 | `workspace-write` | Enables file writes/edits inside workspace path controls and enables shell commands. Dangerous command patterns are blocked unless `full-access` is selected. | Small tasks on a disposable branch or sample repository. |
 | `full-access` | Enables file writes/edits inside workspace path controls and allows shell commands with fewer command-pattern restrictions. | Only for controlled demonstrations where the workspace can be reset. |
 
@@ -84,7 +84,6 @@ Current limitations:
 
 The next security work should prioritize:
 
-- Strict read-only mode that does not create or append workspace memory.
 - Configurable denied paths and file-size limits.
 - Richer approval audit metadata with actor, decision latency, and file hashes.
 - Isolated shell execution with filesystem and network controls.

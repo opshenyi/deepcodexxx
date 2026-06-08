@@ -35,7 +35,7 @@ program
       try {
         const policy = createPolicy(options.mode);
         const workspace = await createWorkspaceContext(options.workspace, policy);
-        const recorder = createSessionRecorder(workspace);
+        const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt: promptParts.join(" "),
           workspace: workspace.root,
@@ -68,7 +68,7 @@ program
         }
         const policy = createPolicy(options.mode);
         const workspace = await createWorkspaceContext(options.workspace, policy);
-        const recorder = createSessionRecorder(workspace);
+        const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt,
           workspace: workspace.root,
@@ -203,7 +203,8 @@ function createPolicy(mode: string): ApprovalPolicy {
     mode: parseMode(mode),
     allowFileWrite: mode !== "suggest",
     allowShell: mode !== "suggest",
-    allowNetwork: false
+    allowNetwork: false,
+    allowStateWrite: mode !== "suggest"
   };
 }
 
@@ -256,9 +257,12 @@ function formatApprovalInput(inputValue: unknown): string {
   return serialized ?? String(inputValue);
 }
 
-function createCliEventHandler(recorder: SessionEventRecorder) {
+function createCliEventHandler(recorder?: SessionEventRecorder) {
   return async (event: AgentEvent) => {
     printEvent(event);
+    if (!recorder) {
+      return;
+    }
     try {
       await recorder.record(event);
     } catch (error) {

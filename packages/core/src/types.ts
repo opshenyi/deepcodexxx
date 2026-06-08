@@ -86,6 +86,7 @@ export interface ApprovalPolicy {
   allowShell?: boolean;
   allowNetwork?: boolean;
   allowFileWrite?: boolean;
+  allowStateWrite?: boolean;
 }
 
 export interface AgentRunOptions {

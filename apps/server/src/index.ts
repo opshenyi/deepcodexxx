@@ -146,27 +146,25 @@ app.post("/api/agent/run", async (req, res) => {
   let recordEvent: ((event: AgentEvent) => Promise<void>) | undefined;
 
   try {
-    const workspace = await createWorkspaceContext(readWorkspace(body.workspace));
-    const recorder = createSessionRecorder(workspace);
-    recordEvent = async (event: AgentEvent) => {
-      try {
-        await recorder.record(event);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`Failed to persist DeepCodex session event: ${message}`);
-      }
-    };
+    const policy = createRunPolicy(body.mode);
+    const workspace = await createWorkspaceContext(readWorkspace(body.workspace), policy);
+    if (policy.allowStateWrite !== false) {
+      const recorder = createSessionRecorder(workspace);
+      recordEvent = async (event: AgentEvent) => {
+        try {
+          await recorder.record(event);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Failed to persist DeepCodex session event: ${message}`);
+        }
+      };
+    }
 
     await runDeepCodexAgent({
       prompt,
       workspace: workspace.root,
       maxSteps: body.maxSteps,
-      policy: {
-        mode: body.mode ?? "workspace-write",
-        allowShell: body.mode !== "suggest",
-        allowFileWrite: body.mode !== "suggest",
-        allowNetwork: false
-      },
+      policy,
       requestToolApproval: createToolApprovalHandler(body.approvalMode ?? "auto"),
       onEvent: async (event) => {
         send(event);
@@ -201,6 +199,17 @@ function readWorkspace(value: unknown): string {
 }
 
 type RunApprovalMode = "auto" | "manual" | "deny";
+
+function createRunPolicy(mode: ApprovalMode | undefined) {
+  const selected = mode ?? "workspace-write";
+  return {
+    mode: selected,
+    allowShell: selected !== "suggest",
+    allowFileWrite: selected !== "suggest",
+    allowNetwork: false,
+    allowStateWrite: selected !== "suggest"
+  };
+}
 
 function createToolApprovalHandler(mode: RunApprovalMode) {
   if (mode === "auto") {
