@@ -92,17 +92,20 @@ const writeFileTool: RuntimeTool = {
   },
   async run(input, runtime) {
     const args = objectInput(input);
-    if (!canWriteFiles(runtime.workspace.policy)) {
-      return fail("File writes are disabled by the current approval policy.");
-    }
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
     if (isDeniedWorkspacePath(rel)) {
       return fail(`Denied path: ${rel}`);
     }
-    await writeFile(target, stringValue(args.content), "utf8");
-    const hash = createHash("sha256").update(stringValue(args.content)).digest("hex").slice(0, 12);
-    return ok(`Wrote ${rel} sha256:${hash}`);
+    const next = stringValue(args.content);
+    const previous = await readFile(target, "utf8").catch(() => "");
+    const diff = createUnifiedDiff(rel, previous, next);
+    if (!canWriteFiles(runtime.workspace.policy)) {
+      return ok(`Preview only. File writes are disabled by the current approval policy.\n\n${diff}`);
+    }
+    await writeFile(target, next, "utf8");
+    const hash = createHash("sha256").update(next).digest("hex").slice(0, 12);
+    return ok(`Wrote ${rel} sha256:${hash}\n\n${diff}`);
   }
 };
 
@@ -125,9 +128,6 @@ const editFileTool: RuntimeTool = {
   },
   async run(input, runtime) {
     const args = objectInput(input);
-    if (!canWriteFiles(runtime.workspace.policy)) {
-      return fail("File edits are disabled by the current approval policy.");
-    }
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
     if (isDeniedWorkspacePath(rel)) {
@@ -139,8 +139,12 @@ const editFileTool: RuntimeTool = {
       return fail(`Search text was not found in ${rel}`);
     }
     const next = current.replace(search, stringValue(args.replace));
+    const diff = createUnifiedDiff(rel, current, next);
+    if (!canWriteFiles(runtime.workspace.policy)) {
+      return ok(`Preview only. File edits are disabled by the current approval policy.\n\n${diff}`);
+    }
     await writeFile(target, next, "utf8");
-    return ok(`Edited ${rel}`);
+    return ok(`Edited ${rel}\n\n${diff}`);
   }
 };
 
@@ -330,3 +334,86 @@ function fail(content: string): ToolResult {
   return { ok: false, content };
 }
 
+function createUnifiedDiff(relativePath: string, before: string, after: string): string {
+  if (before === after) {
+    return `diff -- ${relativePath}\n(no changes)`;
+  }
+
+  const beforeLines = before.split(/\r?\n/);
+  const afterLines = after.split(/\r?\n/);
+  const rows = buildLineDiff(beforeLines, afterLines);
+  const body = rows
+    .slice(0, 240)
+    .map((row) => `${row.kind}${row.value}`)
+    .join("\n");
+  const truncated = rows.length > 240 ? "\n[diff truncated]" : "";
+  return `diff -- ${relativePath}\n--- a/${relativePath}\n+++ b/${relativePath}\n${body}${truncated}`;
+}
+
+function buildLineDiff(
+  before: string[],
+  after: string[]
+): Array<{ kind: " " | "+" | "-"; value: string }> {
+  const table: number[][] = Array.from({ length: before.length + 1 }, () => Array(after.length + 1).fill(0));
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      table[i]![j] =
+        before[i] === after[j] ? table[i + 1]![j + 1]! + 1 : Math.max(table[i + 1]![j]!, table[i]![j + 1]!);
+    }
+  }
+
+  const rows: Array<{ kind: " " | "+" | "-"; value: string }> = [];
+  let i = 0;
+  let j = 0;
+  while (i < before.length && j < after.length) {
+    if (before[i] === after[j]) {
+      rows.push({ kind: " ", value: before[i]! });
+      i += 1;
+      j += 1;
+    } else if (table[i + 1]![j]! >= table[i]![j + 1]!) {
+      rows.push({ kind: "-", value: before[i]! });
+      i += 1;
+    } else {
+      rows.push({ kind: "+", value: after[j]! });
+      j += 1;
+    }
+  }
+  while (i < before.length) {
+    rows.push({ kind: "-", value: before[i]! });
+    i += 1;
+  }
+  while (j < after.length) {
+    rows.push({ kind: "+", value: after[j]! });
+    j += 1;
+  }
+  return compactUnchangedRuns(rows);
+}
+
+function compactUnchangedRuns(rows: Array<{ kind: " " | "+" | "-"; value: string }>) {
+  const compacted: Array<{ kind: " " | "+" | "-"; value: string }> = [];
+  let unchangedRun: string[] = [];
+
+  const flush = () => {
+    if (unchangedRun.length <= 8) {
+      compacted.push(...unchangedRun.map((value) => ({ kind: " " as const, value })));
+    } else {
+      compacted.push(
+        ...unchangedRun.slice(0, 3).map((value) => ({ kind: " " as const, value })),
+        { kind: " " as const, value: `[${unchangedRun.length - 6} unchanged lines]` },
+        ...unchangedRun.slice(-3).map((value) => ({ kind: " " as const, value }))
+      );
+    }
+    unchangedRun = [];
+  };
+
+  for (const row of rows) {
+    if (row.kind === " ") {
+      unchangedRun.push(row.value);
+      continue;
+    }
+    flush();
+    compacted.push(row);
+  }
+  flush();
+  return compacted;
+}

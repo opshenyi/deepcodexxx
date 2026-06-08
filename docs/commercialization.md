@@ -20,8 +20,8 @@ Primary audiences:
 | --- | --- | --- | --- | --- |
 | Agent loop | DeepSeek-compatible chat completions loop with tool calls and bounded steps. | `packages/core` agent, DeepSeek client, and tool registry. | Demo-ready. | Add retry policy, cost controls, and persisted run records. |
 | Provider setup | Environment-driven DeepSeek API key, base URL, and model. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry, per-workspace model policy, and token budget enforcement. |
-| Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add structured patch previews, per-tool approval queue, and richer file type handling. |
-| Execution transparency | Server sends event-stream updates for session, step, tool start, tool result, final answer, and errors. | Local HTTP API and Web event timeline. | Demo-ready. | Add session replay, exportable audit logs, and structured observability. |
+| Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs; `suggest` mode previews without applying. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add per-tool approval queue and richer file type handling. |
+| Execution transparency | Server sends event-stream updates for session, step, tool start, tool result, final answer, and errors. Sessions are persisted locally for audit review. | Local HTTP API, Web event timeline, and session store. | Demo-ready. | Add session replay UI, exportable audit logs, and structured observability. |
 | Web client | Browser console for workspace path, execution mode, prompt, event stream, memory, and final output. | `apps/web`. | Demo-ready. | Add saved sessions, diff viewer, and configurable server URL. |
 | Desktop client | Electron shell that hosts the Web experience after server and Web are available. | `apps/desktop`, `npm run dev:desktop`. | Demo-ready for local development. | Add packaged installers, signing, auto-update policy, and OS-specific QA. |
 | CLI client | `doctor`, `ask`, and `memory` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, JSON output, and non-interactive CI mode. |
@@ -35,7 +35,7 @@ Primary audiences:
 | Package | Purpose | Current state | Release requirement |
 | --- | --- | --- | --- |
 | Interview artifact | Demonstrate architecture, product surface, safety model, and roadmap. | Ready after checklist passes. | Keep docs current, run tests, and prepare a short demo path. |
-| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible after approval and diff preview work. | Add run persistence, better approvals, and documented data handling. |
+| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible after interactive approval work. | Add better approvals, session replay UI, and documented data handling. |
 | Hosted product | Multi-user service with managed workspaces and auth. | Future work. | Add tenancy, RBAC, audit logs, secrets management, and infrastructure isolation. |
 
 ## Demo Narrative

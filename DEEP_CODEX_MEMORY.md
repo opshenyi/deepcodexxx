@@ -22,6 +22,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added docs for architecture, product readiness, and reference agent survey.
 - Added commercial documentation, release checklist, security model, roadmap, runbook, and design system notes.
 - Added session audit persistence under `.deepcodex/state/sessions`.
+- Added unified diff output for write/edit tools; in `suggest` mode those tools preview changes without writing.
 
 ## Architecture Decisions
 
@@ -38,6 +39,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 2. Fix any TypeScript or dependency issues from install/build.
 3. Run `npm run build` and `npm test`.
 4. Start `npm run dev`, inspect the Web client in the browser, and polish layout if needed.
-5. Add approval queue and diff preview for writes before calling this commercial-ready.
-6. Add persisted session history and release packaging.
-7. Initialize git, set remote to `https://github.com/opshenyi/deepcodexxx.git`, commit product code, and push when credentials allow.
+5. Add interactive approval queue for write and shell tools.
+6. Add session replay UI and release packaging.
+7. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.
