@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   InvalidSessionIdError,
   createSessionRecorder,
+  exportSessionHistory,
   listSessionHistories,
+  parseSessionExportFormat,
   readSessionHistory,
   sessionDirectory
 } from "./session-store.js";
@@ -56,6 +58,58 @@ describe("session store", () => {
       eventCount: 3,
       lastEventType: "final"
     });
+  });
+
+  it("exports session history as markdown and json", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+    const recorder = createSessionRecorder(workspace);
+
+    await recorder.record({
+      type: "session_started",
+      sessionId: "session-export",
+      workspace: workspace.root,
+      model: "deepseek-chat"
+    });
+    await recorder.record({
+      type: "tool_approval_requested",
+      approvalId: "approval-1",
+      name: "write_file",
+      input: { path: "README.md" },
+      risk: "workspace-write",
+      reason: "write_file can change files in the selected workspace.",
+      requestedAt: "2026-06-09T00:00:00.000Z"
+    });
+    await recorder.record({
+      type: "tool_approval_resolved",
+      approvalId: "approval-1",
+      name: "write_file",
+      approved: true,
+      reason: "Approved in test.",
+      requestedAt: "2026-06-09T00:00:00.000Z",
+      resolvedAt: "2026-06-09T00:00:01.250Z",
+      decisionLatencyMs: 1250,
+      actor: "test-suite"
+    });
+    await recorder.record({ type: "final", content: "done" });
+
+    const session = await readSessionHistory(workspace, "session-export");
+    const markdown = exportSessionHistory(session, "markdown");
+    expect(markdown).toContain("# DeepCodex Session Export");
+    expect(markdown).toContain("session-export");
+    expect(markdown).toContain("Approval approved for write_file by test-suite in 1250ms.");
+    expect(markdown).toContain("## Final Response");
+
+    const json = JSON.parse(exportSessionHistory(session, "json")) as { sessionId: string; eventCount: number };
+    expect(json.sessionId).toBe("session-export");
+    expect(json.eventCount).toBe(4);
+  });
+
+  it("parses session export formats", () => {
+    expect(parseSessionExportFormat(undefined)).toBe("markdown");
+    expect(parseSessionExportFormat("markdown")).toBe("markdown");
+    expect(parseSessionExportFormat("json")).toBe("json");
+    expect(() => parseSessionExportFormat("xml")).toThrow(/format must be markdown or json/);
   });
 
   it("rejects session ids that could escape the session directory", async () => {

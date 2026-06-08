@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { AgentEvent, WorkspaceContext } from "./types.js";
 
 export type SessionStatus = "running" | "completed" | "errored";
+export type SessionExportFormat = "json" | "markdown";
 
 export interface SessionEventRecord {
   sequence: number;
@@ -119,6 +120,23 @@ export async function readSessionHistory(workspace: WorkspaceContext, sessionId:
   return parseSessionHistory(raw, filePath);
 }
 
+export function exportSessionHistory(session: SessionHistory, format: SessionExportFormat = "markdown"): string {
+  if (format === "json") {
+    return `${JSON.stringify(session, null, 2)}\n`;
+  }
+  return renderSessionMarkdown(session);
+}
+
+export function parseSessionExportFormat(value: unknown): SessionExportFormat {
+  if (value === undefined || value === null || value === "" || value === "markdown") {
+    return "markdown";
+  }
+  if (value === "json") {
+    return "json";
+  }
+  throw new Error("format must be markdown or json");
+}
+
 export function sessionDirectory(workspace: WorkspaceContext): string {
   return path.join(workspace.root, ".deepcodex", "state", "sessions");
 }
@@ -225,4 +243,111 @@ function parseSessionHistory(raw: string, source: string): SessionHistory {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function renderSessionMarkdown(session: SessionHistory): string {
+  const lines = [
+    "# DeepCodex Session Export",
+    "",
+    `- Session: ${session.sessionId}`,
+    `- Status: ${session.status}`,
+    `- Workspace: ${session.workspace || "unknown"}`,
+    `- Model: ${session.model ?? "unknown"}`,
+    `- Created: ${session.createdAt || "unknown"}`,
+    `- Updated: ${session.updatedAt || "unknown"}`,
+    `- Events: ${session.eventCount}`,
+    ""
+  ];
+
+  if (session.finalContent) {
+    lines.push("## Final Response", "", codeFence(session.finalContent), "");
+  }
+  if (session.errorMessage) {
+    lines.push("## Error", "", codeFence(session.errorMessage), "");
+  }
+
+  lines.push("## Events", "");
+  for (const record of session.events) {
+    lines.push(`### ${record.sequence}. ${record.event.type}`, "", `- Timestamp: ${record.timestamp}`, `- ${eventSummary(record.event)}`);
+    const details = eventDetails(record.event);
+    if (details) {
+      lines.push("", codeFence(details));
+    }
+    lines.push("");
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function eventSummary(event: AgentEvent): string {
+  switch (event.type) {
+    case "session_started":
+      return `Session started with ${event.model}.`;
+    case "step":
+      return `Step ${event.index} of ${event.maxSteps}.`;
+    case "assistant_message":
+      return `Assistant message, ${event.content.length} chars.`;
+    case "tool_approval_requested":
+      return `Approval requested for ${event.name} (${event.risk}) at ${event.requestedAt}.`;
+    case "tool_approval_resolved":
+      return `Approval ${event.approved ? "approved" : "denied"} for ${event.name} by ${
+        event.actor ?? "unknown"
+      } in ${event.decisionLatencyMs}ms.`;
+    case "tool_started":
+      return `Tool started: ${event.name}.`;
+    case "tool_finished":
+      return `Tool ${event.ok ? "completed" : "failed"}: ${event.name}.`;
+    case "final":
+      return `Final response, ${event.content.length} chars.`;
+    case "error":
+      return `Error: ${event.message}`;
+  }
+}
+
+function eventDetails(event: AgentEvent): string {
+  switch (event.type) {
+    case "session_started":
+      return `workspace: ${event.workspace}\nmodel: ${event.model}`;
+    case "assistant_message":
+      return event.content;
+    case "tool_approval_requested":
+      return `reason: ${event.reason}\nrequestedAt: ${event.requestedAt}\ninput:\n${formatEventValue(event.input)}`;
+    case "tool_approval_resolved":
+      return `approved: ${event.approved}\nreason: ${event.reason ?? "No reason provided."}\nactor: ${
+        event.actor ?? "unknown"
+      }\nrequestedAt: ${event.requestedAt}\nresolvedAt: ${event.resolvedAt}\ndecisionLatencyMs: ${
+        event.decisionLatencyMs
+      }`;
+    case "tool_started":
+      return formatEventValue(event.input);
+    case "tool_finished":
+      return event.output;
+    case "final":
+      return event.content;
+    case "error":
+      return event.message;
+    case "step":
+      return "";
+  }
+}
+
+function formatEventValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value, null, 2) ?? String(value);
+}
+
+function codeFence(value: string): string {
+  const content = truncateExportValue(value);
+  const fence = content.includes("```") ? "````" : "```";
+  return `${fence}\n${content}\n${fence}`;
+}
+
+function truncateExportValue(value: string): string {
+  const limit = 8_000;
+  if (value.length <= limit) {
+    return value;
+  }
+  return `${value.slice(0, limit)}\n[truncated ${value.length - limit} chars]`;
 }

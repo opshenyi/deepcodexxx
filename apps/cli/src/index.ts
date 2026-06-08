@@ -7,7 +7,9 @@ import { stdin as input, stdout as output } from "node:process";
 import {
   createSessionRecorder,
   createWorkspaceContext,
+  exportSessionHistory,
   listSessionHistories,
+  parseSessionExportFormat,
   readSessionHistory,
   readWorkspaceMemory,
   runDeepCodexAgent
@@ -138,6 +140,17 @@ sessions
       console.log("\nerror");
       console.log(history.errorMessage);
     }
+  });
+
+sessions
+  .command("export")
+  .argument("<sessionId>", "Session id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--format <format>", "markdown or json", "markdown")
+  .action(async (sessionId: string, options: { workspace: string; format: string }) => {
+    const workspace = await createWorkspaceContext(options.workspace);
+    const history = await readSessionHistory(workspace, sessionId);
+    output.write(exportSessionHistory(history, parseSessionExportFormat(options.format)));
   });
 
 program

@@ -7,7 +7,9 @@ import {
   appendWorkspaceMemory,
   createSessionRecorder,
   createWorkspaceContext,
+  exportSessionHistory,
   listSessionHistories,
+  parseSessionExportFormat,
   readSessionHistory,
   readWorkspaceMemory,
   runDeepCodexAgent
@@ -79,6 +81,44 @@ app.get("/api/sessions/:sessionId", async (req, res, next) => {
     const workspacePath = readWorkspace(req.query.workspace);
     const workspace = await createWorkspaceContext(workspacePath);
     res.json({ session: await readSessionHistory(workspace, sessionId) });
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    if (error instanceof InvalidSessionIdError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    if (error instanceof Error && error.message === "format must be markdown or json") {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+app.get("/api/sessions/:sessionId/export", async (req, res, next) => {
+  try {
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    const format = parseSessionExportFormat(req.query.format);
+    const workspacePath = readWorkspace(req.query.workspace);
+    const workspace = await createWorkspaceContext(workspacePath);
+    const session = await readSessionHistory(workspace, sessionId);
+    const exported = exportSessionHistory(session, format);
+    if (format === "json") {
+      res.type("application/json").send(exported);
+      return;
+    }
+    res.type("text/markdown").send(exported);
   } catch (error) {
     if (error instanceof SessionNotFoundError) {
       res.status(404).json({ error: error.message });

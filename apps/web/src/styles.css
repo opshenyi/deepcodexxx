@@ -757,8 +757,14 @@ pre {
 
 .sessionReplayButton {
   width: 100%;
-  margin-top: 10px;
   padding: 8px 10px;
+}
+
+.sessionRowActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .approvalRow {

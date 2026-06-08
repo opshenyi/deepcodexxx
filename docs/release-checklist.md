@@ -44,7 +44,7 @@ Checklist:
 - Event stream shows session start, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - `Load memory` returns either existing memory or the empty-memory state.
-- `Load sessions` shows recent runs, and `Replay` opens a saved timeline without console errors.
+- `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - A missing API key produces the documented local demo response.
 
 Suggested safe prompt:

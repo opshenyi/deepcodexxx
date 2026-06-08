@@ -31,6 +31,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added configurable file-size limits for file read, write, edit, and search tools through `DEEPCODEX_MAX_FILE_BYTES`; default is 512 KiB.
 - Added Web session replay for saved `.deepcodex/state/sessions` audit timelines, with desktop and mobile browser smoke checks.
 - Added approval audit metadata across core/server/Web/CLI: request time, decision time, decision latency, and actor.
+- Added Markdown/JSON session export through core formatter, server endpoint, Web export button, and CLI `sessions export`.
 
 ## Architecture Decisions
 
@@ -47,6 +48,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 2. Fix any TypeScript or dependency issues from install/build.
 3. Run `npm run build` and `npm test`.
 4. Start `npm run dev`, inspect the Web client in the browser, and polish layout if needed.
-5. Add approval file hashes, audit export, and release packaging.
+5. Add approval file hashes, audit retention controls, and release packaging.
 6. Add binary-aware file handling and shell isolation.
 7. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

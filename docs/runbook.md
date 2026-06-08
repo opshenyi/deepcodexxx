@@ -67,7 +67,7 @@ Recommended demo flow:
 4. Set `Tool approvals` to `Manual` when demonstrating write, shell, or memory safety gates.
 5. Watch the event stream for approvals, tool starts, tool results, errors, and final answer.
 6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-7. Use `Load sessions`, then `Replay`, to show the persisted audit timeline for a previous run.
+7. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -109,6 +109,12 @@ Show one session:
 
 ```powershell
 node apps/cli/dist/index.js sessions show <session-id> --workspace D:\Coding\DeepCodex
+```
+
+Export one session as Markdown:
+
+```powershell
+node apps/cli/dist/index.js sessions export <session-id> --workspace D:\Coding\DeepCodex --format markdown
 ```
 
 Run an inspection task:

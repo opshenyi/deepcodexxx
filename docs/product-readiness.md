@@ -11,6 +11,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
+- Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
@@ -45,7 +46,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 ## Next Commercial Milestones
 
 - Add approval file hashes and reusable policy profiles.
-- Add exportable audit logs and retention controls.
+- Add audit retention controls and redaction policies.
 - Add binary-aware file handling and safer generated-asset defaults.
 - Add model pricing controls, token accounting, and budget limits.
 - Add packaged desktop installers and signed releases.

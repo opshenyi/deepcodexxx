@@ -21,10 +21,10 @@ Primary audiences:
 | Agent loop | DeepSeek-compatible chat completions loop with tool calls and bounded steps. | `packages/core` agent, DeepSeek client, and tool registry. | Demo-ready. | Add retry policy, cost controls, and persisted run records. |
 | Provider setup | Environment-driven DeepSeek API key, base URL, and model. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry, per-workspace model policy, and token budget enforcement. |
 | Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs; `suggest` mode previews without applying. File tools enforce a configurable size cap. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add richer binary and generated-asset handling. |
-| Execution transparency | Server sends event-stream updates for session, approval request, approval decision, tool start, tool result, final answer, and errors. Sessions are persisted locally and replayable in the Web client. | Local HTTP API, Web event timeline and replay view, and session store. | Demo-ready. | Add exportable audit logs, retention controls, and structured observability. |
-| Web client | Browser console for workspace path, execution mode, prompt, event stream, session replay, memory, and final output. | `apps/web`. | Demo-ready. | Add saved workspace profiles, diff viewer, and configurable server URL. |
+| Execution transparency | Server sends event-stream updates for session, approval request, approval decision, tool start, tool result, final answer, and errors. Sessions are persisted locally, replayable in the Web client, and exportable as Markdown or JSON. | Local HTTP API, Web event timeline and replay view, CLI export, and session store. | Demo-ready. | Add audit retention controls, redaction policy, and structured observability. |
+| Web client | Browser console for workspace path, execution mode, prompt, event stream, session replay, audit export, memory, and final output. | `apps/web`. | Demo-ready. | Add saved workspace profiles, diff viewer, and configurable server URL. |
 | Desktop client | Electron shell that hosts the Web experience after server and Web are available. | `apps/desktop`, `npm run dev:desktop`. | Demo-ready for local development. | Add packaged installers, signing, auto-update policy, and OS-specific QA. |
-| CLI client | `doctor`, `ask`, and `memory` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, JSON output, and non-interactive CI mode. |
+| CLI client | `doctor`, `ask`, `memory`, and `sessions list/show/export` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, and broader non-interactive CI mode. |
 | Workspace safety | Path resolution prevents file tools from escaping the workspace; denied path patterns protect `.git`, `node_modules`, `references/agents`, env files, and session audit state by default; file-size limits reduce runaway context and memory usage. | `workspace.ts`, safety tests. | MVP-ready. | Add OS-level sandboxing for shell and broader security regression tests. |
 | Approval modes | `suggest`, `workspace-write`, and `full-access` control file and shell behavior. Tool approval mode can be `auto`, `manual`, or `deny`; manual pauses write, shell, and memory tools, and approval events record actor, request time, decision time, and latency. | CLI options, server request policy, Web approval queue and replay view. | Demo-ready with documented limits. | Add approval file hashes and team policy profiles. |
 | Memory | Workspace memory persists under `.deepcodex/memory.md` and can be read from Web, CLI, and server API. `suggest` agent runs do not create workspace memory or session state. | `memory` tool, `/api/memory`, strict read-only tests. | Demo-ready. | Add memory review, redaction, and retention policy. |
@@ -44,7 +44,7 @@ Primary audiences:
 2. Run a repository inspection prompt in `suggest` mode to demonstrate read-only planning.
 3. Switch to `workspace-write` on a disposable branch or sample workspace for a small edit-and-test task.
 4. Show the event timeline so tool calls are visible rather than hidden behind a chat transcript.
-5. Load sessions and replay a previous run to show the saved audit trail.
+5. Load sessions, replay a previous run, and export it to show the saved audit trail.
 6. Load workspace memory and explain where it is stored.
 7. Run `node apps/cli/dist/index.js doctor` and one CLI `ask` command to show parity with the Web client.
 8. Close with the security model and roadmap, including gaps that are intentionally not claimed as complete.
@@ -57,6 +57,7 @@ An interview-ready build should satisfy these criteria:
 - `npm run typecheck`, `npm test`, and `npm run build` pass.
 - Web, Desktop, and CLI clients can each run a basic prompt.
 - The Web client can load and replay a persisted session history.
+- A persisted session can be exported as Markdown or JSON.
 - Missing DeepSeek key produces clear demo-mode behavior.
 - With a configured key, DeepSeek can perform a bounded workspace inspection.
 - The presenter can explain approval modes, path restrictions, memory persistence, and shell limitations.

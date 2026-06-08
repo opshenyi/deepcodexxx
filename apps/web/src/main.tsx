@@ -150,6 +150,7 @@ function App() {
   const [replayState, setReplayState] = useState<LoadState>("idle");
   const [replayError, setReplayError] = useState("");
   const [loadingReplaySessionId, setLoadingReplaySessionId] = useState("");
+  const [exportingSessionId, setExportingSessionId] = useState("");
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
 
   const status = useMemo(() => {
@@ -274,6 +275,7 @@ function App() {
     setReplayState("idle");
     setReplayError("");
     setLoadingReplaySessionId("");
+    setExportingSessionId("");
     try {
       const response = await fetch(`${serverUrl}/api/sessions?${params.toString()}`);
       if (!response.ok) {
@@ -322,6 +324,41 @@ function App() {
       setReplayState("error");
     } finally {
       setLoadingReplaySessionId("");
+    }
+  }
+
+  async function exportSession(sessionId: string) {
+    const params = new URLSearchParams({ format: "markdown" });
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    setExportingSessionId(sessionId);
+    try {
+      const response = await fetch(`${serverUrl}/api/sessions/${encodeURIComponent(sessionId)}/export?${params}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const content = await response.text();
+      const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `deepcodex-session-${sessionId}.md`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      pushItem({
+        kind: "Session",
+        tone: "good",
+        title: "Audit export ready",
+        meta: sessionId.slice(0, 8),
+        body: `Downloaded Markdown export for ${sessionId}.`
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      pushItem({ kind: "Error", tone: "bad", title: "Audit export failed", meta: sessionId.slice(0, 8), body: message });
+    } finally {
+      setExportingSessionId("");
     }
   }
 
@@ -749,14 +786,24 @@ function App() {
                     {session.eventCount} events / {session.lastEventType ?? "none"}
                   </div>
                   <div className="sessionRowText">{session.errorMessage ?? session.finalContent ?? session.workspace}</div>
-                  <button
-                    className="secondary sessionReplayButton"
-                    type="button"
-                    onClick={() => loadSessionReplay(session.sessionId)}
-                    disabled={loadingReplaySessionId === session.sessionId}
-                  >
-                    {loadingReplaySessionId === session.sessionId ? "Loading replay" : "Replay"}
-                  </button>
+                  <div className="sessionRowActions">
+                    <button
+                      className="secondary sessionReplayButton"
+                      type="button"
+                      onClick={() => loadSessionReplay(session.sessionId)}
+                      disabled={loadingReplaySessionId === session.sessionId}
+                    >
+                      {loadingReplaySessionId === session.sessionId ? "Loading replay" : "Replay"}
+                    </button>
+                    <button
+                      className="secondary sessionReplayButton"
+                      type="button"
+                      onClick={() => exportSession(session.sessionId)}
+                      disabled={exportingSessionId === session.sessionId}
+                    >
+                      {exportingSessionId === session.sessionId ? "Exporting" : "Export"}
+                    </button>
+                  </div>
                 </article>
               ))
             )}
