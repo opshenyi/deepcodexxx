@@ -57,6 +57,16 @@ type SessionSummary = {
   errorMessage?: string;
 };
 
+type SessionEventRecord = {
+  sequence: number;
+  timestamp: string;
+  event: AgentEvent;
+};
+
+type SessionHistory = SessionSummary & {
+  events: SessionEventRecord[];
+};
+
 type PendingApproval = {
   approvalId: string;
   name: string;
@@ -69,6 +79,13 @@ type PendingApproval = {
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit"
+});
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "2-digit",
+  day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit"
@@ -124,6 +141,10 @@ function App() {
   const [memoryState, setMemoryState] = useState<MemoryState>("idle");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionState, setSessionState] = useState<LoadState>("idle");
+  const [selectedSession, setSelectedSession] = useState<SessionHistory | null>(null);
+  const [replayState, setReplayState] = useState<LoadState>("idle");
+  const [replayError, setReplayError] = useState("");
+  const [loadingReplaySessionId, setLoadingReplaySessionId] = useState("");
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
 
   const status = useMemo(() => {
@@ -149,6 +170,17 @@ function App() {
   const canRun = prompt.trim().length > 0 && !isRunning;
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const memoryLabel = memoryStateLabels[memoryState];
+  const replayItems = useMemo(
+    () =>
+      selectedSession?.events.map((record) =>
+        createLogItemFromEvent(
+          record.event,
+          formatStoredTime(record.timestamp),
+          `${selectedSession.sessionId}-${record.sequence}`
+        )
+      ) ?? [],
+    [selectedSession]
+  );
 
   async function runAgent() {
     if (!prompt.trim()) {
@@ -233,6 +265,10 @@ function App() {
       params.set("workspace", workspace);
     }
     setSessionState("loading");
+    setSelectedSession(null);
+    setReplayState("idle");
+    setReplayError("");
+    setLoadingReplaySessionId("");
     try {
       const response = await fetch(`${serverUrl}/api/sessions?${params.toString()}`);
       if (!response.ok) {
@@ -255,6 +291,32 @@ function App() {
         }
       ]);
       setSessionState("error");
+    }
+  }
+
+  async function loadSessionReplay(sessionId: string) {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    setReplayState("loading");
+    setReplayError("");
+    setLoadingReplaySessionId(sessionId);
+    try {
+      const response = await fetch(`${serverUrl}/api/sessions/${encodeURIComponent(sessionId)}?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { session: SessionHistory };
+      setSelectedSession(body.session);
+      setReplayState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSelectedSession(null);
+      setReplayError(message);
+      setReplayState("error");
+    } finally {
+      setLoadingReplaySessionId("");
     }
   }
 
@@ -292,32 +354,6 @@ function App() {
 
   function applyEvent(event: AgentEvent) {
     switch (event.type) {
-      case "session_started":
-        pushItem({
-          kind: "Session",
-          tone: "muted",
-          title: "Session started",
-          meta: `${event.sessionId.slice(0, 8)} / ${event.model}`,
-          body: event.workspace
-        });
-        break;
-      case "step":
-        pushItem({
-          kind: "Step",
-          tone: "accent",
-          title: "Step in progress",
-          meta: `${event.index} of ${event.maxSteps}`
-        });
-        break;
-      case "assistant_message":
-        pushItem({
-          kind: "Assistant",
-          tone: "plain",
-          title: "Assistant message",
-          meta: `${event.content.length} chars`,
-          body: event.content
-        });
-        break;
       case "tool_approval_requested":
         setPendingApprovals((current) => [
           ...current,
@@ -330,60 +366,23 @@ function App() {
             requestedAt: formatTimestamp()
           }
         ]);
-        pushItem({
-          kind: "Approval",
-          tone: "accent",
-          title: event.name,
-          meta: event.risk,
-          body: `${event.reason}\n\n${formatBody(event.input)}`
-        });
         break;
       case "tool_approval_resolved":
         setPendingApprovals((current) => current.filter((approval) => approval.approvalId !== event.approvalId));
-        pushItem({
-          kind: "Approval",
-          tone: event.approved ? "good" : "bad",
-          title: event.name,
-          meta: event.approved ? "Approved" : "Denied",
-          body: event.reason ?? "No reason provided."
-        });
-        break;
-      case "tool_started":
-        pushItem({
-          kind: "Tool",
-          tone: "muted",
-          title: event.name,
-          meta: "Tool started",
-          body: formatBody(event.input)
-        });
-        break;
-      case "tool_finished":
-        pushItem({
-          kind: "Tool",
-          tone: event.ok ? "good" : "bad",
-          title: event.name,
-          meta: event.ok ? "Tool completed" : "Tool failed",
-          body: event.output
-        });
         break;
       case "final":
         setFinalText(event.content);
-        pushItem({
-          kind: "Final",
-          tone: "good",
-          title: "Final response",
-          meta: `${event.content.length} chars`,
-          body: event.content
-        });
-        break;
-      case "error":
-        pushItem({ kind: "Error", tone: "bad", title: "Error", meta: "Agent", body: event.message });
         break;
     }
+    pushLogItem(createLogItemFromEvent(event, formatTimestamp(), crypto.randomUUID()));
+  }
+
+  function pushLogItem(item: LogItem) {
+    setItems((current) => [...current, item]);
   }
 
   function pushItem(item: Omit<LogItem, "id" | "timestamp">) {
-    setItems((current) => [...current, { ...item, id: crypto.randomUUID(), timestamp: formatTimestamp() }]);
+    pushLogItem({ ...item, id: crypto.randomUUID(), timestamp: formatTimestamp() });
   }
 
   return (
@@ -549,6 +548,91 @@ function App() {
               )}
             </div>
           </section>
+
+          <section className="replaySurface" aria-labelledby="replay-title">
+            <div className="sectionHeader">
+              <div>
+                <span className="eyebrow">Audit replay</span>
+                <h2 id="replay-title">Session replay</h2>
+              </div>
+              <div className="streamMeta" aria-label="Replay summary">
+                <span>{selectedSession ? selectedSession.status : replayState === "idle" ? "No session" : replayState}</span>
+                <span>{selectedSession ? `${selectedSession.eventCount} events` : "0 events"}</span>
+                <span>{selectedSession?.model ?? "No model"}</span>
+              </div>
+            </div>
+
+            {replayState === "error" ? (
+              <div className="replayEmpty">
+                <span className="eyebrow">Replay error</span>
+                <p>{replayError || "The selected session could not be loaded."}</p>
+              </div>
+            ) : selectedSession ? (
+              <div className="replayLayout">
+                <aside className="replaySummary" aria-label="Selected session summary">
+                  <div>
+                    <span className="eyebrow">Session</span>
+                    <strong>{selectedSession.sessionId}</strong>
+                  </div>
+                  <div className="replayStats">
+                    <div>
+                      <span>Status</span>
+                      <strong>{selectedSession.status}</strong>
+                    </div>
+                    <div>
+                      <span>Events</span>
+                      <strong>{selectedSession.eventCount}</strong>
+                    </div>
+                    <div>
+                      <span>Created</span>
+                      <strong>{formatStoredDateTime(selectedSession.createdAt)}</strong>
+                    </div>
+                    <div>
+                      <span>Updated</span>
+                      <strong>{formatStoredDateTime(selectedSession.updatedAt)}</strong>
+                    </div>
+                  </div>
+                  <div className="replayWorkspace">
+                    <span className="eyebrow">Workspace</span>
+                    <p>{selectedSession.workspace}</p>
+                  </div>
+                  {selectedSession.errorMessage ? (
+                    <div className="replayNote bad">
+                      <span className="eyebrow">Error</span>
+                      <p>{selectedSession.errorMessage}</p>
+                    </div>
+                  ) : selectedSession.finalContent ? (
+                    <div className="replayNote">
+                      <span className="eyebrow">Final</span>
+                      <p>{selectedSession.finalContent}</p>
+                    </div>
+                  ) : null}
+                </aside>
+                <div className="replayTimeline" aria-label="Replay event timeline">
+                  {replayItems.map((item) => (
+                    <article key={item.id} className={`event ${item.tone}`}>
+                      <div className="eventHeader">
+                        <div className="eventIdentity">
+                          <span className="eventKind">{item.kind}</span>
+                          <div className="eventTitle">{item.title}</div>
+                        </div>
+                        <div className="eventAside">
+                          {item.meta ? <span>{item.meta}</span> : null}
+                          <time>{item.timestamp}</time>
+                        </div>
+                      </div>
+                      {item.body ? <pre className="eventBody">{item.body}</pre> : null}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="replayEmpty">
+                <span className="eyebrow">No replay selected</span>
+                <p>Load recent sessions, then choose Replay on a session to inspect the saved audit trail.</p>
+              </div>
+            )}
+          </section>
         </section>
 
         <footer className="composer">
@@ -645,7 +729,12 @@ function App() {
               <p className="sessionEmpty">No sessions loaded.</p>
             ) : (
               sessions.slice(0, 8).map((session) => (
-                <article key={session.sessionId} className={`sessionRow ${session.status}`}>
+                <article
+                  key={session.sessionId}
+                  className={`sessionRow ${session.status} ${
+                    selectedSession?.sessionId === session.sessionId ? "selected" : ""
+                  }`}
+                >
                   <div className="sessionRowHead">
                     <strong>{session.sessionId.slice(0, 8)}</strong>
                     <span>{session.status}</span>
@@ -654,6 +743,14 @@ function App() {
                     {session.eventCount} events / {session.lastEventType ?? "none"}
                   </div>
                   <div className="sessionRowText">{session.errorMessage ?? session.finalContent ?? session.workspace}</div>
+                  <button
+                    className="secondary sessionReplayButton"
+                    type="button"
+                    onClick={() => loadSessionReplay(session.sessionId)}
+                    disabled={loadingReplaySessionId === session.sessionId}
+                  >
+                    {loadingReplaySessionId === session.sessionId ? "Loading replay" : "Replay"}
+                  </button>
                 </article>
               ))
             )}
@@ -683,8 +780,112 @@ function formatBody(value: unknown) {
   return serialized ?? String(value);
 }
 
+function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string): LogItem {
+  switch (event.type) {
+    case "session_started":
+      return {
+        id,
+        timestamp,
+        kind: "Session",
+        tone: "muted",
+        title: "Session started",
+        meta: `${event.sessionId.slice(0, 8)} / ${event.model}`,
+        body: event.workspace
+      };
+    case "step":
+      return {
+        id,
+        timestamp,
+        kind: "Step",
+        tone: "accent",
+        title: "Step in progress",
+        meta: `${event.index} of ${event.maxSteps}`
+      };
+    case "assistant_message":
+      return {
+        id,
+        timestamp,
+        kind: "Assistant",
+        tone: "plain",
+        title: "Assistant message",
+        meta: `${event.content.length} chars`,
+        body: event.content
+      };
+    case "tool_approval_requested":
+      return {
+        id,
+        timestamp,
+        kind: "Approval",
+        tone: "accent",
+        title: event.name,
+        meta: event.risk,
+        body: `${event.reason}\n\n${formatBody(event.input)}`
+      };
+    case "tool_approval_resolved":
+      return {
+        id,
+        timestamp,
+        kind: "Approval",
+        tone: event.approved ? "good" : "bad",
+        title: event.name,
+        meta: event.approved ? "Approved" : "Denied",
+        body: event.reason ?? "No reason provided."
+      };
+    case "tool_started":
+      return {
+        id,
+        timestamp,
+        kind: "Tool",
+        tone: "muted",
+        title: event.name,
+        meta: "Tool started",
+        body: formatBody(event.input)
+      };
+    case "tool_finished":
+      return {
+        id,
+        timestamp,
+        kind: "Tool",
+        tone: event.ok ? "good" : "bad",
+        title: event.name,
+        meta: event.ok ? "Tool completed" : "Tool failed",
+        body: event.output
+      };
+    case "final":
+      return {
+        id,
+        timestamp,
+        kind: "Final",
+        tone: "good",
+        title: "Final response",
+        meta: `${event.content.length} chars`,
+        body: event.content
+      };
+    case "error":
+      return {
+        id,
+        timestamp,
+        kind: "Error",
+        tone: "bad",
+        title: "Error",
+        meta: "Agent",
+        body: event.message
+      };
+  }
+}
+
 function formatTimestamp() {
   return timeFormatter.format(new Date());
+}
+
+function formatStoredTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : timeFormatter.format(date);
+}
+
+function formatStoredDateTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
 }
 
 type RootElement = HTMLElement & { __deepcodexRoot?: Root };

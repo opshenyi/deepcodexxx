@@ -78,7 +78,7 @@ Current limitations:
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
-| Prompts and tool outputs | In memory during the local run, visible in client event streams, and persisted locally under `.deepcodex/state/sessions`. | Add session replay UI, retention controls, and redaction. |
+| Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, and persisted locally under `.deepcodex/state/sessions`. | Add retention controls, export controls, and redaction. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |
 

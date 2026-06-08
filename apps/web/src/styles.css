@@ -362,12 +362,16 @@ h2 {
 }
 
 .sessionBoard {
+  display: grid;
+  align-content: start;
+  gap: 18px;
   min-height: 0;
   overflow: auto;
   padding: 24px 28px;
 }
 
-.streamSurface {
+.streamSurface,
+.replaySurface {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -533,6 +537,91 @@ pre {
   padding: 12px;
 }
 
+.replayLayout {
+  display: grid;
+  grid-template-columns: minmax(190px, 270px) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-subtle);
+}
+
+.replaySummary {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: #ffffff;
+  padding: 16px;
+}
+
+.replaySummary strong {
+  display: block;
+  min-width: 0;
+  margin-top: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.replayStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.replayStats div {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.replayStats span {
+  display: block;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.replayWorkspace p,
+.replayNote p,
+.replayEmpty p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.replayNote {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.replayNote.bad p {
+  color: var(--bad);
+}
+
+.replayTimeline {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-height: 560px;
+  overflow: auto;
+  padding: 18px;
+  background: var(--surface-subtle);
+}
+
+.replayEmpty {
+  min-width: 0;
+  padding: 22px;
+  background: #ffffff;
+}
+
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(132px, 180px);
@@ -658,6 +747,18 @@ pre {
 
 .sessionRow.running {
   border-left-color: var(--brand);
+}
+
+.sessionRow.selected {
+  border-color: #f2c7b4;
+  border-left-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.sessionReplayButton {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
 }
 
 .approvalRow {
@@ -805,6 +906,15 @@ pre {
   .emptyState {
     grid-template-columns: 1fr;
     padding: 18px;
+  }
+
+  .replayLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .replaySummary {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .composer {
