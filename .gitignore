@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-types/
+*.tsbuildinfo
+apps/web/vite.config.d.ts
+apps/web/vite.config.js
+apps/web/vite.config.js.map
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.deepcodex/
+.deepcodex/state/
+.deepcodex/tmp/
+references/agents/

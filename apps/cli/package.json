@@ -1,0 +1,21 @@
+{
+  "name": "@deepcodex/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "deepcodex": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@deepcodex/core": "0.1.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

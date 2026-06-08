@@ -1,0 +1,47 @@
+# Product Readiness
+
+DeepCodex is currently an interview-ready local product slice. It is suitable for demonstrating architecture, DeepSeek integration, multi-client operation, and a documented safety model. It should not yet be described as a hosted enterprise product.
+
+## Ready Now
+
+- Clean TypeScript monorepo structure.
+- DeepSeek-compatible agent loop with function tools.
+- Workspace-scoped file read, write, edit, search, shell, and memory tools.
+- Web, Desktop, and CLI clients using the same core agent.
+- Local event stream for transparent tool execution.
+- Demo mode when `DEEPSEEK_API_KEY` is missing.
+- Basic workspace guardrails for path traversal and denied folders.
+- Reference repositories documented for architecture study.
+- Commercialization, runbook, security model, release checklist, and roadmap docs.
+
+## Interview-Ready Evidence
+
+| Evidence | Where to review | What it demonstrates |
+| --- | --- | --- |
+| Capability matrix | `docs/commercialization.md` | Implemented product surface and commercial gaps. |
+| Runtime instructions | `docs/runbook.md` | Web, Desktop, CLI, and DeepSeek setup. |
+| Security model | `docs/security-model.md` | Trust boundaries, approval modes, and known limits. |
+| Release checklist | `docs/release-checklist.md` | Repeatable demo and smoke-test path. |
+| Roadmap | `docs/roadmap.md` | Sequenced path from interview artifact to pilot and hosted product. |
+| Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
+
+## Readiness Levels
+
+| Level | Status | Notes |
+| --- | --- | --- |
+| Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
+| Local pilot | Not ready by default. | Needs per-tool approvals, diff preview, and stronger read-only behavior. |
+| Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
+| Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
+
+## Next Commercial Milestones
+
+- Add persisted session history and replay.
+- Add explicit human approval queues for each write or shell command.
+- Add Git diff preview before write operations.
+- Add strict read-only mode that avoids workspace memory writes.
+- Add configurable denied paths and file-size limits.
+- Add model pricing controls, token accounting, and budget limits.
+- Add packaged desktop installers and signed releases.
+- Add benchmark tasks and regression evals inspired by the reference repos.
+- Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.
