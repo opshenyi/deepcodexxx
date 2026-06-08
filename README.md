@@ -25,6 +25,7 @@ CLI client:
 npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
+node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
 ## Environment
@@ -44,6 +45,7 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - Web: `npm run dev`, then open `http://127.0.0.1:5173`.
 - Desktop: `npm run dev:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
+- Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.
 - Health check: `http://127.0.0.1:17361/api/health`.
 
 Use `suggest` mode for inspection demos, `workspace-write` for bounded edits in a disposable workspace, and `full-access` only for controlled local runs.

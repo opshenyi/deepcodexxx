@@ -16,6 +16,7 @@ type AgentEvent =
 type LogKind = "Session" | "Step" | "Assistant" | "Tool" | "Final" | "Error";
 type LogTone = "plain" | "muted" | "good" | "bad" | "accent";
 type MemoryState = "idle" | "loading" | "ready" | "error";
+type LoadState = "idle" | "loading" | "ready" | "error";
 
 type LogItem = {
   id: string;
@@ -25,6 +26,19 @@ type LogItem = {
   meta?: string;
   body?: string;
   timestamp: string;
+};
+
+type SessionSummary = {
+  sessionId: string;
+  workspace: string;
+  model?: string;
+  status: "running" | "completed" | "errored";
+  createdAt: string;
+  updatedAt: string;
+  eventCount: number;
+  lastEventType?: AgentEvent["type"];
+  finalContent?: string;
+  errorMessage?: string;
 };
 
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
@@ -76,6 +90,8 @@ function App() {
   const [memory, setMemory] = useState("");
   const [memoryPath, setMemoryPath] = useState("");
   const [memoryState, setMemoryState] = useState<MemoryState>("idle");
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessionState, setSessionState] = useState<LoadState>("idle");
 
   const status = useMemo(() => {
     if (isRunning) {
@@ -174,6 +190,37 @@ function App() {
       setMemory(message);
       setMemoryPath("");
       setMemoryState("error");
+    }
+  }
+
+  async function loadSessions() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    setSessionState("loading");
+    try {
+      const response = await fetch(`${serverUrl}/api/sessions?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { sessions: SessionSummary[] };
+      setSessions(body.sessions);
+      setSessionState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSessions([
+        {
+          sessionId: "load-error",
+          workspace: workspace || "default",
+          status: "errored",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          eventCount: 0,
+          errorMessage: message
+        }
+      ]);
+      setSessionState("error");
     }
   }
 
@@ -334,6 +381,9 @@ function App() {
             <button className="secondary" type="button" onClick={loadMemory} disabled={memoryState === "loading"}>
               {memoryState === "loading" ? "Loading memory" : "Load memory"}
             </button>
+            <button className="secondary" type="button" onClick={loadSessions} disabled={sessionState === "loading"}>
+              {sessionState === "loading" ? "Loading sessions" : "Load sessions"}
+            </button>
           </div>
         </header>
 
@@ -436,6 +486,33 @@ function App() {
           </div>
           <pre className={memory ? "railText" : "railText placeholderText"}>{memory || "No memory loaded."}</pre>
           {memoryPath ? <div className="railFoot">{memoryPath}</div> : null}
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
+              <span className="eyebrow">Audit trail</span>
+              <h2>Recent sessions</h2>
+            </div>
+            <span className={`outputStatus ${sessionState}`}>{sessionState === "idle" ? "Idle" : sessionState}</span>
+          </div>
+          <div className="sessionList">
+            {sessions.length === 0 ? (
+              <p className="sessionEmpty">No sessions loaded.</p>
+            ) : (
+              sessions.slice(0, 8).map((session) => (
+                <article key={session.sessionId} className={`sessionRow ${session.status}`}>
+                  <div className="sessionRowHead">
+                    <strong>{session.sessionId.slice(0, 8)}</strong>
+                    <span>{session.status}</span>
+                  </div>
+                  <div className="sessionRowMeta">
+                    {session.eventCount} events / {session.lastEventType ?? "none"}
+                  </div>
+                  <div className="sessionRowText">{session.errorMessage ?? session.finalContent ?? session.workspace}</div>
+                </article>
+              ))
+            )}
+          </div>
         </section>
       </aside>
     </main>

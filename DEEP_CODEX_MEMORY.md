@@ -23,6 +23,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added commercial documentation, release checklist, security model, roadmap, runbook, and design system notes.
 - Added session audit persistence under `.deepcodex/state/sessions`.
 - Added unified diff output for write/edit tools; in `suggest` mode those tools preview changes without writing.
+- Added Web and CLI session history views (`Load sessions`, `deepcodex sessions list/show`).
 
 ## Architecture Decisions
 

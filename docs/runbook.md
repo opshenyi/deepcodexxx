@@ -64,6 +64,7 @@ Recommended demo flow:
 3. Use `workspace-write` only on a disposable branch or sample workspace.
 4. Watch the event stream for tool starts, tool results, errors, and final answer.
 5. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+6. Use `Load sessions` to show persisted audit history for recent runs.
 
 ## Desktop Client
 
@@ -93,6 +94,18 @@ Read workspace memory:
 
 ```powershell
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
+```
+
+List persisted sessions:
+
+```powershell
+node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
+```
+
+Show one session:
+
+```powershell
+node apps/cli/dist/index.js sessions show <session-id> --workspace D:\Coding\DeepCodex
 ```
 
 Run an inspection task:

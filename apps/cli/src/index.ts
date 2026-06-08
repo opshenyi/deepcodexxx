@@ -4,7 +4,13 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { createWorkspaceContext, readWorkspaceMemory, runDeepCodexAgent } from "@deepcodex/core";
+import {
+  createWorkspaceContext,
+  listSessionHistories,
+  readSessionHistory,
+  readWorkspaceMemory,
+  runDeepCodexAgent
+} from "@deepcodex/core";
 import type { AgentEvent } from "@deepcodex/core";
 
 const program = new Command();
@@ -73,6 +79,55 @@ program
   .action(async (options: { workspace: string }) => {
     const workspace = await createWorkspaceContext(options.workspace);
     console.log(await readWorkspaceMemory(workspace));
+  });
+
+const sessions = program.command("sessions").description("Inspect persisted DeepCodex session history.");
+
+sessions
+  .command("list")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; json: boolean }) => {
+    const workspace = await createWorkspaceContext(options.workspace);
+    const histories = await listSessionHistories(workspace);
+    if (options.json) {
+      console.log(JSON.stringify(histories, null, 2));
+      return;
+    }
+    if (histories.length === 0) {
+      console.log("No sessions found.");
+      return;
+    }
+    for (const session of histories) {
+      console.log(
+        `${session.sessionId}  ${session.status}  ${session.eventCount} events  ${session.updatedAt}  ${session.lastEventType ?? "none"}`
+      );
+    }
+  });
+
+sessions
+  .command("show")
+  .argument("<sessionId>", "Session id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (sessionId: string, options: { workspace: string; json: boolean }) => {
+    const workspace = await createWorkspaceContext(options.workspace);
+    const history = await readSessionHistory(workspace, sessionId);
+    if (options.json) {
+      console.log(JSON.stringify(history, null, 2));
+      return;
+    }
+    console.log(`${history.sessionId}  ${history.status}  ${history.eventCount} events`);
+    console.log(`workspace ${history.workspace}`);
+    console.log(`updated ${history.updatedAt}`);
+    if (history.finalContent) {
+      console.log("\nfinal");
+      console.log(history.finalContent);
+    }
+    if (history.errorMessage) {
+      console.log("\nerror");
+      console.log(history.errorMessage);
+    }
   });
 
 program

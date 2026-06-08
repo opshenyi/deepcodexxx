@@ -621,6 +621,73 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.sessionList {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.sessionEmpty {
+  color: var(--quiet);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sessionRow {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--quiet);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 11px;
+}
+
+.sessionRow.completed {
+  border-left-color: var(--good);
+}
+
+.sessionRow.errored {
+  border-left-color: var(--bad);
+}
+
+.sessionRow.running {
+  border-left-color: var(--brand);
+}
+
+.sessionRowHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.sessionRowHead strong,
+.sessionRowHead span,
+.sessionRowMeta,
+.sessionRowText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sessionRowMeta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sessionRowText {
+  display: -webkit-box;
+  margin-top: 8px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
 @media (max-width: 1180px) {
   .shell {
     grid-template-areas:
