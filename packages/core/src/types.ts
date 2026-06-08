@@ -88,6 +88,7 @@ export interface ApprovalPolicy {
   allowFileWrite?: boolean;
   allowStateWrite?: boolean;
   deniedPaths?: string[];
+  maxFileBytes?: number;
 }
 
 export interface AgentRunOptions {

@@ -7,7 +7,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Boundary | Current behavior | Commercial requirement |
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
-| DeepCodex to workspace files | File tools resolve paths under one workspace root, return unified diffs for write/edit operations, and can be paused by manual tool approval. | Add richer approval audit metadata and shell isolation. |
+| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval. | Add richer approval audit metadata and shell isolation. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. | Add secrets management, provider allowlists, and token accounting. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
@@ -35,6 +35,7 @@ Implemented controls:
 - Workspace paths are resolved with `path.resolve` and rejected if they escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, `.env`, `.env.*`, and `.deepcodex/state` are denied by default for file listing, reading, writing, editing, and search.
 - `DEEPCODEX_DENIED_PATHS` can extend the default denied path patterns for controlled environments.
+- File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
 - Search and list operations are bounded to reduce runaway traversal.
 - Large tool outputs are truncated before being returned to the model.
@@ -44,7 +45,7 @@ Current limitations:
 - The shell tool is not constrained by the same path resolver after a command starts.
 - A shell command can invoke external programs with the user's local permissions.
 - The denial list is intentionally small and should become configurable for real pilots.
-- Binary and large-file handling is basic.
+- Binary detection and specialized asset handling are basic.
 
 ## Shell Controls
 
@@ -85,7 +86,7 @@ Current limitations:
 
 The next security work should prioritize:
 
-- File-size limits for reads and writes.
+- Binary-aware file handling and safer generated-asset defaults.
 - Richer approval audit metadata with actor, decision latency, and file hashes.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

@@ -78,4 +78,59 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(false);
     expect(result.content).toContain("Denied path");
   });
+
+  it("rejects reading files larger than the configured size limit", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "large.txt"), "abcdef", "utf8");
+    const workspace = await createWorkspaceContext(tempDir, { mode: "workspace-write", maxFileBytes: 5 });
+    const readTool = createDefaultTools().find((tool) => tool.definition.function.name === "read_file");
+    expect(readTool).toBeDefined();
+
+    const result = await readTool!.run({ path: "large.txt" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("File exceeds maxFileBytes (5)");
+  });
+
+  it("rejects writing content larger than the configured size limit", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, { mode: "workspace-write", maxFileBytes: 0 });
+    const writeTool = createDefaultTools().find((tool) => tool.definition.function.name === "write_file");
+    expect(writeTool).toBeDefined();
+
+    const result = await writeTool!.run({ path: "too-large.txt", content: "x" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Content exceeds maxFileBytes (0)");
+    await expect(readFile(path.join(tempDir, "too-large.txt"), "utf8")).rejects.toThrow();
+  });
+
+  it("rejects editing files larger than the configured size limit", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "large.txt"), "alpha", "utf8");
+    const workspace = await createWorkspaceContext(tempDir, { mode: "workspace-write", maxFileBytes: 4 });
+    const editTool = createDefaultTools().find((tool) => tool.definition.function.name === "edit_file");
+    expect(editTool).toBeDefined();
+
+    const result = await editTool!.run({ path: "large.txt", search: "alpha", replace: "beta" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("File exceeds maxFileBytes (4)");
+    await expect(readFile(path.join(tempDir, "large.txt"), "utf8")).resolves.toBe("alpha");
+  });
+
+  it("skips oversized files when searching", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "small.txt"), "needle\n", "utf8");
+    await writeFile(path.join(tempDir, "large.txt"), "needle in a file that is too large\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir, { mode: "workspace-write", maxFileBytes: 10 });
+    const searchTool = createDefaultTools().find((tool) => tool.definition.function.name === "search_files");
+    expect(searchTool).toBeDefined();
+
+    const result = await searchTool!.run({ query: "needle" }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("small.txt:1");
+    expect(result.content).not.toContain("large.txt");
+  });
 });

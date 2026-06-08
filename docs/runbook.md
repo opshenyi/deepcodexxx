@@ -28,6 +28,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_PORT` | Optional for server. | `17361` | Keep `17361` for the current Web client because it connects to `http://127.0.0.1:17361`. |
 | `DEEPCODEX_WORKSPACE` | Optional. | Current working directory. | Used by the server and CLI when a request does not pass a workspace path. |
 | `DEEPCODEX_DENIED_PATHS` | Optional. | Built-in defaults. | Comma-separated deny patterns such as `secrets,private/*.json`. Extends the default list. |
+| `DEEPCODEX_MAX_FILE_BYTES` | Optional. | `524288` | Maximum UTF-8 file size for read, write, edit, and search tools. Set `0` to block non-empty file content. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -149,3 +150,4 @@ Tool approval modes:
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
+| A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |

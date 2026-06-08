@@ -70,6 +70,10 @@ const readFileTool: RuntimeTool = {
     if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
       return fail(`Denied path: ${rel}`);
     }
+    const targetStat = await stat(target);
+    if (exceedsFileLimit(targetStat.size, runtime)) {
+      return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
+    }
     return ok(truncateForModel(await readFile(target, "utf8")));
   }
 };
@@ -98,6 +102,9 @@ const writeFileTool: RuntimeTool = {
       return fail(`Denied path: ${rel}`);
     }
     const next = stringValue(args.content);
+    if (exceedsFileLimit(Buffer.byteLength(next, "utf8"), runtime)) {
+      return fail(`Content exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
+    }
     const previous = await readFile(target, "utf8").catch(() => "");
     const diff = createUnifiedDiff(rel, previous, next);
     if (!canWriteFiles(runtime.workspace.policy)) {
@@ -132,6 +139,10 @@ const editFileTool: RuntimeTool = {
     const rel = workspaceRelative(runtime.workspace, target);
     if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
       return fail(`Denied path: ${rel}`);
+    }
+    const targetStat = await stat(target);
+    if (exceedsFileLimit(targetStat.size, runtime)) {
+      return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
     const current = await readFile(target, "utf8");
     const search = stringValue(args.search);
@@ -174,6 +185,10 @@ const searchFilesTool: RuntimeTool = {
     for (const file of files) {
       const rel = workspaceRelative(runtime.workspace, file);
       if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+        continue;
+      }
+      const fileStat = await stat(file).catch(() => null);
+      if (!fileStat || exceedsFileLimit(fileStat.size, runtime)) {
         continue;
       }
       const content = await readFile(file, "utf8").catch(() => "");
@@ -347,6 +362,11 @@ function ok(content: string): ToolResult {
 
 function fail(content: string): ToolResult {
   return { ok: false, content };
+}
+
+function exceedsFileLimit(size: number, runtime: ToolRuntime): boolean {
+  const limit = runtime.workspace.policy.maxFileBytes;
+  return typeof limit === "number" && Number.isFinite(limit) && limit >= 0 && size > limit;
 }
 
 function createUnifiedDiff(relativePath: string, before: string, after: string): string {

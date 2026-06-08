@@ -205,7 +205,8 @@ function createPolicy(mode: string): ApprovalPolicy {
     allowShell: mode !== "suggest",
     allowNetwork: false,
     allowStateWrite: mode !== "suggest",
-    deniedPaths: readDeniedPathsFromEnv()
+    deniedPaths: readDeniedPathsFromEnv(),
+    maxFileBytes: readMaxFileBytesFromEnv()
   };
 }
 
@@ -218,6 +219,15 @@ function readDeniedPathsFromEnv(): string[] | undefined {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function readMaxFileBytesFromEnv(): number | undefined {
+  const raw = process.env.DEEPCODEX_MAX_FILE_BYTES;
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 type CliApprovalMode = "auto" | "prompt" | "deny";

@@ -53,4 +53,21 @@ describe("workspace boundaries", () => {
     expect(isDeniedByPatterns(".env", workspace.policy.deniedPaths ?? [])).toBe(true);
     expect(isDeniedByPatterns("secrets/key.txt", workspace.policy.deniedPaths ?? [])).toBe(true);
   });
+
+  it("applies the default file size limit", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+
+    expect(workspace.policy.maxFileBytes).toBe(512 * 1024);
+  });
+
+  it("supports configurable file size limits", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      maxFileBytes: 2048
+    });
+
+    expect(workspace.policy.maxFileBytes).toBe(2048);
+  });
 });
