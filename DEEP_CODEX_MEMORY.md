@@ -27,6 +27,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added manual tool approvals across core/server/Web/CLI for `write_file`, `edit_file`, `run_command`, and `append_memory`.
 - CLI agent runs now persist the same `.deepcodex/state/sessions` audit history as Web/server runs.
 - Added strict read-only `suggest` behavior so agent inspection runs do not create `.deepcodex` memory or session state.
+- Added configurable denied path patterns and default protection for `.env*` and `.deepcodex/state`.
 
 ## Architecture Decisions
 
@@ -44,5 +45,5 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 3. Run `npm run build` and `npm test`.
 4. Start `npm run dev`, inspect the Web client in the browser, and polish layout if needed.
 5. Add session replay UI, approval audit metadata, and release packaging.
-6. Add configurable denied paths and shell isolation.
+6. Add file-size limits and shell isolation.
 7. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

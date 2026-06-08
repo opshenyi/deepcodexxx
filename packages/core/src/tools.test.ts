@@ -65,5 +65,17 @@ describe("workspace tools", () => {
     expect(result.content).toContain("+gamma");
     await expect(readFile(path.join(tempDir, "src", "app.txt"), "utf8")).resolves.toBe("alpha\ngamma\n");
   });
-});
 
+  it("denies secret files by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, ".env"), "DEEPSEEK_API_KEY=secret\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir);
+    const readTool = createDefaultTools().find((tool) => tool.definition.function.name === "read_file");
+    expect(readTool).toBeDefined();
+
+    const result = await readTool!.run({ path: ".env" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied path");
+  });
+});

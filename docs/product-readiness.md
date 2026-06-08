@@ -15,6 +15,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
+- Configurable denied path patterns, with default protection for env files and session audit state.
 - Reference repositories documented for architecture study.
 - Commercialization, runbook, security model, release checklist, and roadmap docs.
 
@@ -42,7 +43,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 - Add session replay UI on top of persisted local session history.
 - Add richer approval audit metadata, including actor, decision latency, and file hashes.
-- Add configurable denied paths and file-size limits.
+- Add file-size limits for reads and writes.
 - Add model pricing controls, token accounting, and budget limits.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.

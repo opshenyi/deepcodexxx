@@ -7,7 +7,8 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowFileWrite: true,
   allowShell: true,
   allowNetwork: false,
-  allowStateWrite: true
+  allowStateWrite: true,
+  deniedPaths: [".git", "node_modules", "references/agents", ".env", ".env.*", ".deepcodex/state"]
 };
 
 export async function createWorkspaceContext(
@@ -28,7 +29,8 @@ export async function createWorkspaceContext(
     allowStateWrite:
       selectedMode === "suggest" && policy.allowStateWrite === undefined
         ? false
-        : (policy.allowStateWrite ?? DEFAULT_POLICY.allowStateWrite)
+        : (policy.allowStateWrite ?? DEFAULT_POLICY.allowStateWrite),
+    deniedPaths: uniqueDeniedPaths([...(DEFAULT_POLICY.deniedPaths ?? []), ...(policy.deniedPaths ?? [])])
   };
 
   const memoryDir = path.join(root, ".deepcodex");
@@ -58,13 +60,30 @@ export function workspaceRelative(workspace: WorkspaceContext, absolutePath: str
 }
 
 export function isDeniedWorkspacePath(relativePath: string): boolean {
+  return isDeniedByPatterns(relativePath, DEFAULT_POLICY.deniedPaths ?? []);
+}
+
+export function isDeniedByPatterns(relativePath: string, deniedPaths: string[]): boolean {
   const normalized = relativePath.replaceAll("\\", "/");
-  return (
-    normalized === ".git" ||
-    normalized.startsWith(".git/") ||
-    normalized === "node_modules" ||
-    normalized.startsWith("node_modules/") ||
-    normalized === "references/agents" ||
-    normalized.startsWith("references/agents/")
-  );
+  return deniedPaths.some((pattern) => matchesDeniedPattern(normalized, pattern));
+}
+
+function matchesDeniedPattern(relativePath: string, pattern: string): boolean {
+  const normalizedPattern = pattern.trim().replaceAll("\\", "/").replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!normalizedPattern) {
+    return false;
+  }
+  if (normalizedPattern.includes("*")) {
+    const regex = new RegExp(`^${normalizedPattern.split("*").map(escapeRegex).join("[^/]*")}(?:/.*)?$`);
+    return regex.test(relativePath);
+  }
+  return relativePath === normalizedPattern || relativePath.startsWith(`${normalizedPattern}/`);
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+
+function uniqueDeniedPaths(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

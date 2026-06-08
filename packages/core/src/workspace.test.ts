@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createWorkspaceContext, isDeniedWorkspacePath, resolveWorkspacePath } from "./workspace.js";
+import { createWorkspaceContext, isDeniedByPatterns, isDeniedWorkspacePath, resolveWorkspacePath } from "./workspace.js";
 
 let tempDir: string | undefined;
 
@@ -30,7 +30,27 @@ describe("workspace boundaries", () => {
     expect(isDeniedWorkspacePath(".git/config")).toBe(true);
     expect(isDeniedWorkspacePath("node_modules/react/index.js")).toBe(true);
     expect(isDeniedWorkspacePath("references/agents/openai-codex/README.md")).toBe(true);
+    expect(isDeniedWorkspacePath(".env")).toBe(true);
+    expect(isDeniedWorkspacePath(".env.local")).toBe(true);
+    expect(isDeniedWorkspacePath(".deepcodex/state/sessions/run.json")).toBe(true);
     expect(isDeniedWorkspacePath("apps/web/src/main.tsx")).toBe(false);
   });
-});
 
+  it("supports configurable denied paths", () => {
+    expect(isDeniedByPatterns("secrets/key.txt", ["secrets"])).toBe(true);
+    expect(isDeniedByPatterns("logs/app.log", ["*.log"])).toBe(false);
+    expect(isDeniedByPatterns("app.log", ["*.log"])).toBe(true);
+    expect(isDeniedByPatterns("src/index.ts", ["secrets", "*.local"])).toBe(false);
+  });
+
+  it("extends defaults when custom denied paths are configured", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      deniedPaths: ["secrets"]
+    });
+
+    expect(isDeniedByPatterns(".env", workspace.policy.deniedPaths ?? [])).toBe(true);
+    expect(isDeniedByPatterns("secrets/key.txt", workspace.policy.deniedPaths ?? [])).toBe(true);
+  });
+});

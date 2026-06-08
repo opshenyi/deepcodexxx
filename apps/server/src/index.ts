@@ -207,8 +207,20 @@ function createRunPolicy(mode: ApprovalMode | undefined) {
     allowShell: selected !== "suggest",
     allowFileWrite: selected !== "suggest",
     allowNetwork: false,
-    allowStateWrite: selected !== "suggest"
+    allowStateWrite: selected !== "suggest",
+    deniedPaths: readDeniedPathsFromEnv()
   };
+}
+
+function readDeniedPathsFromEnv(): string[] | undefined {
+  const raw = process.env.DEEPCODEX_DENIED_PATHS;
+  if (!raw) {
+    return undefined;
+  }
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function createToolApprovalHandler(mode: RunApprovalMode) {

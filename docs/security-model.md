@@ -33,7 +33,8 @@ DeepCodex is a local development product. Its current safety model is designed f
 Implemented controls:
 
 - Workspace paths are resolved with `path.resolve` and rejected if they escape the workspace root.
-- `.git`, `node_modules`, and `references/agents` are denied for file listing, reading, writing, editing, and search.
+- `.git`, `node_modules`, `references/agents`, `.env`, `.env.*`, and `.deepcodex/state` are denied by default for file listing, reading, writing, editing, and search.
+- `DEEPCODEX_DENIED_PATHS` can extend the default denied path patterns for controlled environments.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
 - Search and list operations are bounded to reduce runaway traversal.
 - Large tool outputs are truncated before being returned to the model.
@@ -84,7 +85,7 @@ Current limitations:
 
 The next security work should prioritize:
 
-- Configurable denied paths and file-size limits.
+- File-size limits for reads and writes.
 - Richer approval audit metadata with actor, decision latency, and file hashes.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

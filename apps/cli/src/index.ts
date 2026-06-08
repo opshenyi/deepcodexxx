@@ -204,8 +204,20 @@ function createPolicy(mode: string): ApprovalPolicy {
     allowFileWrite: mode !== "suggest",
     allowShell: mode !== "suggest",
     allowNetwork: false,
-    allowStateWrite: mode !== "suggest"
+    allowStateWrite: mode !== "suggest",
+    deniedPaths: readDeniedPathsFromEnv()
   };
+}
+
+function readDeniedPathsFromEnv(): string[] | undefined {
+  const raw = process.env.DEEPCODEX_DENIED_PATHS;
+  if (!raw) {
+    return undefined;
+  }
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 type CliApprovalMode = "auto" | "prompt" | "deny";

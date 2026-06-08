@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
 import { assertShellCommandAllowed, canWriteFiles, truncateForModel } from "./safety.js";
 import type { RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
-import { isDeniedWorkspacePath, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
+import { isDeniedByPatterns, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
 const execAsync = promisify(exec);
 
@@ -43,7 +43,7 @@ const listFilesTool: RuntimeTool = {
     const start = resolveWorkspacePath(runtime.workspace, stringValue(args.path, "."));
     const maxDepth = Math.min(numberValue(args.maxDepth, 2), 4);
     const entries: string[] = [];
-    await walk(start, runtime.workspace.root, maxDepth, entries);
+    await walk(start, runtime.workspace.root, maxDepth, entries, runtime.workspace.policy.deniedPaths ?? []);
     return ok(entries.join("\n") || ".");
   }
 };
@@ -67,7 +67,7 @@ const readFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedWorkspacePath(rel)) {
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
       return fail(`Denied path: ${rel}`);
     }
     return ok(truncateForModel(await readFile(target, "utf8")));
@@ -94,7 +94,7 @@ const writeFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedWorkspacePath(rel)) {
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
       return fail(`Denied path: ${rel}`);
     }
     const next = stringValue(args.content);
@@ -130,7 +130,7 @@ const editFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedWorkspacePath(rel)) {
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
       return fail(`Denied path: ${rel}`);
     }
     const current = await readFile(target, "utf8");
@@ -169,11 +169,11 @@ const searchFilesTool: RuntimeTool = {
     const query = stringValue(args.query);
     const start = resolveWorkspacePath(runtime.workspace, stringValue(args.path, "."));
     const files: string[] = [];
-    await collectFiles(start, runtime.workspace.root, files, 350);
+    await collectFiles(start, runtime.workspace.root, files, 350, runtime.workspace.policy.deniedPaths ?? []);
     const matches: string[] = [];
     for (const file of files) {
       const rel = workspaceRelative(runtime.workspace, file);
-      if (isDeniedWorkspacePath(rel)) {
+      if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
         continue;
       }
       const content = await readFile(file, "utf8").catch(() => "");
@@ -270,9 +270,15 @@ const appendMemoryTool: RuntimeTool = {
   }
 };
 
-async function walk(current: string, root: string, depth: number, entries: string[]): Promise<void> {
+async function walk(
+  current: string,
+  root: string,
+  depth: number,
+  entries: string[],
+  deniedPaths: string[]
+): Promise<void> {
   const rel = path.relative(root, current) || ".";
-  if (isDeniedWorkspacePath(rel)) {
+  if (isDeniedByPatterns(rel, deniedPaths)) {
     return;
   }
   const currentStat = await stat(current);
@@ -282,16 +288,22 @@ async function walk(current: string, root: string, depth: number, entries: strin
   }
   const children = await readdir(current, { withFileTypes: true });
   for (const child of children.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 80)) {
-    await walk(path.join(current, child.name), root, depth - 1, entries);
+    await walk(path.join(current, child.name), root, depth - 1, entries, deniedPaths);
   }
 }
 
-async function collectFiles(current: string, root: string, files: string[], limit: number): Promise<void> {
+async function collectFiles(
+  current: string,
+  root: string,
+  files: string[],
+  limit: number,
+  deniedPaths: string[]
+): Promise<void> {
   if (files.length >= limit) {
     return;
   }
   const rel = path.relative(root, current) || ".";
-  if (isDeniedWorkspacePath(rel)) {
+  if (isDeniedByPatterns(rel, deniedPaths)) {
     return;
   }
   const currentStat = await stat(current);
@@ -307,7 +319,7 @@ async function collectFiles(current: string, root: string, files: string[], limi
     if (files.length >= limit) {
       break;
     }
-    await collectFiles(path.join(current, child.name), root, files, limit);
+    await collectFiles(path.join(current, child.name), root, files, limit, deniedPaths);
   }
 }
 

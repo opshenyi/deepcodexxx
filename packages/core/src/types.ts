@@ -87,6 +87,7 @@ export interface ApprovalPolicy {
   allowNetwork?: boolean;
   allowFileWrite?: boolean;
   allowStateWrite?: boolean;
+  deniedPaths?: string[];
 }
 
 export interface AgentRunOptions {
