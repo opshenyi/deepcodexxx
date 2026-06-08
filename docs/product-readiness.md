@@ -20,6 +20,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Basic workspace guardrails for path traversal and denied folders.
 - Configurable denied path patterns, with default protection for env files and session audit state.
 - Configurable file-size limits for read, write, edit, and search tools.
+- Binary-aware read, edit, and search handling for non-text files.
 - Reference repositories documented for architecture study.
 - Commercialization, runbook, security model, release checklist, and roadmap docs.
 
@@ -47,7 +48,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 - Add approval file hashes and reusable policy profiles.
 - Add audit retention controls and redaction policies.
-- Add binary-aware file handling and safer generated-asset defaults.
+- Add richer generated-asset handling and file-type policies.
 - Add model pricing controls, token accounting, and budget limits.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.

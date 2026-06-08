@@ -74,7 +74,11 @@ const readFileTool: RuntimeTool = {
     if (exceedsFileLimit(targetStat.size, runtime)) {
       return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
-    return ok(truncateForModel(await readFile(target, "utf8")));
+    const content = await readUtf8TextFile(target);
+    if (content === undefined) {
+      return fail(`File appears to be binary: ${rel}`);
+    }
+    return ok(truncateForModel(content));
   }
 };
 
@@ -144,7 +148,10 @@ const editFileTool: RuntimeTool = {
     if (exceedsFileLimit(targetStat.size, runtime)) {
       return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
-    const current = await readFile(target, "utf8");
+    const current = await readUtf8TextFile(target);
+    if (current === undefined) {
+      return fail(`File appears to be binary: ${rel}`);
+    }
     const search = stringValue(args.search);
     if (!current.includes(search)) {
       return fail(`Search text was not found in ${rel}`);
@@ -191,7 +198,10 @@ const searchFilesTool: RuntimeTool = {
       if (!fileStat || exceedsFileLimit(fileStat.size, runtime)) {
         continue;
       }
-      const content = await readFile(file, "utf8").catch(() => "");
+      const content = await readUtf8TextFile(file).catch(() => undefined);
+      if (content === undefined) {
+        continue;
+      }
       const lines = content.split(/\r?\n/);
       lines.forEach((line, index) => {
         if (line.includes(query)) {
@@ -367,6 +377,31 @@ function fail(content: string): ToolResult {
 function exceedsFileLimit(size: number, runtime: ToolRuntime): boolean {
   const limit = runtime.workspace.policy.maxFileBytes;
   return typeof limit === "number" && Number.isFinite(limit) && limit >= 0 && size > limit;
+}
+
+async function readUtf8TextFile(target: string): Promise<string | undefined> {
+  const buffer = await readFile(target);
+  if (isProbablyBinary(buffer)) {
+    return undefined;
+  }
+  return buffer.toString("utf8");
+}
+
+function isProbablyBinary(buffer: Buffer): boolean {
+  const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+  if (sample.length === 0) {
+    return false;
+  }
+  if (sample.includes(0)) {
+    return true;
+  }
+  let suspicious = 0;
+  for (const byte of sample) {
+    if (byte < 7 || (byte > 14 && byte < 32)) {
+      suspicious += 1;
+    }
+  }
+  return suspicious / sample.length > 0.08;
 }
 
 function createUnifiedDiff(relativePath: string, before: string, after: string): string {

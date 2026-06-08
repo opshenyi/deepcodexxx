@@ -36,6 +36,7 @@ Implemented controls:
 - `.git`, `node_modules`, `references/agents`, `.env`, `.env.*`, and `.deepcodex/state` are denied by default for file listing, reading, writing, editing, and search.
 - `DEEPCODEX_DENIED_PATHS` can extend the default denied path patterns for controlled environments.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
+- File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
 - Search and list operations are bounded to reduce runaway traversal.
 - Large tool outputs are truncated before being returned to the model.
@@ -45,7 +46,7 @@ Current limitations:
 - The shell tool is not constrained by the same path resolver after a command starts.
 - A shell command can invoke external programs with the user's local permissions.
 - The denial list is intentionally small and should become configurable for real pilots.
-- Binary detection and specialized asset handling are basic.
+- Specialized generated-asset handling is basic.
 
 ## Shell Controls
 
@@ -86,7 +87,7 @@ Current limitations:
 
 The next security work should prioritize:
 
-- Binary-aware file handling and safer generated-asset defaults.
+- Richer generated-asset handling and file-type policies.
 - Approval file hashes and policy profile metadata.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

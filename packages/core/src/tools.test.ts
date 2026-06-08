@@ -119,6 +119,34 @@ describe("workspace tools", () => {
     await expect(readFile(path.join(tempDir, "large.txt"), "utf8")).resolves.toBe("alpha");
   });
 
+  it("rejects reading binary files", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "asset.bin"), Buffer.from([0, 1, 2, 3, 4, 5]));
+    const workspace = await createWorkspaceContext(tempDir);
+    const readTool = createDefaultTools().find((tool) => tool.definition.function.name === "read_file");
+    expect(readTool).toBeDefined();
+
+    const result = await readTool!.run({ path: "asset.bin" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("File appears to be binary");
+  });
+
+  it("rejects editing binary files", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const binary = Buffer.from([0, 65, 66, 67]);
+    await writeFile(path.join(tempDir, "asset.bin"), binary);
+    const workspace = await createWorkspaceContext(tempDir);
+    const editTool = createDefaultTools().find((tool) => tool.definition.function.name === "edit_file");
+    expect(editTool).toBeDefined();
+
+    const result = await editTool!.run({ path: "asset.bin", search: "ABC", replace: "XYZ" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("File appears to be binary");
+    await expect(readFile(path.join(tempDir, "asset.bin"))).resolves.toEqual(binary);
+  });
+
   it("skips oversized files when searching", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     await writeFile(path.join(tempDir, "small.txt"), "needle\n", "utf8");
@@ -132,5 +160,20 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain("small.txt:1");
     expect(result.content).not.toContain("large.txt");
+  });
+
+  it("skips binary files when searching", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "small.txt"), "needle\n", "utf8");
+    await writeFile(path.join(tempDir, "asset.bin"), Buffer.from([0, 110, 101, 101, 100, 108, 101]));
+    const workspace = await createWorkspaceContext(tempDir);
+    const searchTool = createDefaultTools().find((tool) => tool.definition.function.name === "search_files");
+    expect(searchTool).toBeDefined();
+
+    const result = await searchTool!.run({ query: "needle" }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("small.txt:1");
+    expect(result.content).not.toContain("asset.bin");
   });
 });
