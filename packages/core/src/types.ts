@@ -88,6 +88,17 @@ export interface FileAuditEntry {
 
 export interface ToolAuditMetadata {
   files?: FileAuditEntry[];
+  shell?: ShellAuditEntry;
+}
+
+export interface ShellAuditEntry {
+  executionMode: ShellExecutionMode;
+  copiedFiles?: number;
+  copiedBytes?: number;
+  skippedEntries?: number;
+  maxFiles?: number;
+  maxBytes?: number;
+  workspaceCopyRemoved?: boolean;
 }
 
 export type AgentEvent =
@@ -129,6 +140,7 @@ export type AgentEventHandler = (event: AgentEvent) => void | Promise<void>;
 export type ApprovalMode = "suggest" | "workspace-write" | "full-access";
 export type ToolApprovalRisk = "workspace-write" | "shell" | "memory";
 export type ShellEnvironmentMode = "minimal" | "inherit";
+export type ShellExecutionMode = "direct" | "workspace-copy";
 export type ProfileApprovalMode = "auto" | "manual" | "deny";
 
 export interface ToolApprovalRequest {
@@ -163,6 +175,7 @@ export interface ApprovalPolicy {
   dlpPatterns?: string[];
   maxFileBytes?: number;
   shellEnvironment?: ShellEnvironmentMode;
+  shellExecutionMode?: ShellExecutionMode;
 }
 
 export interface PolicyProfile {

@@ -452,7 +452,7 @@ function eventDetails(event: AgentEvent): string {
     case "tool_started":
       return formatEventValue(event.input);
     case "tool_finished":
-      return event.audit?.files ? `${event.output}\n\nFile audit\n${formatEventValue(event.audit.files)}` : event.output;
+      return withToolAudit(event.output, event.audit);
     case "final":
       return event.content;
     case "error":
@@ -479,6 +479,16 @@ function formatEventValue(value: unknown): string {
 
 function withFileAudit(value: string, fileAudits: unknown): string {
   return fileAudits ? `${value}\n\nfileAudits:\n${formatEventValue(fileAudits)}` : value;
+}
+
+function withToolAudit(value: string, audit: Extract<AgentEvent, { type: "tool_finished" }>["audit"]): string {
+  return [
+    value,
+    audit?.files ? `File audit\n${formatEventValue(audit.files)}` : "",
+    audit?.shell ? `Shell audit\n${formatEventValue(audit.shell)}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function codeFence(value: string): string {

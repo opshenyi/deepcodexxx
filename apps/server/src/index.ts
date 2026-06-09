@@ -30,6 +30,7 @@ import type {
   ApprovalMode,
   ApprovalPolicy,
   ShellEnvironmentMode,
+  ShellExecutionMode,
   ToolApprovalDecision,
   ToolApprovalRequest,
   PolicyBundleVerificationOptions,
@@ -241,6 +242,7 @@ app.post("/api/agent/run", async (req, res) => {
     model?: string;
     allowNetwork?: boolean;
     allowArchiveListing?: boolean;
+    shellExecutionMode?: unknown;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -268,6 +270,7 @@ app.post("/api/agent/run", async (req, res) => {
       body.mode,
       body.allowNetwork,
       body.allowArchiveListing,
+      readShellExecutionModeFromRequest(body.shellExecutionMode),
       profile,
       workspaceConfig.config
     );
@@ -369,6 +372,7 @@ function createRunPolicy(
   mode: ApprovalMode | undefined,
   allowNetwork: boolean | undefined,
   allowArchiveListing: boolean | undefined,
+  shellExecutionMode: ShellExecutionMode | undefined,
   profile: ReturnType<typeof readPolicyProfile>,
   config?: WorkspaceConfig
 ) {
@@ -386,7 +390,8 @@ function createRunPolicy(
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
     maxFileBytes: readMaxFileBytesFromEnv() ?? base.maxFileBytes,
-    shellEnvironment: readShellEnvironmentModeFromEnv() ?? base.shellEnvironment
+    shellEnvironment: readShellEnvironmentModeFromEnv() ?? base.shellEnvironment,
+    shellExecutionMode: shellExecutionMode ?? readShellExecutionModeFromEnv() ?? base.shellExecutionMode
   };
 }
 
@@ -414,6 +419,27 @@ function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
     return value;
   }
   throw new Error("DEEPCODEX_SHELL_ENV must be minimal or inherit.");
+}
+
+function readShellExecutionModeFromEnv(): ShellExecutionMode | undefined {
+  const value = process.env.DEEPCODEX_SHELL_EXECUTION_MODE;
+  if (!value) {
+    return undefined;
+  }
+  if (value === "direct" || value === "workspace-copy") {
+    return value;
+  }
+  throw new Error("DEEPCODEX_SHELL_EXECUTION_MODE must be direct or workspace-copy.");
+}
+
+function readShellExecutionModeFromRequest(value: unknown): ShellExecutionMode | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (value === "direct" || value === "workspace-copy") {
+    return value;
+  }
+  throw new Error("shellExecutionMode must be direct or workspace-copy.");
 }
 
 async function readPolicyBundleVerificationOptions(): Promise<PolicyBundleVerificationOptions> {

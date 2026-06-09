@@ -56,7 +56,8 @@ describe("workspace config", () => {
               allowFileWrite: true,
               allowSecretWrites: false,
               allowArchiveListing: false,
-              shellEnvironment: "minimal"
+              shellEnvironment: "minimal",
+              shellExecutionMode: "workspace-copy"
             },
             budget: {
               maxTokens: "1000"
@@ -77,7 +78,8 @@ describe("workspace config", () => {
           redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
           dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
           maxFileBytes: 2048,
-          shellEnvironment: "minimal"
+          shellEnvironment: "minimal",
+          shellExecutionMode: "workspace-copy"
         },
         retention: { maxSessions: "20", maxAgeDays: "14" }
       }),
@@ -109,7 +111,8 @@ describe("workspace config", () => {
             allowFileWrite: true,
             allowSecretWrites: false,
             allowArchiveListing: false,
-            shellEnvironment: "minimal"
+            shellEnvironment: "minimal",
+            shellExecutionMode: "workspace-copy"
           },
           budget: {
             maxTokens: 1000
@@ -130,7 +133,8 @@ describe("workspace config", () => {
         redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
         dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
         maxFileBytes: 2048,
-        shellEnvironment: "minimal"
+        shellEnvironment: "minimal",
+        shellExecutionMode: "workspace-copy"
       },
       retention: { maxSessions: 20, maxAgeDays: 14 }
     });
@@ -167,6 +171,18 @@ describe("workspace config", () => {
     );
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/dlpPatterns/);
+  });
+
+  it("rejects invalid shell execution modes", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ policy: { shellExecutionMode: "unsafe" } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/shellExecutionMode/);
   });
 
   it("rejects custom policy profiles without a mode", async () => {

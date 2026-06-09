@@ -488,6 +488,39 @@ describe("workspace tools", () => {
     }
   });
 
+  it("can run shell commands in an isolated workspace copy", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "input.txt"), "original\n", "utf8");
+    await writeFile(path.join(tempDir, ".env"), "DEEPSEEK_API_KEY=secret\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowShell: true,
+      shellExecutionMode: "workspace-copy"
+    });
+    const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+    expect(runTool).toBeDefined();
+
+    const result = await runTool!.run(
+      {
+        command: `${quoteCommandPath(
+          process.execPath
+        )} -e "const fs=require('fs'); fs.writeFileSync('created.txt','copy'); fs.writeFileSync('input.txt','changed'); console.log(fs.existsSync('.env') ? 'env-present' : 'env-missing')"`
+      },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.content.trim()).toBe("env-missing");
+    expect(result.audit?.shell).toMatchObject({
+      executionMode: "workspace-copy",
+      copiedFiles: 1,
+      skippedEntries: 1,
+      workspaceCopyRemoved: true
+    });
+    await expect(readFile(path.join(tempDir, "input.txt"), "utf8")).resolves.toBe("original\n");
+    await expect(readFile(path.join(tempDir, "created.txt"), "utf8")).rejects.toThrow();
+  });
+
   it("blocks common shell network commands by default", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir, {

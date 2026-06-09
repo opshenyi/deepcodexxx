@@ -38,6 +38,7 @@ import type {
   PolicyProfile,
   SessionRetentionPolicy,
   ShellEnvironmentMode,
+  ShellExecutionMode,
   ToolAuditMetadata,
   SessionEventRecorder,
   ToolApprovalDecision,
@@ -66,6 +67,7 @@ program
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
+  .option("--shell-execution-mode <mode>", "direct or workspace-copy")
   .option("--allow-network", "Allow shell commands that perform network access", false)
   .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
   .option("--json", "Print newline-delimited JSON events", false)
@@ -84,6 +86,7 @@ program
         outputUsdPerMillionTokens?: string;
         pricingProfile?: string;
         shellEnv?: string;
+        shellExecutionMode?: string;
         allowNetwork?: boolean;
         allowArchiveListing?: boolean;
         json?: boolean;
@@ -105,6 +108,7 @@ program
         const policy = createPolicy(
           options.mode,
           options.shellEnv,
+          options.shellExecutionMode,
           options.allowNetwork,
           options.allowArchiveListing,
           profile,
@@ -145,6 +149,7 @@ program
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
+  .option("--shell-execution-mode <mode>", "direct or workspace-copy")
   .option("--allow-network", "Allow shell commands that perform network access", false)
   .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
   .option("--max-steps <number>", "Maximum agent loop count")
@@ -159,6 +164,7 @@ program
     outputUsdPerMillionTokens?: string;
     pricingProfile?: string;
     shellEnv?: string;
+    shellExecutionMode?: string;
     allowNetwork?: boolean;
     allowArchiveListing?: boolean;
     maxSteps?: string;
@@ -182,6 +188,7 @@ program
         const policy = createPolicy(
           options.mode,
           options.shellEnv,
+          options.shellExecutionMode,
           options.allowNetwork,
           options.allowArchiveListing,
           profile,
@@ -436,6 +443,9 @@ program
       pricingProfile: process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom",
       configuredPricingProfiles: readPricingProfilesFromEnv().length,
       shellEnvironment: process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal",
+      shellExecutionMode: parseShellExecutionMode(
+        process.env.DEEPCODEX_SHELL_EXECUTION_MODE ?? basePolicy.shellExecutionMode ?? "direct"
+      ),
       shellNetworkAccess: resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked",
       archiveListing: resolveAllowArchiveListingPolicy(false, basePolicy.allowArchiveListing) ? "allowed" : "blocked",
       workspaceConfig: {
@@ -469,6 +479,7 @@ program
     console.log(`Pricing profile: ${diagnostics.pricingProfile}`);
     console.log(`Configured pricing profiles: ${diagnostics.configuredPricingProfiles}`);
     console.log(`Shell environment: ${diagnostics.shellEnvironment}`);
+    console.log(`Shell execution mode: ${diagnostics.shellExecutionMode}`);
     console.log(`Shell network access: ${diagnostics.shellNetworkAccess}`);
     console.log(`Archive listing: ${diagnostics.archiveListing}`);
     console.log(`Workspace config: ${diagnostics.workspaceConfig.status === "present" ? diagnostics.workspaceConfig.path : "missing"}`);
@@ -563,6 +574,7 @@ function resolveCliProfile(profileId?: string, config?: WorkspaceConfig): Policy
 function createPolicy(
   mode: string | undefined,
   shellEnv: string | undefined,
+  shellExecutionMode: string | undefined,
   allowNetwork: boolean | undefined,
   allowArchiveListing: boolean | undefined,
   profile?: PolicyProfile,
@@ -573,6 +585,8 @@ function createPolicy(
   const selectedMode = mode ? parseMode(mode) : (configPolicy.mode ?? profile?.policy.mode ?? "workspace-write");
   const selectedShellEnv =
     shellEnv ?? process.env.DEEPCODEX_SHELL_ENV ?? base.shellEnvironment ?? "minimal";
+  const selectedShellExecutionMode =
+    shellExecutionMode ?? process.env.DEEPCODEX_SHELL_EXECUTION_MODE ?? base.shellExecutionMode ?? "direct";
   return {
     ...base,
     mode: selectedMode,
@@ -584,7 +598,8 @@ function createPolicy(
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
     maxFileBytes: readMaxFileBytesFromEnv() ?? base.maxFileBytes,
-    shellEnvironment: parseShellEnvironmentMode(selectedShellEnv)
+    shellEnvironment: parseShellEnvironmentMode(selectedShellEnv),
+    shellExecutionMode: parseShellExecutionMode(selectedShellExecutionMode)
   };
 }
 
@@ -698,6 +713,13 @@ function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {
     return value;
   }
   throw new Error("shell-env must be minimal or inherit");
+}
+
+function parseShellExecutionMode(value: string): ShellExecutionMode {
+  if (value === "direct" || value === "workspace-copy") {
+    return value;
+  }
+  throw new Error("shell-execution-mode must be direct or workspace-copy");
 }
 
 function createRetentionPolicy(options: {
@@ -922,7 +944,14 @@ function formatApprovalInput(inputValue: unknown, fileAudits?: FileAuditEntry[])
 
 function formatToolOutput(outputValue: string, audit?: ToolAuditMetadata): string {
   const fileAudit = formatFileAudits(audit?.files);
-  return fileAudit ? `${outputValue}\n\nFile audit\n${fileAudit}` : outputValue;
+  const shellAudit = formatShellAudit(audit?.shell);
+  return [
+    outputValue,
+    fileAudit ? `File audit\n${fileAudit}` : "",
+    shellAudit ? `Shell audit\n${shellAudit}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function formatValue(inputValue: unknown): string {
@@ -962,6 +991,23 @@ function formatFileSnapshot(snapshot?: FileHashSnapshot): string {
     return "missing";
   }
   return `sha256:${snapshot.sha256?.slice(0, 12) ?? "unknown"} bytes:${snapshot.bytes ?? 0}`;
+}
+
+function formatShellAudit(shellAudit?: ToolAuditMetadata["shell"]): string {
+  if (!shellAudit) {
+    return "";
+  }
+  return [
+    `mode: ${shellAudit.executionMode}`,
+    shellAudit.copiedFiles !== undefined ? `copiedFiles: ${shellAudit.copiedFiles}` : "",
+    shellAudit.copiedBytes !== undefined ? `copiedBytes: ${shellAudit.copiedBytes}` : "",
+    shellAudit.skippedEntries !== undefined ? `skippedEntries: ${shellAudit.skippedEntries}` : "",
+    shellAudit.maxFiles !== undefined ? `maxFiles: ${shellAudit.maxFiles}` : "",
+    shellAudit.maxBytes !== undefined ? `maxBytes: ${shellAudit.maxBytes}` : "",
+    shellAudit.workspaceCopyRemoved !== undefined ? `workspaceCopyRemoved: ${shellAudit.workspaceCopyRemoved}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function createCliEventHandler(recorder?: SessionEventRecorder) {

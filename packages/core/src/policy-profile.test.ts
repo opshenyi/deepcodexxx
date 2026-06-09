@@ -81,7 +81,8 @@ describe("policy profiles", () => {
       mode: "workspace-write",
       allowShell: true,
       allowFileWrite: true,
-      shellEnvironment: "minimal"
+      shellEnvironment: "minimal",
+      shellExecutionMode: "direct"
     });
   });
 

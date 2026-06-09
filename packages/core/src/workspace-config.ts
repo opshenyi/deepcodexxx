@@ -11,7 +11,8 @@ import type {
   PolicyProfile,
   ProviderPolicy,
   ProfileApprovalMode,
-  ShellEnvironmentMode
+  ShellEnvironmentMode,
+  ShellExecutionMode
 } from "./types.js";
 
 export const WORKSPACE_CONFIG_RELATIVE_PATH = ".deepcodex/config.json";
@@ -119,7 +120,8 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
           allowStateWrite: true,
           allowSecretWrites: false,
           allowArchiveListing: false,
-          shellEnvironment: "minimal"
+          shellEnvironment: "minimal",
+          shellExecutionMode: "direct"
         },
         budget: {
           maxTokens: 80000
@@ -133,6 +135,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
       allowSecretWrites: false,
       allowArchiveListing: false,
       shellEnvironment: "minimal",
+      shellExecutionMode: "direct",
       maxFileBytes: 512 * 1024,
       deniedPaths: ["secrets"],
       deniedFileExtensions: [".pem", ".sqlite"],
@@ -249,7 +252,8 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     redactionPatterns: readOptionalRegexArray(entry.redactionPatterns, "policy.redactionPatterns"),
     dlpPatterns: readOptionalRegexArray(entry.dlpPatterns, "policy.dlpPatterns"),
     maxFileBytes: readOptionalNumber(entry.maxFileBytes, "policy.maxFileBytes"),
-    shellEnvironment: readOptionalShellEnvironment(entry.shellEnvironment)
+    shellEnvironment: readOptionalShellEnvironment(entry.shellEnvironment),
+    shellExecutionMode: readOptionalShellExecutionMode(entry.shellExecutionMode)
   });
 }
 
@@ -420,6 +424,16 @@ function readOptionalShellEnvironment(value: unknown): ShellEnvironmentMode | un
     return value;
   }
   throw new Error("policy.shellEnvironment must be minimal or inherit.");
+}
+
+function readOptionalShellExecutionMode(value: unknown): ShellExecutionMode | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (value === "direct" || value === "workspace-copy") {
+    return value;
+  }
+  throw new Error("policy.shellExecutionMode must be direct or workspace-copy.");
 }
 
 function removeUndefinedConfigValues(config: WorkspaceConfig): WorkspaceConfig {

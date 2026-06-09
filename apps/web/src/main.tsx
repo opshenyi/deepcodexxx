@@ -4,6 +4,7 @@ import "./styles.css";
 
 type ApprovalMode = "suggest" | "workspace-write" | "full-access";
 type ToolApprovalMode = "auto" | "manual" | "deny";
+type ShellExecutionMode = "direct" | "workspace-copy";
 
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
@@ -92,6 +93,7 @@ type ServerPolicyProfile = {
     dlpPatterns?: string[];
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
+    shellExecutionMode?: "direct" | "workspace-copy";
   };
   budget?: BudgetPolicy;
 };
@@ -124,6 +126,7 @@ type WorkspaceConfig = {
     dlpPatterns?: string[];
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
+    shellExecutionMode?: "direct" | "workspace-copy";
   };
   retention?: {
     maxSessions?: number;
@@ -175,6 +178,17 @@ type FileAuditEntry = {
 
 type ToolAuditMetadata = {
   files?: FileAuditEntry[];
+  shell?: ShellAuditEntry;
+};
+
+type ShellAuditEntry = {
+  executionMode: "direct" | "workspace-copy";
+  copiedFiles?: number;
+  copiedBytes?: number;
+  skippedEntries?: number;
+  maxFiles?: number;
+  maxBytes?: number;
+  workspaceCopyRemoved?: boolean;
 };
 
 type SessionSummary = {
@@ -239,6 +253,8 @@ const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxA
 const defaultPolicyProfile =
   localStorage.getItem("deepcodex.policyProfile") ?? "custom";
 const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
+const defaultShellExecutionMode =
+  (localStorage.getItem("deepcodex.shellExecutionMode") as ShellExecutionMode | null) ?? "direct";
 const configuredServerUrl = normalizeServerUrl(import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361");
 const defaultServerUrl = localStorage.getItem("deepcodex.serverUrl") ?? configuredServerUrl;
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -264,6 +280,11 @@ const approvalOptions: Array<{ value: ToolApprovalMode; label: string; detail: s
   { value: "auto", label: "Auto", detail: "Run requested tools after mode checks" },
   { value: "manual", label: "Manual", detail: "Pause write, shell, and memory tools for review" },
   { value: "deny", label: "Deny", detail: "Reject mutating tool calls for dry runs" }
+];
+
+const shellExecutionOptions: Array<{ value: ShellExecutionMode; label: string }> = [
+  { value: "direct", label: "Direct workspace" },
+  { value: "workspace-copy", label: "Temporary copy" }
 ];
 
 const basePolicyProfileOptions: PolicyProfileOption[] = [
@@ -332,6 +353,9 @@ function App() {
   const [policyProfileId, setPolicyProfileId] = useState<PolicyProfileOption["id"]>(defaultPolicyProfile);
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
   const [approvalMode, setApprovalMode] = useState<ToolApprovalMode>("manual");
+  const [shellExecutionMode, setShellExecutionMode] = useState<ShellExecutionMode>(
+    defaultShellExecutionMode === "workspace-copy" ? "workspace-copy" : "direct"
+  );
   const [maxSteps, setMaxSteps] = useState(defaultMaxSteps);
   const [maxSessionTokens, setMaxSessionTokens] = useState(defaultMaxSessionTokens);
   const [maxSessionUsd, setMaxSessionUsd] = useState(defaultMaxSessionUsd);
@@ -416,6 +440,7 @@ function App() {
     setPendingApprovals([]);
     localStorage.setItem("deepcodex.workspace", workspace);
     localStorage.setItem("deepcodex.policyProfile", policyProfileId);
+    localStorage.setItem("deepcodex.shellExecutionMode", shellExecutionMode);
     localStorage.setItem("deepcodex.maxSteps", maxSteps);
     localStorage.setItem("deepcodex.maxSessionTokens", maxSessionTokens);
     localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
@@ -439,6 +464,7 @@ function App() {
           profileId: policyProfileId === "custom" ? undefined : policyProfileId,
           mode,
           approvalMode,
+          shellExecutionMode,
           maxSteps: readOptionalRunInteger(maxSteps, "Max steps") ?? selectedPolicyProfile()?.maxSteps ?? 12,
           pricingProfileId: pricingProfileId === "custom" ? undefined : pricingProfileId,
           budget
@@ -814,6 +840,9 @@ function App() {
     if (config.approvalMode) {
       setApprovalMode(config.approvalMode);
     }
+    if (config.policy?.shellExecutionMode) {
+      setShellExecutionMode(config.policy.shellExecutionMode);
+    }
     if (config.maxSteps !== undefined) {
       setMaxSteps(String(config.maxSteps));
     }
@@ -958,6 +987,20 @@ function App() {
               onChange={(event) => setMaxSteps(event.target.value)}
               placeholder="12"
             />
+          </label>
+          <label className="singleField" htmlFor="shell-execution-mode">
+            <span>Shell execution</span>
+            <select
+              id="shell-execution-mode"
+              value={shellExecutionMode}
+              onChange={(event) => setShellExecutionMode(event.target.value as ShellExecutionMode)}
+            >
+              {shellExecutionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
         </section>
 
@@ -1732,7 +1775,14 @@ function formatApprovalDetails(input: unknown, fileAudits?: FileAuditEntry[]) {
 
 function formatToolOutput(output: string, audit?: ToolAuditMetadata) {
   const fileAudit = formatFileAudits(audit?.files);
-  return fileAudit ? `${output}\n\nFile audit\n${fileAudit}` : output;
+  const shellAudit = formatShellAudit(audit?.shell);
+  return [
+    output,
+    fileAudit ? `File audit\n${fileAudit}` : "",
+    shellAudit ? `Shell audit\n${shellAudit}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function formatFileAudits(fileAudits?: FileAuditEntry[]) {
@@ -1764,6 +1814,23 @@ function formatFileSnapshot(snapshot?: FileHashSnapshot) {
     return "missing";
   }
   return `sha256:${snapshot.sha256?.slice(0, 12) ?? "unknown"} bytes:${snapshot.bytes ?? 0}`;
+}
+
+function formatShellAudit(shellAudit?: ToolAuditMetadata["shell"]) {
+  if (!shellAudit) {
+    return "";
+  }
+  return [
+    `mode: ${shellAudit.executionMode}`,
+    shellAudit.copiedFiles !== undefined ? `copiedFiles: ${shellAudit.copiedFiles}` : "",
+    shellAudit.copiedBytes !== undefined ? `copiedBytes: ${shellAudit.copiedBytes}` : "",
+    shellAudit.skippedEntries !== undefined ? `skippedEntries: ${shellAudit.skippedEntries}` : "",
+    shellAudit.maxFiles !== undefined ? `maxFiles: ${shellAudit.maxFiles}` : "",
+    shellAudit.maxBytes !== undefined ? `maxBytes: ${shellAudit.maxBytes}` : "",
+    shellAudit.workspaceCopyRemoved !== undefined ? `workspaceCopyRemoved: ${shellAudit.workspaceCopyRemoved}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function formatBudgetStatus(budget: BudgetSnapshot | null): string {

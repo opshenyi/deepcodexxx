@@ -77,7 +77,8 @@ const DEFAULT_POLICY: ApprovalPolicy = {
     ".zip"
   ],
   maxFileBytes: 512 * 1024,
-  shellEnvironment: "minimal"
+  shellEnvironment: "minimal",
+  shellExecutionMode: "direct"
 };
 
 export async function createWorkspaceContext(
@@ -107,7 +108,8 @@ export async function createWorkspaceContext(
     redactionPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.redactionPatterns ?? []), ...(policy.redactionPatterns ?? [])]),
     dlpPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.dlpPatterns ?? []), ...(policy.dlpPatterns ?? [])]),
     maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
-    shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment
+    shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment,
+    shellExecutionMode: policy.shellExecutionMode ?? DEFAULT_POLICY.shellExecutionMode
   };
 
   const memoryDir = path.join(root, ".deepcodex");

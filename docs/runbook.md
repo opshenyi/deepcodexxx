@@ -41,6 +41,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_MAX_SESSIONS` | Optional. | Empty. | Default maximum retained session history files for retention pruning. |
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 | `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
+| `DEEPCODEX_SHELL_EXECUTION_MODE` | Optional. | `direct` | `direct` runs shell commands in the selected workspace. `workspace-copy` runs them in a temporary copy that is removed after execution. |
 | `DEEPCODEX_ALLOW_NETWORK` | Optional. | `false` | Blocks common shell network commands by default. Set `true` only for trusted package install, remote git, or network utility tasks. |
 | `DEEPCODEX_ALLOW_ARCHIVE_LISTING` | Optional. | `false` | Enables ZIP-compatible archive entry metadata listing without extraction. Keep disabled unless a trusted workspace needs archive manifests. |
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
@@ -56,7 +57,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, shell environment mode, shell network access, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, shell environment mode, shell execution mode, shell network access, and session retention defaults.
 
 Create a template:
 
@@ -100,7 +101,8 @@ Example:
         "allowStateWrite": true,
         "allowSecretWrites": false,
         "allowArchiveListing": false,
-        "shellEnvironment": "minimal"
+        "shellEnvironment": "minimal",
+        "shellExecutionMode": "direct"
       },
       "budget": {
         "maxTokens": 80000
@@ -115,6 +117,7 @@ Example:
     "allowSecretWrites": false,
     "allowArchiveListing": false,
     "shellEnvironment": "minimal",
+    "shellExecutionMode": "direct",
     "maxFileBytes": 524288,
     "deniedPaths": ["secrets"],
     "deniedFileExtensions": [".pem", ".sqlite"],
@@ -150,6 +153,8 @@ Write and edit tools also apply sensitive-text checks before producing diffs or 
 
 ZIP-compatible archive listing is disabled by default. When `policy.allowArchiveListing: true`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or CLI `--allow-archive-listing` is set, the agent can call `list_archive_entries` to read the ZIP central directory and return bounded entry metadata. It does not extract files, decompress data, return entry contents, return archive comments, or bypass denied workspace paths. Entries matching denied path policy are omitted from the manifest.
 
+Shell execution defaults to `direct` for compatibility. Set `policy.shellExecutionMode: "workspace-copy"`, `DEEPCODEX_SHELL_EXECUTION_MODE=workspace-copy`, or CLI `--shell-execution-mode workspace-copy` to run shell commands from a temporary workspace snapshot. The snapshot skips denied paths, denied file extensions, symlinks, files above `maxFileBytes`, and stops at bounded file-count and total-byte caps. It is removed after the command, and shell tool events include a `Shell audit` block with copy statistics. This protects the real workspace from relative-path writes, but it is not a kernel sandbox; a command that explicitly reaches an absolute path can still use the user's OS permissions.
+
 ## Verify Configuration
 
 ```powershell
@@ -170,6 +175,7 @@ Expected checks:
 - Signed policy required prints `yes` when `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`.
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
+- Shell execution mode prints as `direct` unless a workspace copy is explicitly enabled.
 - Archive listing policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
 
@@ -384,6 +390,8 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 
 For `run_command`, a zero exit code is required for a successful tool result. Non-zero exits, timeout termination, signals, and output overflow are reported as failed tool results. Shell output collection is bounded, and timeouts attempt to terminate the spawned process tree so a failed verification command is not treated as proof that checks passed.
 
+When `shellExecutionMode` is `workspace-copy`, `run_command` executes from a temporary snapshot instead of the selected workspace path. The tool omits denied and oversized files from the snapshot, records copy statistics in `Shell audit`, and removes the snapshot after execution. Use this for safer test or inspection commands that should not write into the real repository.
+
 The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, PDF text, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
 
 The `list_archive_entries` tool can list ZIP-compatible archive entry metadata only when archive listing policy is explicitly enabled. It reads the end-of-central-directory record and a bounded central directory range, reports entry names, directory/file status, compressed and uncompressed sizes, compression method, unsafe-path flags, truncation status, and denied-entry counts. It never extracts archive members or returns member content.
@@ -400,6 +408,7 @@ The `list_archive_entries` tool can list ZIP-compatible archive entry metadata o
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
 | Shell command failed. | The command exited non-zero, timed out, was terminated, or exceeded the output cap. | Treat it as failed verification; inspect stdout/stderr and rerun only after changing the command or fixing the underlying issue. |
 | Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
+| Shell command changes are missing from the workspace. | Shell execution mode is `workspace-copy`, so relative-path writes happened in the temporary snapshot. | Use direct mode only when the command is intentionally allowed to update the selected workspace, or keep workspace-copy for verification commands. |
 | Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
 | Write or edit is blocked by DLP policy. | The proposed content looks like a secret assignment, bearer token, token literal, or workspace custom DLP match. | Move the value to an environment variable or set `policy.allowSecretWrites: true` only for a trusted fixture/migration workspace. |
 | A project-specific secret still appears in output. | Redaction is pattern-based. | Add the pattern to a future project DLP policy and rotate the exposed secret if necessary. |

@@ -281,7 +281,8 @@ label,
   text-transform: uppercase;
 }
 
-.singleField input {
+.singleField input,
+.singleField select {
   padding: 9px 10px;
 }
 

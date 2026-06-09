@@ -15,7 +15,8 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: false,
       allowNetwork: false,
       allowStateWrite: false,
-      shellEnvironment: "minimal"
+      shellEnvironment: "minimal",
+      shellExecutionMode: "direct"
     }
   },
   {
@@ -30,7 +31,8 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: true,
       allowNetwork: false,
       allowStateWrite: true,
-      shellEnvironment: "minimal"
+      shellEnvironment: "minimal",
+      shellExecutionMode: "direct"
     }
   },
   {
@@ -45,7 +47,8 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: true,
       allowNetwork: false,
       allowStateWrite: true,
-      shellEnvironment: "minimal"
+      shellEnvironment: "minimal",
+      shellExecutionMode: "direct"
     }
   }
 ];

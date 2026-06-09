@@ -8,7 +8,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, block probable secret writes by default, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
-| DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. Common network commands are blocked unless network access is explicitly enabled. | Add OS-level sandboxing or isolated execution workers. |
+| DeepCodex to shell | Shell runs with the user's OS privileges, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. Common network commands are blocked unless network access is explicitly enabled. Shell commands can optionally run in a temporary workspace copy that is removed after execution. | Add kernel-level sandboxing or remote isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model, provider base URL, provider/model allowlists, and budget defaults. Signed policy bundles can verify the active workspace config before CLI/server runs when enforcement is enabled. | Add secrets management, key rotation, and richer provider fallback policy. |
 | Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
 
@@ -71,6 +71,8 @@ Implemented controls:
 - Shell commands are disabled in `suggest` mode.
 - Commands run with `cwd` set to the workspace root.
 - Shell tools default to `DEEPCODEX_SHELL_ENV=minimal`, passing only essential environment variables such as PATH, TEMP, and OS shell variables. `inherit` is available for trusted workspaces that require the parent environment.
+- Shell execution defaults to `direct`. `DEEPCODEX_SHELL_EXECUTION_MODE=workspace-copy`, CLI `--shell-execution-mode workspace-copy`, server request policy, or workspace policy `shellExecutionMode: "workspace-copy"` can run shell commands from a temporary workspace snapshot that is removed after execution.
+- Workspace-copy shell execution skips denied paths, denied file extensions, symlinks, and files above `maxFileBytes`, with bounded file-count and total-byte caps. Tool events include shell audit metadata with copy statistics.
 - Shell network access defaults to blocked. CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` can enable common network command patterns for trusted runs.
 - Shell timeout is capped at 180 seconds.
 - Shell output collection is bounded, and timeout or output-overflow termination attempts to stop the spawned process tree.
@@ -80,9 +82,10 @@ Implemented controls:
 
 Current limitations:
 
-- This is command filtering, not an OS sandbox.
+- Direct shell execution is command filtering, not an OS sandbox.
+- Workspace-copy shell execution protects the selected workspace from relative-path writes, but it is still not a kernel sandbox and cannot block a command that explicitly accesses absolute paths with the user's OS permissions.
 - Network command blocking is pattern-based and is not a kernel-level network sandbox.
-- Shell review can be per-command in manual approval mode, but shell execution is still not OS-sandboxed after approval.
+- Shell review can be per-command in manual approval mode, but shell execution is still not fully OS-sandboxed after approval.
 - Minimal shell environment reduces accidental secret exposure but does not prevent a command from reading files it is otherwise allowed to access.
 - The pattern list cannot prove a command is safe.
 
@@ -139,6 +142,6 @@ The next security work should prioritize:
 - Richer generated-asset handling, OCR/PDF extraction policy, archive malware scanning, and file-type policies.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Policy bundle creation/distribution UI and audit workflows.
-- Isolated shell execution with filesystem and network controls.
+- Kernel-level or remote isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

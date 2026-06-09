@@ -34,6 +34,7 @@ Expected result:
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
+- CLI `doctor` reports shell execution mode, defaulting to `direct`.
 - CLI `doctor` reports shell network access, defaulting to `blocked`.
 - CLI `doctor` reports archive listing, defaulting to `blocked`.
 - CLI `doctor` reports a workspace config SHA-256 when a config file exists.
@@ -64,6 +65,7 @@ Checklist:
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
+- Shell execution selector can switch between direct workspace and temporary-copy execution.
 - `suggest` mode can run a repository inspection prompt.
 - Event stream shows session start, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
@@ -79,6 +81,7 @@ Checklist:
 - Archive listing remains blocked by default; when enabled for a trusted ZIP fixture, entry manifests omit denied entries and do not expose member contents.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - A deliberately failing verification command appears as a failed tool result, not a successful tool event with stderr text.
+- With `shellExecutionMode` set to `workspace-copy` for a trusted fixture, shell commands run from a temporary snapshot, leave the real workspace unchanged for relative-path writes, and show `Shell audit` metadata.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - Saved live or replay events containing unified diffs render as structured diff blocks, including multi-file diffs, and following `File audit` metadata remains readable.
@@ -131,6 +134,7 @@ Checklist:
 - Budgeted `ask` prints budget status when the provider returns usage metadata.
 - `--mode suggest` does not allow shell or file write/edit tools.
 - Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.
+- Safer verification demos can use `--shell-execution-mode workspace-copy` when command side effects should stay out of the selected workspace.
 - Network-capable shell demos use `--allow-network` only after the command has been reviewed.
 - Archive manifest demos use `--allow-archive-listing` only for trusted ZIP-compatible fixtures.
 

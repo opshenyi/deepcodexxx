@@ -70,6 +70,9 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added default-off policy-controlled ZIP archive manifest listing. New `list_archive_entries` reads only the ZIP end-of-central-directory and a bounded central directory range, reports entry metadata, omits denied-path entries, flags unsafe member paths, and never extracts, decompresses, or returns member contents.
 - Added archive-listing policy plumbing across core/config/CLI/server/Web types. `allowArchiveListing` defaults to false, `.deepcodex/config.json` can set it, CLI/server honor `DEEPCODEX_ALLOW_ARCHIVE_LISTING`, CLI has `--allow-archive-listing`, server requests can pass `allowArchiveListing`, and CLI `doctor` reports archive listing as blocked/allowed.
 - Verified archive listing with `npx vitest run packages/core/src/tools.test.ts packages/core/src/workspace-config.test.ts` (38 tests), `npm run typecheck`, final `npm run verify` (13 files / 104 tests), and CLI `doctor`/`doctor --json` showing default `Archive listing: blocked`.
+- Added audited shell workspace-copy execution mode. `shellExecutionMode` defaults to `direct`; `.deepcodex/config.json`, `DEEPCODEX_SHELL_EXECUTION_MODE`, CLI `--shell-execution-mode`, server requests, and the Web Execution panel can select `workspace-copy`. In that mode `run_command` copies allowed workspace files into a bounded temporary snapshot, skips denied paths/extensions/symlinks/oversized files, runs the command there, records `Shell audit` metadata, removes the snapshot afterward, and leaves the selected workspace unchanged for relative-path writes.
+- Hardened Windows timeout cleanup by using synchronous `taskkill /t /f` for process-tree termination, preventing timed-out shell tests from returning while the process still locks the workspace directory.
+- Verified shell workspace-copy execution with `npx vitest run packages/core/src/tools.test.ts packages/core/src/workspace-config.test.ts packages/core/src/policy-profile.test.ts` (47 tests), `npm run typecheck`, final `npm run verify` (13 files / 106 tests), CLI `doctor`/`doctor --json` showing default `Shell execution mode: direct`, and a Web browser smoke confirming the Shell execution selector renders, switches to `workspace-copy`, and produces zero console errors.
 
 ## Architecture Decisions
 
@@ -82,8 +85,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 ## Next Steps
 
-1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env plus network-command pattern blocking, not a full sandbox.
+1. Add kernel-level shell sandboxing or remote isolated execution workers; current protection is command filtering, minimal env, network-command pattern blocking, and optional workspace-copy execution, not a full OS sandbox.
 2. Add policy-controlled OCR/PDF extraction and richer archive analysis if deeper non-text artifact summaries are needed.
-3. Add richer DLP classification, OS-level shell isolation, and higher-level policy-bundle administration tooling.
+3. Add richer DLP classification, kernel-level shell isolation, and higher-level policy-bundle administration tooling.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

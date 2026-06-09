@@ -1,5 +1,6 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { open, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { copyFile, lstat, mkdir, mkdtemp, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
@@ -9,6 +10,8 @@ import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./typ
 import { isDeniedByPatterns, isDeniedFileExtension, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
 const SHELL_MAX_BUFFER_BYTES = 1024 * 1024 * 4;
+const SHELL_COPY_MAX_FILES = 2000;
+const SHELL_COPY_MAX_BYTES = 64 * 1024 * 1024;
 const ZIP_EOCD_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const ZIP_EOCD_MIN_BYTES = 22;
@@ -379,15 +382,20 @@ const runCommandTool: RuntimeTool = {
     const command = stringValue(args.command);
     assertShellCommandAllowed(command, runtime.workspace.policy);
     const timeout = normalizeShellTimeout(args.timeoutMs);
-    const result = await runShellCommand(command, {
-      cwd: runtime.workspace.root,
-      env: createShellEnvironment(runtime.workspace.policy),
-      timeout
-    });
-    if (result.timedOut || result.outputOverflow || result.code !== 0 || result.signal) {
-      return fail(truncateForModel(formatShellFailure(result, timeout)));
+    const execution = await prepareShellExecution(runtime);
+    try {
+      const result = await runShellCommand(command, {
+        cwd: execution.cwd,
+        env: createShellEnvironment(runtime.workspace.policy),
+        timeout
+      });
+      if (result.timedOut || result.outputOverflow || result.code !== 0 || result.signal) {
+        return fail(truncateForModel(formatShellFailure(result, timeout)), execution.audit);
+      }
+      return ok(truncateForModel([result.stdout, result.stderr].filter(Boolean).join("\n")), execution.audit);
+    } finally {
+      await execution.cleanup();
     }
-    return ok(truncateForModel([result.stdout, result.stderr].filter(Boolean).join("\n")));
   }
 };
 
@@ -520,6 +528,117 @@ function normalizeShellTimeout(value: unknown): number {
   return Math.min(Math.max(requested, 100), 180_000);
 }
 
+interface ShellExecutionContext {
+  cwd: string;
+  audit?: ToolResult["audit"];
+  cleanup: () => Promise<void>;
+}
+
+interface WorkspaceCopyReport {
+  copiedFiles: number;
+  copiedBytes: number;
+  skippedEntries: number;
+  maxFiles: number;
+  maxBytes: number;
+}
+
+async function prepareShellExecution(runtime: ToolRuntime): Promise<ShellExecutionContext> {
+  if (runtime.workspace.policy.shellExecutionMode !== "workspace-copy") {
+    return {
+      cwd: runtime.workspace.root,
+      cleanup: async () => undefined
+    };
+  }
+
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "deepcodex-shell-"));
+  const copyRoot = path.join(tempRoot, "workspace");
+  let report: WorkspaceCopyReport;
+  try {
+    await mkdir(copyRoot, { recursive: true });
+    report = await copyWorkspaceForShell(runtime.workspace.root, copyRoot, runtime);
+  } catch (error) {
+    await rm(tempRoot, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    cwd: copyRoot,
+    audit: {
+      shell: {
+        executionMode: "workspace-copy",
+        copiedFiles: report.copiedFiles,
+        copiedBytes: report.copiedBytes,
+        skippedEntries: report.skippedEntries,
+        maxFiles: report.maxFiles,
+        maxBytes: report.maxBytes,
+        workspaceCopyRemoved: true
+      }
+    },
+    cleanup: async () => {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  };
+}
+
+async function copyWorkspaceForShell(sourceRoot: string, targetRoot: string, runtime: ToolRuntime): Promise<WorkspaceCopyReport> {
+  const report: WorkspaceCopyReport = {
+    copiedFiles: 0,
+    copiedBytes: 0,
+    skippedEntries: 0,
+    maxFiles: SHELL_COPY_MAX_FILES,
+    maxBytes: SHELL_COPY_MAX_BYTES
+  };
+  await copyWorkspaceEntry(sourceRoot, targetRoot, sourceRoot, runtime, report);
+  return report;
+}
+
+async function copyWorkspaceEntry(
+  source: string,
+  target: string,
+  sourceRoot: string,
+  runtime: ToolRuntime,
+  report: WorkspaceCopyReport
+): Promise<void> {
+  const rel = path.relative(sourceRoot, source) || ".";
+  if (rel !== "." && isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+    report.skippedEntries += 1;
+    return;
+  }
+
+  const sourceInfo = await lstat(source);
+  if (sourceInfo.isSymbolicLink()) {
+    report.skippedEntries += 1;
+    return;
+  }
+  if (sourceInfo.isDirectory()) {
+    await mkdir(target, { recursive: true });
+    const children = await readdir(source, { withFileTypes: true });
+    for (const child of children.sort((a, b) => a.name.localeCompare(b.name))) {
+      await copyWorkspaceEntry(path.join(source, child.name), path.join(target, child.name), sourceRoot, runtime, report);
+    }
+    return;
+  }
+  if (!sourceInfo.isFile()) {
+    report.skippedEntries += 1;
+    return;
+  }
+  if (isDeniedFileExtension(rel, runtime.workspace.policy.deniedFileExtensions ?? [])) {
+    report.skippedEntries += 1;
+    return;
+  }
+  if (exceedsFileLimit(sourceInfo.size, runtime)) {
+    report.skippedEntries += 1;
+    return;
+  }
+  if (report.copiedFiles >= report.maxFiles || report.copiedBytes + sourceInfo.size > report.maxBytes) {
+    report.skippedEntries += 1;
+    return;
+  }
+  await mkdir(path.dirname(target), { recursive: true });
+  await copyFile(source, target);
+  report.copiedFiles += 1;
+  report.copiedBytes += sourceInfo.size;
+}
+
 interface ShellCommandResult {
   stdout: string;
   stderr: string;
@@ -612,11 +731,13 @@ function terminateProcessTree(child: ChildProcessWithoutNullStreams): void {
     return;
   }
   if (process.platform === "win32") {
-    const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+    const result = spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
       windowsHide: true,
       stdio: "ignore"
     });
-    killer.on("error", () => child.kill("SIGTERM"));
+    if (result.error) {
+      child.kill("SIGTERM");
+    }
     return;
   }
   try {
@@ -650,8 +771,8 @@ function ok(content: string, audit?: ToolResult["audit"]): ToolResult {
   return audit ? { ok: true, content, audit } : { ok: true, content };
 }
 
-function fail(content: string): ToolResult {
-  return { ok: false, content };
+function fail(content: string, audit?: ToolResult["audit"]): ToolResult {
+  return audit ? { ok: false, content, audit } : { ok: false, content };
 }
 
 function filePolicyDenial(relativePath: string, runtime: ToolRuntime): string | undefined {
