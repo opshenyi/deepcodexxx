@@ -1,5 +1,5 @@
-import { createHash, verify as verifySignature } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { createHash, createPublicKey, sign as signPayload, verify as verifySignature } from "node:crypto";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readWorkspaceConfig } from "./workspace-config.js";
 
@@ -46,6 +46,90 @@ export interface PolicyBundleVerificationResult {
   configSha256?: string;
   bundleSha256?: string;
   publicKeySha256?: string;
+}
+
+export interface CreatePolicyBundleOptions {
+  privateKey: string;
+  issuer: string;
+  issuedAt?: Date | string;
+  expiresAt?: Date | string;
+  publicKey?: string;
+  embedPublicKey?: boolean;
+  overwrite?: boolean;
+}
+
+export interface CreatePolicyBundleResult {
+  path: string;
+  bundle: PolicyBundle;
+  issuer: string;
+  issuedAt: string;
+  expiresAt?: string;
+  configSha256: string;
+  bundleSha256: string;
+  publicKeySha256?: string;
+}
+
+export async function createWorkspacePolicyBundle(
+  workspaceInput: string,
+  options: CreatePolicyBundleOptions
+): Promise<CreatePolicyBundleResult> {
+  const root = await resolveWorkspaceRoot(workspaceInput);
+  const workspaceConfig = await readWorkspaceConfig(root);
+  if (!workspaceConfig.exists || !workspaceConfig.sha256) {
+    throw new Error("Workspace config is missing; policy bundle cannot be signed.");
+  }
+
+  const issuer = options.issuer.trim();
+  if (!issuer) {
+    throw new Error("Policy bundle issuer is required.");
+  }
+  const privateKey = options.privateKey.trim();
+  if (!privateKey) {
+    throw new Error("Policy bundle private key is required.");
+  }
+
+  const issuedAt = normalizeBundleDate(options.issuedAt ?? new Date(), "issuedAt");
+  const expiresAt = options.expiresAt ? normalizeBundleDate(options.expiresAt, "expiresAt") : undefined;
+  if (expiresAt && Date.parse(expiresAt) <= Date.parse(issuedAt)) {
+    throw new Error("Policy bundle expiresAt must be later than issuedAt.");
+  }
+
+  const bundlePath = path.join(root, POLICY_BUNDLE_RELATIVE_PATH);
+  if (options.overwrite !== true && (await fileExists(bundlePath))) {
+    throw new Error(`Policy bundle already exists: ${bundlePath}. Use overwrite to replace it.`);
+  }
+
+  const embeddedPublicKey = options.publicKey?.trim() || (options.embedPublicKey ? derivePublicKeyPem(privateKey) : undefined);
+  const payload: PolicyBundlePayload = {
+    version: 1,
+    issuer,
+    issuedAt,
+    expiresAt,
+    configSha256: workspaceConfig.sha256
+  };
+  const signature = signPayload(null, Buffer.from(createPolicyBundleSigningPayload(payload)), privateKey).toString("base64");
+  const bundle: PolicyBundle = {
+    payload,
+    signature: {
+      algorithm: "ed25519",
+      value: signature,
+      publicKey: embeddedPublicKey
+    }
+  };
+  const raw = serializePolicyBundle(bundle);
+  await mkdir(path.dirname(bundlePath), { recursive: true });
+  await writeFile(bundlePath, raw, "utf8");
+
+  return {
+    path: bundlePath,
+    bundle,
+    issuer,
+    issuedAt,
+    expiresAt,
+    configSha256: workspaceConfig.sha256,
+    bundleSha256: createSha256(raw),
+    publicKeySha256: embeddedPublicKey ? createSha256(embeddedPublicKey) : undefined
+  };
 }
 
 export async function verifyWorkspacePolicyBundle(
@@ -204,6 +288,10 @@ export function createPolicyBundleSigningPayload(payload: PolicyBundlePayload): 
   return canonicalJson(payload);
 }
 
+function serializePolicyBundle(bundle: PolicyBundle): string {
+  return `${JSON.stringify(bundle, null, 2)}\n`;
+}
+
 function parsePolicyBundle(raw: string): PolicyBundle {
   const value = JSON.parse(raw) as unknown;
   const entry = readObject(value, "policy bundle");
@@ -324,6 +412,29 @@ function readBase64(value: unknown, field: string): string {
     throw new Error(`${field} must be base64.`);
   }
   return parsed;
+}
+
+async function fileExists(target: string): Promise<boolean> {
+  return stat(target)
+    .then(() => true)
+    .catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return false;
+      }
+      throw error;
+    });
+}
+
+function normalizeBundleDate(value: Date | string, field: string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error(`Policy bundle ${field} must be a valid date.`);
+  }
+  return date.toISOString();
+}
+
+function derivePublicKeyPem(privateKeyPem: string): string {
+  return createPublicKey(privateKeyPem).export({ type: "spki", format: "pem" }).toString();
 }
 
 function createSha256(value: string): string {

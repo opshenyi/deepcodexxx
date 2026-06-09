@@ -1,10 +1,11 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createPolicyBundleSigningPayload,
+  createWorkspacePolicyBundle,
   POLICY_BUNDLE_RELATIVE_PATH,
   type PolicyBundlePayload,
   verifyWorkspacePolicyBundle
@@ -21,6 +22,80 @@ afterEach(async () => {
 });
 
 describe("policy bundle verification", () => {
+  it("creates and verifies a signed policy bundle from the active workspace config", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+
+    const created = await createWorkspacePolicyBundle(tempDir, {
+      privateKey: keys.privateKeyPem,
+      issuer: "Security Team",
+      issuedAt: "2026-06-09T01:00:00.000Z",
+      expiresAt: "2026-06-10T01:00:00.000Z",
+      publicKey: keys.publicKeyPem
+    });
+    const raw = await readFile(path.join(tempDir, POLICY_BUNDLE_RELATIVE_PATH), "utf8");
+    const verified = await verifyWorkspacePolicyBundle(tempDir, {
+      publicKey: keys.publicKeyPem,
+      trustedIssuers: ["Security Team"],
+      now: new Date("2026-06-09T02:00:00.000Z")
+    });
+
+    expect(created).toMatchObject({
+      issuer: "Security Team",
+      issuedAt: "2026-06-09T01:00:00.000Z",
+      expiresAt: "2026-06-10T01:00:00.000Z",
+      configSha256: workspaceConfig.sha256,
+      publicKeySha256: createSha256(keys.publicKeyPem.trim())
+    });
+    expect(created.bundleSha256).toBe(createSha256(raw));
+    expect(verified.ok).toBe(true);
+    expect(verified.issuer).toBe("Security Team");
+  });
+
+  it("does not overwrite an existing signed policy bundle unless requested", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+    await createWorkspacePolicyBundle(tempDir, {
+      privateKey: keys.privateKeyPem,
+      issuer: "Security Team",
+      issuedAt: "2026-06-09T01:00:00.000Z"
+    });
+
+    await expect(
+      createWorkspacePolicyBundle(tempDir, {
+        privateKey: keys.privateKeyPem,
+        issuer: "Replacement",
+        issuedAt: "2026-06-09T02:00:00.000Z"
+      })
+    ).rejects.toThrow(/already exists/);
+
+    const replaced = await createWorkspacePolicyBundle(tempDir, {
+      privateKey: keys.privateKeyPem,
+      issuer: "Replacement",
+      issuedAt: "2026-06-09T02:00:00.000Z",
+      overwrite: true
+    });
+
+    expect(replaced.issuer).toBe("Replacement");
+  });
+
+  it("rejects policy bundles that expire before they are issued", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+
+    await expect(
+      createWorkspacePolicyBundle(tempDir, {
+        privateKey: keys.privateKeyPem,
+        issuer: "Security Team",
+        issuedAt: "2026-06-10T00:00:00.000Z",
+        expiresAt: "2026-06-09T00:00:00.000Z"
+      })
+    ).rejects.toThrow(/expiresAt/);
+  });
+
   it("verifies a policy bundle against a trusted public key and active config hash", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);

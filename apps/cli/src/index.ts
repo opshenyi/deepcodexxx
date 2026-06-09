@@ -22,6 +22,7 @@ import {
   resolvePolicyProfile,
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
+  createWorkspacePolicyBundle,
   resolveProviderSelection,
   runDeepCodexAgent,
   writeWorkspaceConfigTemplate
@@ -253,6 +254,56 @@ config
     const result = await writeWorkspaceConfigTemplate(options.workspace, { overwrite: options.force });
     console.log(`Created workspace config: ${result.path}`);
   });
+
+config
+  .command("sign-bundle")
+  .description("Sign the active workspace config into .deepcodex/policy-bundle.json.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .requiredOption("--private-key <path>", "Ed25519 private key PEM path used for signing")
+  .requiredOption("--issuer <name>", "Issuer name recorded in the policy bundle")
+  .option("--issued-at <date>", "Issued-at timestamp. Defaults to now.")
+  .option("--expires-at <date>", "Optional expiry timestamp.")
+  .option("--public-key <path>", "Optional public key PEM path to embed as bundle metadata")
+  .option("--embed-public-key", "Embed a public key derived from the private key", false)
+  .option("--force", "Overwrite an existing policy bundle", false)
+  .option("--json", "Print JSON output", false)
+  .action(
+    async (options: {
+      workspace: string;
+      privateKey: string;
+      issuer: string;
+      issuedAt?: string;
+      expiresAt?: string;
+      publicKey?: string;
+      embedPublicKey: boolean;
+      force: boolean;
+      json: boolean;
+    }) => {
+      const privateKey = await readFile(options.privateKey, "utf8");
+      const publicKey = options.publicKey ? await readFile(options.publicKey, "utf8") : undefined;
+      const result = await createWorkspacePolicyBundle(options.workspace, {
+        privateKey,
+        issuer: options.issuer,
+        issuedAt: options.issuedAt,
+        expiresAt: options.expiresAt,
+        publicKey,
+        embedPublicKey: options.embedPublicKey,
+        overwrite: options.force
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`Policy bundle written: ${result.path}`);
+      console.log(`Issuer: ${result.issuer}`);
+      console.log(`Issued at: ${result.issuedAt}`);
+      console.log(`Expires at: ${result.expiresAt ?? "not set"}`);
+      console.log(`Config SHA-256: ${result.configSha256}`);
+      console.log(`Bundle SHA-256: ${result.bundleSha256}`);
+      console.log(`Embedded public key SHA-256: ${result.publicKeySha256 ?? "not embedded"}`);
+      console.log("Trusted enforcement still requires a trusted public key through verify-bundle or environment policy.");
+    }
+  );
 
 config
   .command("verify-bundle")

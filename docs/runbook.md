@@ -139,13 +139,19 @@ When the configured DeepSeek-compatible provider returns usage metadata, DeepCod
 
 Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records.
 
-Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle signs a payload containing the active config SHA-256, issuer, issue time, and optional expiry. Verify it with a trusted Ed25519 public key:
+Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle signs a payload containing the active config SHA-256, issuer, issue time, and optional expiry. Sign the active workspace config with an Ed25519 private key kept outside the workspace:
+
+```powershell
+node apps/cli/dist/index.js config sign-bundle --workspace D:\Coding\DeepCodex --private-key D:\keys\policy-private.pem --issuer "Security Team" --expires-at 2026-12-31T23:59:59.000Z
+```
+
+`config sign-bundle` refuses to overwrite an existing bundle unless `--force` is passed. `--embed-public-key` or `--public-key <path>` can include public-key metadata in the bundle for audit convenience, but embedded keys are not trusted for signed-only enforcement. Verify the bundle with a trusted Ed25519 public key:
 
 ```powershell
 node apps/cli/dist/index.js config verify-bundle --workspace D:\Coding\DeepCodex --public-key D:\keys\old-policy.pub.pem D:\keys\new-policy.pub.pem
 ```
 
-The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`. Use `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS` to narrow the trust policy during rotation or incident response. Set `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` to require a trusted signed bundle before CLI/server agent runs start. This enforcement switch is environment-only so an unsigned workspace config cannot disable it.
+The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`. Use `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS` to narrow the trust policy during rotation or incident response. Set `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` to require a trusted signed bundle before CLI/server agent runs start. This enforcement switch is environment-only so an unsigned workspace config cannot disable it. Do not put signing private keys in `.deepcodex/config.json`, `.env`, repository files, session memory, or session history.
 
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
