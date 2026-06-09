@@ -68,6 +68,38 @@ type BudgetPolicy = {
   outputUsdPerMillionTokens?: number;
 };
 
+type WorkspaceConfig = {
+  version?: number;
+  model?: string;
+  policyProfileId?: string;
+  pricingProfileId?: string;
+  approvalMode?: ToolApprovalMode;
+  maxSteps?: number;
+  budget?: BudgetPolicy;
+  policy?: {
+    mode?: ApprovalMode;
+    allowShell?: boolean;
+    allowNetwork?: boolean;
+    allowFileWrite?: boolean;
+    allowStateWrite?: boolean;
+    deniedPaths?: string[];
+    deniedFileExtensions?: string[];
+    maxFileBytes?: number;
+    shellEnvironment?: "minimal" | "inherit";
+  };
+  retention?: {
+    maxSessions?: number;
+    maxAgeDays?: number;
+    dryRun?: boolean;
+  };
+};
+
+type WorkspaceConfigResult = {
+  path: string;
+  exists: boolean;
+  config: WorkspaceConfig;
+};
+
 type PricingProfile = {
   id: string;
   label: string;
@@ -162,6 +194,7 @@ const defaultMaxSessionTokens = localStorage.getItem("deepcodex.maxSessionTokens
 const defaultMaxSessionUsd = localStorage.getItem("deepcodex.maxSessionUsd") ?? "";
 const defaultInputUsdPerMillionTokens = localStorage.getItem("deepcodex.inputUsdPerMillionTokens") ?? "";
 const defaultOutputUsdPerMillionTokens = localStorage.getItem("deepcodex.outputUsdPerMillionTokens") ?? "";
+const defaultMaxSteps = localStorage.getItem("deepcodex.maxSteps") ?? "12";
 const defaultRetentionMaxSessions = localStorage.getItem("deepcodex.retentionMaxSessions") ?? "";
 const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxAgeDays") ?? "";
 const defaultPolicyProfile =
@@ -256,6 +289,7 @@ function App() {
   const [policyProfileId, setPolicyProfileId] = useState<PolicyProfileOption["id"]>(defaultPolicyProfile);
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
   const [approvalMode, setApprovalMode] = useState<ToolApprovalMode>("manual");
+  const [maxSteps, setMaxSteps] = useState(defaultMaxSteps);
   const [maxSessionTokens, setMaxSessionTokens] = useState(defaultMaxSessionTokens);
   const [maxSessionUsd, setMaxSessionUsd] = useState(defaultMaxSessionUsd);
   const [inputUsdPerMillionTokens, setInputUsdPerMillionTokens] = useState(defaultInputUsdPerMillionTokens);
@@ -266,6 +300,8 @@ function App() {
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
   const [retentionState, setRetentionState] = useState<LoadState>("idle");
+  const [configState, setConfigState] = useState<LoadState>("idle");
+  const [configMessage, setConfigMessage] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -333,6 +369,7 @@ function App() {
     setPendingApprovals([]);
     localStorage.setItem("deepcodex.workspace", workspace);
     localStorage.setItem("deepcodex.policyProfile", policyProfileId);
+    localStorage.setItem("deepcodex.maxSteps", maxSteps);
     localStorage.setItem("deepcodex.maxSessionTokens", maxSessionTokens);
     localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
     localStorage.setItem("deepcodex.inputUsdPerMillionTokens", inputUsdPerMillionTokens);
@@ -355,7 +392,7 @@ function App() {
           profileId: policyProfileId === "custom" ? undefined : policyProfileId,
           mode,
           approvalMode,
-          maxSteps: selectedPolicyProfile()?.maxSteps ?? 12,
+          maxSteps: readOptionalRunInteger(maxSteps, "Max steps") ?? selectedPolicyProfile()?.maxSteps ?? 12,
           pricingProfileId: pricingProfileId === "custom" ? undefined : pricingProfileId,
           budget
         })
@@ -434,6 +471,33 @@ function App() {
       }
     } catch {
       setPricingProfiles([]);
+    }
+  }
+
+  async function loadWorkspaceConfig() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    setConfigState("loading");
+    setConfigMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/workspace-config?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const result = (await response.json()) as WorkspaceConfigResult;
+      if (result.exists) {
+        applyWorkspaceConfig(result.config);
+        setConfigMessage(`Loaded ${result.path}`);
+      } else {
+        setConfigMessage(`No config at ${result.path}`);
+      }
+      setConfigState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setConfigMessage(message);
+      setConfigState("error");
     }
   }
 
@@ -648,10 +712,66 @@ function App() {
     if (profile?.approvalMode) {
       setApprovalMode(profile.approvalMode);
     }
+    if (profile?.maxSteps) {
+      setMaxSteps(String(profile.maxSteps));
+    }
   }
 
   function selectedPolicyProfile() {
     return policyProfileOptions.find((entry) => entry.id === policyProfileId);
+  }
+
+  function applyWorkspaceConfig(config: WorkspaceConfig) {
+    const configuredProfileId = toPolicyProfileOptionId(config.policyProfileId);
+    if (configuredProfileId) {
+      applyPolicyProfile(configuredProfileId);
+    }
+    if (config.policy?.mode) {
+      setMode(config.policy.mode);
+    }
+    if (config.approvalMode) {
+      setApprovalMode(config.approvalMode);
+    }
+    if (config.maxSteps !== undefined) {
+      setMaxSteps(String(config.maxSteps));
+    }
+    if (config.pricingProfileId) {
+      setPricingProfileId(config.pricingProfileId);
+    }
+    applyBudgetConfig(config.budget);
+    if (config.retention?.maxSessions !== undefined) {
+      setRetentionMaxSessions(String(config.retention.maxSessions));
+    }
+    if (config.retention?.maxAgeDays !== undefined) {
+      setRetentionMaxAgeDays(String(config.retention.maxAgeDays));
+    }
+  }
+
+  function applyBudgetConfig(budget?: BudgetPolicy) {
+    if (!budget) {
+      return;
+    }
+    if (budget.maxTokens !== undefined) {
+      setMaxSessionTokens(String(budget.maxTokens));
+    }
+    if (budget.maxEstimatedUsd !== undefined) {
+      setMaxSessionUsd(String(budget.maxEstimatedUsd));
+    }
+    if (budget.inputUsdPerMillionTokens !== undefined) {
+      setInputUsdPerMillionTokens(String(budget.inputUsdPerMillionTokens));
+    }
+    if (budget.outputUsdPerMillionTokens !== undefined) {
+      setOutputUsdPerMillionTokens(String(budget.outputUsdPerMillionTokens));
+    }
+  }
+
+  function toPolicyProfileOptionId(value?: string): PolicyProfileOption["id"] | undefined {
+    if (!value) {
+      return undefined;
+    }
+    return policyProfileOptions.some((profile) => profile.id === value)
+      ? (value as PolicyProfileOption["id"])
+      : "custom";
   }
 
   return (
@@ -676,6 +796,13 @@ function App() {
             placeholder="D:\\Coding\\DeepCodex"
             spellCheck={false}
           />
+          <div className="panelActions">
+            <button type="button" className="secondary" onClick={loadWorkspaceConfig} disabled={configState === "loading"}>
+              {configState === "loading" ? "Loading config" : "Load config"}
+            </button>
+            <span className={`fieldStatus ${configState}`}>{configState === "idle" ? "Optional" : configState}</span>
+          </div>
+          {configMessage ? <p className="fieldHelp">{configMessage}</p> : null}
         </section>
 
         <section className="panel">
@@ -716,6 +843,18 @@ function App() {
               </button>
             ))}
           </div>
+          <label className="singleField" htmlFor="max-steps">
+            <span>Max steps</span>
+            <input
+              id="max-steps"
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={maxSteps}
+              onChange={(event) => setMaxSteps(event.target.value)}
+              placeholder="12"
+            />
+          </label>
         </section>
 
         <section className="panel">
@@ -1252,6 +1391,17 @@ function readOptionalRetentionInteger(value: string, label: string): number | un
   }
   if (!Number.isInteger(parsed)) {
     throw new Error(`${label} must be a whole number.`);
+  }
+  return parsed;
+}
+
+function readOptionalRunInteger(value: string, label: string): number | undefined {
+  const parsed = readOptionalBudgetNumber(value, label);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${label} must be a positive whole number.`);
   }
   return parsed;
 }

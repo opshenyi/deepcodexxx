@@ -43,6 +43,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added built-in reusable policy profiles across core/server/Web/Desktop/CLI: `inspection`, `guarded-write`, and `full-access-review`. Profiles bundle execution mode, approval default, max steps, and shell environment, with CLI `profiles list/show` and Web profile selector.
 - Added caller-managed pricing profiles across core/server/Web/Desktop/CLI. `DEEPCODEX_PRICING_PROFILES` supplies JSON profile definitions, `DEEPCODEX_PRICING_PROFILE` or run options select one, CLI has `pricing list/show`, server exposes `/api/pricing-profiles`, and Web shows a Budget pricing selector when profiles exist.
 - Added media/artifact extension policy: default file tools deny common image, video, audio, archive, Office/PDF, executable, library, and WebAssembly extensions; `DEEPCODEX_DENIED_EXTENSIONS` can extend the list.
+- Added workspace-level `.deepcodex/config.json` support across core/server/Web/Desktop/CLI. The config can set non-secret repository defaults for model, policy profile, approval mode, max steps, budget, pricing profile, shell environment, file policy additions, and session retention. CLI now has `config show/init`, `doctor --workspace` reports config status, server exposes `/api/workspace-config`, and Web has `Load config` plus a max-steps control.
 
 ## Architecture Decisions
 
@@ -57,6 +58,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env, not a full sandbox.
 2. Add purpose-built media/artifact preview tools for safe non-text summaries when needed.
-3. Add per-workspace model/budget policy templates, custom team policy profile storage, and project-specific DLP controls.
+3. Add custom team policy profile storage, signed policy bundles, provider allowlists, and project-specific DLP controls.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

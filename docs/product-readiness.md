@@ -8,6 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
+- Workspace-level `.deepcodex/config.json` defaults for model, policy profile, approval mode, max steps, budget, pricing profile, file policy additions, shell environment, and retention.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs.
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
@@ -49,7 +50,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, strict read-only inspection, and minimal shell env; still needs OS-level sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, strict read-only inspection, and minimal shell env; still needs OS-level sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
@@ -58,7 +59,6 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add custom team policy profile storage.
 - Add project-specific DLP policies and purpose-built media/artifact preview tools.
 - Add richer generated-asset handling and file-type policies.
-- Add per-workspace model and budget policy templates.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.

@@ -9,7 +9,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. | Add OS-level sandboxing or isolated execution workers. |
-| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, and pricing profiles are caller-managed configuration. | Add secrets management, provider allowlists, and per-workspace model policy. |
+| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model and budget defaults. | Add secrets management and provider allowlists. |
 | Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
 
 ## Approval Modes
@@ -43,7 +43,9 @@ Implemented controls:
 - Workspace paths are resolved with `path.resolve` and rejected if they escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, `.env`, `.env.*`, `.deepcodex/state`, and common generated/build output folders such as `dist`, `build`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.vite`, and `.parcel-cache` are denied by default for file listing, reading, writing, editing, and search. Nested matches are covered with `**` patterns.
 - `DEEPCODEX_DENIED_PATHS` can extend the default denied path patterns for controlled environments, including `**` patterns such as `**/*.map`.
+- `.deepcodex/config.json` can also extend denied path patterns for a specific workspace.
 - Common media, archive, Office/PDF, executable, library, and WebAssembly extensions are denied by default for file listing, reading, writing, editing, and search. `DEEPCODEX_DENIED_EXTENSIONS` can extend the default list.
+- `.deepcodex/config.json` can also extend denied file extensions for a specific workspace.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
@@ -85,6 +87,7 @@ Provider usage controls:
 - Token budgets can be set with `DEEPCODEX_MAX_SESSION_TOKENS`, CLI flags, or the Web Budget panel.
 - Estimated cost budgets can be set with `DEEPCODEX_MAX_SESSION_USD`, but require caller-provided input and output token prices.
 - Pricing profiles can be configured with `DEEPCODEX_PRICING_PROFILES` and selected through CLI, server, or Web budget controls.
+- `.deepcodex/config.json` can provide workspace defaults for model, policy profile, pricing profile, max steps, token/cost budget, shell environment, and retention.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
 - Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.
 
@@ -112,6 +115,7 @@ Current limitations:
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
+| Workspace configuration | `.deepcodex/config.json` in the selected workspace. | Non-secret team defaults only; explicit CLI/Web values and environment variables can override it. |
 | Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, redacted for common secret patterns before event persistence, and prunable by retention policy. | Add export review controls and broader DLP coverage. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |
@@ -123,7 +127,7 @@ The next security work should prioritize:
 - Richer generated-asset handling and file-type policies.
 - Policy profile metadata.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
-- Per-workspace provider and model policy.
+- Provider allowlists and signed team policy bundles.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

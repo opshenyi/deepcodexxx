@@ -10,4 +10,5 @@ export * from "./safety.js";
 export * from "./session-store.js";
 export * from "./tools.js";
 export * from "./types.js";
+export * from "./workspace-config.js";
 export * from "./workspace.js";

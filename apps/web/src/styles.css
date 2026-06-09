@@ -204,6 +204,19 @@ label,
   overflow-wrap: anywhere;
 }
 
+.panelActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.panelActions button {
+  flex: 1 1 auto;
+  padding: 9px 11px;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: 1fr;
@@ -250,6 +263,26 @@ label,
   border-color: var(--brand);
   background: var(--brand-soft);
   box-shadow: inset 0 0 0 1px rgba(240, 84, 35, 0.18);
+}
+
+.singleField {
+  display: block;
+  margin-top: 10px;
+}
+
+.singleField span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.singleField input {
+  padding: 9px 10px;
 }
 
 .budgetFields {

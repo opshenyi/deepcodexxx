@@ -15,6 +15,7 @@ import {
   parsePricingProfiles,
   pruneSessionHistories,
   readSessionHistory,
+  readWorkspaceConfig,
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
@@ -26,7 +27,8 @@ import type {
   ApprovalPolicy,
   ShellEnvironmentMode,
   ToolApprovalDecision,
-  ToolApprovalRequest
+  ToolApprovalRequest,
+  WorkspaceConfig
 } from "@deepcodex/core";
 import type { BudgetPolicy, SessionRetentionPolicy } from "@deepcodex/core";
 
@@ -74,6 +76,14 @@ app.get("/api/pricing-profiles", (_req, res) => {
   });
 });
 
+app.get("/api/workspace-config", async (req, res, next) => {
+  try {
+    res.json(await readWorkspaceConfig(readWorkspace(req.query.workspace)));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/memory", async (req, res, next) => {
   try {
     const workspacePath = readWorkspace(req.body.workspace);
@@ -98,8 +108,9 @@ app.get("/api/sessions", async (req, res, next) => {
 app.post("/api/sessions/prune", async (req, res, next) => {
   try {
     const workspacePath = readWorkspace(req.body?.workspace ?? req.query.workspace);
+    const workspaceConfig = await readWorkspaceConfig(workspacePath);
     const workspace = await createWorkspaceContext(workspacePath);
-    const result = await pruneSessionHistories(workspace, createRetentionPolicy(req.body));
+    const result = await pruneSessionHistories(workspace, createRetentionPolicy(req.body, workspaceConfig.config));
     res.json({ result });
   } catch (error) {
     next(error);
@@ -206,6 +217,7 @@ app.post("/api/agent/run", async (req, res) => {
     budget?: BudgetPolicy;
     profileId?: string;
     pricingProfileId?: string;
+    model?: string;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -225,9 +237,11 @@ app.post("/api/agent/run", async (req, res) => {
   let recordEvent: ((event: AgentEvent) => Promise<void>) | undefined;
 
   try {
-    const profile = readPolicyProfile(body.profileId);
-    const policy = createRunPolicy(body.mode, profile);
-    const workspace = await createWorkspaceContext(readWorkspace(body.workspace), policy);
+    const workspacePath = readWorkspace(body.workspace);
+    const workspaceConfig = await readWorkspaceConfig(workspacePath);
+    const profile = readPolicyProfile(body.profileId, workspaceConfig.config);
+    const policy = createRunPolicy(body.mode, profile, workspaceConfig.config);
+    const workspace = await createWorkspaceContext(workspacePath, policy);
     if (policy.allowStateWrite !== false) {
       const recorder = createSessionRecorder(workspace);
       recordEvent = async (event: AgentEvent) => {
@@ -243,10 +257,13 @@ app.post("/api/agent/run", async (req, res) => {
     await runDeepCodexAgent({
       prompt,
       workspace: workspace.root,
-      maxSteps: body.maxSteps ?? profile?.maxSteps,
+      model: readModel(body.model, workspaceConfig.config),
+      maxSteps: body.maxSteps ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps,
       policy,
-      budget: createBudgetPolicy(body.budget ?? profile?.budget, body.pricingProfileId),
-      requestToolApproval: createToolApprovalHandler(body.approvalMode ?? profile?.approvalMode ?? "auto"),
+      budget: createBudgetPolicy(body.budget, profile?.budget, body.pricingProfileId, workspaceConfig.config),
+      requestToolApproval: createToolApprovalHandler(
+        resolveRunApprovalMode(body.approvalMode, profile, workspaceConfig.config)
+      ),
       onEvent: async (event) => {
         send(event);
         await recordEvent?.(event);
@@ -281,13 +298,18 @@ function readWorkspace(value: unknown): string {
 
 type RunApprovalMode = "auto" | "manual" | "deny";
 
-function readPolicyProfile(profileId?: string) {
-  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE);
+function readPolicyProfile(profileId?: string, config?: WorkspaceConfig) {
+  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId);
 }
 
-function createRunPolicy(mode: ApprovalMode | undefined, profile: ReturnType<typeof readPolicyProfile>) {
-  const selected = mode ?? profile?.policy.mode ?? "workspace-write";
-  const base: Partial<ApprovalPolicy> = profile?.policy ?? {};
+function createRunPolicy(
+  mode: ApprovalMode | undefined,
+  profile: ReturnType<typeof readPolicyProfile>,
+  config?: WorkspaceConfig
+) {
+  const configPolicy = config?.policy ?? {};
+  const base: Partial<ApprovalPolicy> = { ...profile?.policy, ...configPolicy };
+  const selected = mode ?? configPolicy.mode ?? profile?.policy.mode ?? "workspace-write";
   return {
     ...base,
     mode: selected,
@@ -295,11 +317,24 @@ function createRunPolicy(mode: ApprovalMode | undefined, profile: ReturnType<typ
     allowFileWrite: selected !== "suggest" && (base.allowFileWrite ?? true),
     allowNetwork: false,
     allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
-    deniedPaths: readDeniedPathsFromEnv(),
-    deniedFileExtensions: readDeniedFileExtensionsFromEnv(),
-    maxFileBytes: readMaxFileBytesFromEnv(),
+    deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
+    deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
+    maxFileBytes: readMaxFileBytesFromEnv() ?? base.maxFileBytes,
     shellEnvironment: readShellEnvironmentModeFromEnv() ?? base.shellEnvironment
   };
+}
+
+function readModel(model: string | undefined, config?: WorkspaceConfig): string | undefined {
+  const selected = model?.trim() || process.env.DEEPSEEK_MODEL || config?.model;
+  return selected?.trim() ? selected.trim() : undefined;
+}
+
+function resolveRunApprovalMode(
+  mode: RunApprovalMode | undefined,
+  profile: ReturnType<typeof readPolicyProfile>,
+  config?: WorkspaceConfig
+): RunApprovalMode {
+  return mode ?? config?.approvalMode ?? profile?.approvalMode ?? "auto";
 }
 
 function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
@@ -317,9 +352,10 @@ function createRetentionPolicy(input?: {
   maxSessions?: unknown;
   maxAgeDays?: unknown;
   dryRun?: unknown;
-}): SessionRetentionPolicy {
+}, config?: WorkspaceConfig): SessionRetentionPolicy {
   return removeUndefinedRetentionValues({
-    ...readRetentionPolicyFromEnv(),
+    ...config?.retention,
+    ...removeUndefinedRetentionValues(readRetentionPolicyFromEnv()),
     ...removeUndefinedRetentionValues({
       maxSessions: readOptionalInteger(input?.maxSessions),
       maxAgeDays: readOptionalNumber(input?.maxAgeDays),
@@ -350,16 +386,24 @@ function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): Session
   return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as SessionRetentionPolicy;
 }
 
-function createBudgetPolicy(input?: BudgetPolicy, pricingProfileId?: string): BudgetPolicy | undefined {
+function createBudgetPolicy(
+  input?: BudgetPolicy,
+  profileBudget?: BudgetPolicy,
+  pricingProfileId?: string,
+  config?: WorkspaceConfig
+): BudgetPolicy | undefined {
   const pricingProfile = resolvePricingProfile(
     readPricingProfilesFromEnv(),
-    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE
+    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE ?? config?.pricingProfileId
   );
   const merged = removeUndefinedBudgetValues({
-    ...applyPricingProfileToBudget(readBudgetPolicyFromEnv(), pricingProfile),
+    ...removeUndefinedBudgetValues(profileBudget ?? {}),
+    ...removeUndefinedBudgetValues(config?.budget ?? {}),
+    ...readBudgetPolicyFromEnv(),
     ...removeUndefinedBudgetValues(readBudgetPolicyFromInput(input))
   });
-  return Object.values(merged).some((value) => value !== undefined) ? merged : undefined;
+  const budget = removeUndefinedBudgetValues(applyPricingProfileToBudget(merged, pricingProfile) ?? {});
+  return Object.values(budget).some((value) => value !== undefined) ? budget : undefined;
 }
 
 function readPricingProfilesFromEnv() {
@@ -434,6 +478,11 @@ function readMaxFileBytesFromEnv(): number | undefined {
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {
+  const merged = lists.flatMap((list) => list ?? []).map((entry) => entry.trim()).filter(Boolean);
+  return merged.length > 0 ? [...new Set(merged)] : undefined;
 }
 
 function createToolApprovalHandler(mode: RunApprovalMode) {

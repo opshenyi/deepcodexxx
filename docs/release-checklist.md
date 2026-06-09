@@ -19,6 +19,7 @@ npm run typecheck
 npm test
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
 Expected result:
@@ -29,6 +30,7 @@ Expected result:
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
+- CLI `doctor` reports workspace config status, and `config show` reports either a valid config or a clear missing state.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
 - CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
@@ -44,6 +46,7 @@ Checklist:
 - `http://127.0.0.1:17361/api/health` returns `ok: true`.
 - `http://127.0.0.1:5173` loads the Web client.
 - Workspace path can be entered and saved in the browser.
+- `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - Policy profile selector can switch between Inspection, Guarded write, and Full access review.
 - `suggest` mode can run a repository inspection prompt.
 - Event stream shows session start, steps, tool calls, and final output.
@@ -81,6 +84,7 @@ Checklist:
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
@@ -91,6 +95,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest -
 Checklist:
 
 - CLI prints configuration through `doctor`.
+- CLI can show workspace defaults through `config show`.
 - `memory` reads workspace memory without crashing.
 - `ask` prints session, step, tool, and final output events.
 - Budgeted `ask` prints budget status when the provider returns usage metadata.

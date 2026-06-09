@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include reusable policy profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
+Core safety features include workspace-level configuration, reusable policy profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
 
 ## Quick Start
 
@@ -26,6 +26,7 @@ CLI client:
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
@@ -33,6 +34,13 @@ node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepC
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-tokens 20000 "Inspect this repository with a token budget."
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
+```
+
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model, policy profile, approval mode, max steps, budget, file policy additions, pricing profile, and session retention defaults:
+
+```powershell
+node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
 ## Environment
@@ -54,6 +62,8 @@ node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 
+Environment variables and explicit CLI/Web request values override `.deepcodex/config.json`; the workspace config is the team default layer, not a secrets store.
+
 ## Runbook
 
 Detailed setup and smoke-test steps are in `docs/runbook.md`.
@@ -61,6 +71,7 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - Web: `npm run dev`, then open `http://127.0.0.1:5173`.
 - Desktop: `npm run dev:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
+- Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
 - Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.
 - Health check: `http://127.0.0.1:17361/api/health`.
 

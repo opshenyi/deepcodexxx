@@ -41,6 +41,50 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
 
+## Workspace Configuration
+
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, shell environment mode, and session retention defaults.
+
+Create a template:
+
+```powershell
+node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
+```
+
+Inspect the active file:
+
+```powershell
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
+```
+
+Example:
+
+```json
+{
+  "version": 1,
+  "model": "deepseek-chat",
+  "policyProfileId": "guarded-write",
+  "approvalMode": "manual",
+  "maxSteps": 12,
+  "pricingProfileId": "custom",
+  "budget": {
+    "maxTokens": 120000
+  },
+  "policy": {
+    "shellEnvironment": "minimal",
+    "maxFileBytes": 524288,
+    "deniedPaths": ["secrets"],
+    "deniedFileExtensions": [".pem", ".sqlite"]
+  },
+  "retention": {
+    "maxSessions": 100,
+    "maxAgeDays": 30
+  }
+}
+```
+
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Do not put provider keys or secrets in workspace config.
+
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
@@ -52,6 +96,7 @@ Agent events are redacted for common secret patterns before they are streamed to
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
 Expected checks:
@@ -59,6 +104,7 @@ Expected checks:
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
 - Budget variables print when they are configured.
+- Workspace config path and status print without crashing.
 - Node version prints without crashing.
 
 ## Web Client
@@ -80,11 +126,12 @@ Recommended demo flow:
 1. Enter a workspace path such as `D:\Coding\DeepCodex`.
 2. Start with the `Inspection` policy profile for read-only prompts.
 3. Use `Guarded write` only on a disposable branch or sample workspace.
-4. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
-5. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-7. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-8. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+4. Use `Load config` when the workspace has `.deepcodex/config.json`, then confirm profile, approval, max steps, budget, pricing, and retention values.
+5. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
+6. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
+7. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+8. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+9. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -120,6 +167,12 @@ List configured pricing profiles:
 
 ```powershell
 node apps/cli/dist/index.js pricing list
+```
+
+Inspect workspace defaults:
+
+```powershell
+node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
 Read workspace memory:
@@ -240,5 +293,6 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
+| Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON or unsupported values. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |
 | Session history grows too large. | Retention variables are not set and pruning has not been run. | Use Web Audit retention controls or `deepcodex sessions prune --dry-run` before applying deletion. |

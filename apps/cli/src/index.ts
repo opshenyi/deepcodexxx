@@ -15,10 +15,12 @@ import {
   parsePricingProfiles,
   pruneSessionHistories,
   readSessionHistory,
+  readWorkspaceConfig,
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
-  runDeepCodexAgent
+  runDeepCodexAgent,
+  writeWorkspaceConfigTemplate
 } from "@deepcodex/core";
 import type {
   AgentEvent,
@@ -33,7 +35,8 @@ import type {
   ToolAuditMetadata,
   SessionEventRecorder,
   ToolApprovalDecision,
-  ToolApprovalRequest
+  ToolApprovalRequest,
+  WorkspaceConfig
 } from "@deepcodex/core";
 
 const program = new Command();
@@ -56,7 +59,7 @@ program
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
-  .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
+  .option("--shell-env <mode>", "minimal or inherit")
   .action(
     async (
       promptParts: string[],
@@ -74,19 +77,23 @@ program
         shellEnv?: string;
       }
     ) => {
-      const profile = resolveCliProfile(options.profile);
-      const approvalMode = parseCliApprovalMode(options.approval ?? profile?.approvalMode ?? "auto");
+      const workspaceConfig = await readWorkspaceConfig(options.workspace);
+      const profile = resolveCliProfile(options.profile, workspaceConfig.config);
+      const approvalMode = parseCliApprovalMode(
+        options.approval ?? workspaceConfig.config.approvalMode ?? profile?.approvalMode ?? "auto"
+      );
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
-        const policy = createPolicy(options.mode, options.shellEnv, profile);
+        const policy = createPolicy(options.mode, options.shellEnv, profile, workspaceConfig.config);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt: promptParts.join(" "),
           workspace: workspace.root,
-          maxSteps: readOptionalInteger(options.maxSteps) ?? profile?.maxSteps ?? 12,
+          model: readModel(workspaceConfig.config),
+          maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile),
+          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -108,7 +115,8 @@ program
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
-  .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
+  .option("--shell-env <mode>", "minimal or inherit")
+  .option("--max-steps <number>", "Maximum agent loop count")
   .action(async (options: {
     workspace: string;
     mode?: string;
@@ -120,10 +128,14 @@ program
     outputUsdPerMillionTokens?: string;
     pricingProfile?: string;
     shellEnv?: string;
+    maxSteps?: string;
   }) => {
     const rl = createInterface({ input, output });
-    const profile = resolveCliProfile(options.profile);
-    const approvalMode = parseCliApprovalMode(options.approval ?? profile?.approvalMode ?? "auto");
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const profile = resolveCliProfile(options.profile, workspaceConfig.config);
+    const approvalMode = parseCliApprovalMode(
+      options.approval ?? workspaceConfig.config.approvalMode ?? profile?.approvalMode ?? "auto"
+    );
     console.log(chalk.gray("DeepCodex interactive session. Submit an empty line to exit."));
     try {
       while (true) {
@@ -131,15 +143,16 @@ program
         if (!prompt) {
           break;
         }
-        const policy = createPolicy(options.mode, options.shellEnv, profile);
+        const policy = createPolicy(options.mode, options.shellEnv, profile, workspaceConfig.config);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt,
           workspace: workspace.root,
-          maxSteps: profile?.maxSteps ?? 12,
+          model: readModel(workspaceConfig.config),
+          maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile),
+          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -161,6 +174,33 @@ const sessions = program.command("sessions").description("Inspect persisted Deep
 
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
+const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
+
+config
+  .command("show")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; json: boolean }) => {
+    const result = await readWorkspaceConfig(options.workspace);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(`Config path: ${result.path}`);
+    console.log(`Config status: ${result.exists ? "present" : "missing"}`);
+    if (result.exists) {
+      console.log(JSON.stringify(result.config, null, 2));
+    }
+  });
+
+config
+  .command("init")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--force", "Overwrite an existing workspace config", false)
+  .action(async (options: { workspace: string; force: boolean }) => {
+    const result = await writeWorkspaceConfigTemplate(options.workspace, { overwrite: options.force });
+    console.log(`Created workspace config: ${result.path}`);
+  });
 
 profiles
   .command("list")
@@ -284,8 +324,9 @@ sessions
   .option("--dry-run", "Show what would be deleted without removing files", false)
   .action(
     async (options: { workspace: string; maxSessions?: string; maxAgeDays?: string; dryRun: boolean }) => {
+      const workspaceConfig = await readWorkspaceConfig(options.workspace);
       const workspace = await createWorkspaceContext(options.workspace);
-      const result = await pruneSessionHistories(workspace, createRetentionPolicy(options));
+      const result = await pruneSessionHistories(workspace, createRetentionPolicy(options, workspaceConfig.config));
       console.log(
         `scanned ${result.scanned} sessions, retained ${result.retained}, ${
           result.dryRun ? "would delete" : "deleted"
@@ -299,10 +340,12 @@ sessions
 
 program
   .command("doctor")
-  .action(() => {
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .action(async (options: { workspace: string }) => {
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
     console.log(`DeepSeek base URL: ${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}`);
-    console.log(`DeepSeek model: ${process.env.DEEPSEEK_MODEL ?? "deepseek-chat"}`);
+    console.log(`DeepSeek model: ${readModel(workspaceConfig.config) ?? "deepseek-chat"}`);
     console.log(`Max session tokens: ${process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set"}`);
     console.log(`Max session USD: ${process.env.DEEPCODEX_MAX_SESSION_USD ?? "not set"}`);
     console.log(
@@ -311,10 +354,13 @@ program
     console.log(
       `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
     );
-    console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? "custom"}`);
-    console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? "custom"}`);
+    console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? workspaceConfig.config.policyProfileId ?? "custom"}`);
+    console.log(`Approval mode: ${workspaceConfig.config.approvalMode ?? "profile/default"}`);
+    console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom"}`);
     console.log(`Configured pricing profiles: ${readPricingProfilesFromEnv().length}`);
-    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? "minimal"}`);
+    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? workspaceConfig.config.policy?.shellEnvironment ?? "minimal"}`);
+    console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
+    console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
     console.log(`Node: ${process.version}`);
   });
 
@@ -384,25 +430,38 @@ function parseMode(value: string): "suggest" | "workspace-write" | "full-access"
   throw new Error("mode must be suggest, workspace-write, or full-access");
 }
 
-function resolveCliProfile(profileId?: string): PolicyProfile | undefined {
-  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE);
+function resolveCliProfile(profileId?: string, config?: WorkspaceConfig): PolicyProfile | undefined {
+  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId);
 }
 
-function createPolicy(mode: string | undefined, shellEnv: string | undefined, profile?: PolicyProfile): ApprovalPolicy {
-  const selectedMode = mode ? parseMode(mode) : (profile?.policy.mode ?? "workspace-write");
-  const selectedShellEnv = shellEnv ?? process.env.DEEPCODEX_SHELL_ENV ?? profile?.policy.shellEnvironment ?? "minimal";
+function createPolicy(
+  mode: string | undefined,
+  shellEnv: string | undefined,
+  profile?: PolicyProfile,
+  config?: WorkspaceConfig
+): ApprovalPolicy {
+  const configPolicy = config?.policy ?? {};
+  const base: Partial<ApprovalPolicy> = { ...profile?.policy, ...configPolicy };
+  const selectedMode = mode ? parseMode(mode) : (configPolicy.mode ?? profile?.policy.mode ?? "workspace-write");
+  const selectedShellEnv =
+    shellEnv ?? process.env.DEEPCODEX_SHELL_ENV ?? base.shellEnvironment ?? "minimal";
   return {
-    ...profile?.policy,
+    ...base,
     mode: selectedMode,
-    allowFileWrite: selectedMode !== "suggest" && (profile?.policy.allowFileWrite ?? true),
-    allowShell: selectedMode !== "suggest" && (profile?.policy.allowShell ?? true),
+    allowFileWrite: selectedMode !== "suggest" && (base.allowFileWrite ?? true),
+    allowShell: selectedMode !== "suggest" && (base.allowShell ?? true),
     allowNetwork: false,
-    allowStateWrite: selectedMode !== "suggest" && (profile?.policy.allowStateWrite ?? true),
-    deniedPaths: readDeniedPathsFromEnv(),
-    deniedFileExtensions: readDeniedFileExtensionsFromEnv(),
-    maxFileBytes: readMaxFileBytesFromEnv() ?? profile?.policy.maxFileBytes,
+    allowStateWrite: selectedMode !== "suggest" && (base.allowStateWrite ?? true),
+    deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
+    deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
+    maxFileBytes: readMaxFileBytesFromEnv() ?? base.maxFileBytes,
     shellEnvironment: parseShellEnvironmentMode(selectedShellEnv)
   };
+}
+
+function readModel(config?: WorkspaceConfig): string | undefined {
+  const selected = process.env.DEEPSEEK_MODEL || config?.model;
+  return selected?.trim() ? selected.trim() : undefined;
 }
 
 function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {
@@ -416,10 +475,13 @@ function createRetentionPolicy(options: {
   maxSessions?: string;
   maxAgeDays?: string;
   dryRun?: boolean;
-}): SessionRetentionPolicy {
+}, config?: WorkspaceConfig): SessionRetentionPolicy {
   const merged: SessionRetentionPolicy = {
-    maxSessions: readOptionalInteger(process.env.DEEPCODEX_MAX_SESSIONS),
-    maxAgeDays: readOptionalNumber(process.env.DEEPCODEX_SESSION_RETENTION_DAYS)
+    ...config?.retention,
+    ...removeUndefinedRetentionValues({
+      maxSessions: readOptionalInteger(process.env.DEEPCODEX_MAX_SESSIONS),
+      maxAgeDays: readOptionalNumber(process.env.DEEPCODEX_SESSION_RETENTION_DAYS)
+    })
   };
   const cliPolicy = removeUndefinedRetentionValues({
     maxSessions: readOptionalInteger(options.maxSessions),
@@ -434,13 +496,14 @@ function createBudgetPolicy(options: {
   maxSessionUsd?: string;
   inputUsdPerMillionTokens?: string;
   outputUsdPerMillionTokens?: string;
-}, profileBudget?: BudgetPolicy, pricingProfileId?: string): BudgetPolicy | undefined {
+}, profileBudget?: BudgetPolicy, pricingProfileId?: string, config?: WorkspaceConfig): BudgetPolicy | undefined {
   const pricingProfile = resolvePricingProfile(
     readPricingProfilesFromEnv(),
-    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE
+    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE ?? config?.pricingProfileId
   );
   const merged: BudgetPolicy = {
-    ...applyPricingProfileToBudget(profileBudget, pricingProfile),
+    ...removeUndefinedBudgetValues(profileBudget ?? {}),
+    ...removeUndefinedBudgetValues(config?.budget ?? {}),
     ...removeUndefinedBudgetValues({
     maxTokens: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_TOKENS),
     maxEstimatedUsd: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_USD),
@@ -457,7 +520,8 @@ function createBudgetPolicy(options: {
   };
 
   const budget = { ...merged, ...removeUndefinedBudgetValues(cliBudget) };
-  return Object.values(budget).some((value) => value !== undefined) ? budget : undefined;
+  const withPricing = removeUndefinedBudgetValues(applyPricingProfileToBudget(budget, pricingProfile) ?? {});
+  return Object.values(withPricing).some((value) => value !== undefined) ? withPricing : undefined;
 }
 
 function readPricingProfilesFromEnv() {
@@ -544,6 +608,11 @@ function readMaxFileBytesFromEnv(): number | undefined {
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {
+  const merged = lists.flatMap((list) => list ?? []).map((entry) => entry.trim()).filter(Boolean);
+  return merged.length > 0 ? [...new Set(merged)] : undefined;
 }
 
 type CliApprovalMode = "auto" | "prompt" | "deny";
