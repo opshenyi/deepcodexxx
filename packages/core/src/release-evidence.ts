@@ -4,6 +4,7 @@ import {
   type PolicyBundleVerificationResult,
   verifyWorkspacePolicyBundle
 } from "./policy-bundle.js";
+import { assertProviderAllowed, resolveProviderSelection } from "./provider-policy.js";
 import {
   scanWorkspaceSensitiveText,
   type SensitiveTextScanOptions,
@@ -26,6 +27,15 @@ export interface ReleaseEvidenceCheck {
 
 export interface ReleaseEvidenceProviderStatus {
   deepSeekConfigured?: boolean;
+  baseUrl?: string;
+  model?: string;
+  fallbackModels?: string[];
+  thinking?: string;
+  reasoningEffort?: string;
+  allowedBaseUrls?: number;
+  allowedModels?: number;
+  policyValid?: boolean;
+  policyReason?: string;
 }
 
 export interface ReleaseEvidenceSessionSummary {
@@ -79,9 +89,7 @@ export async function createReleaseEvidenceReport(
   ]);
   const recentLimit = clampReportLimit(options.recentSessionLimit, 8, 1, 100);
   const generatedAt = normalizeReportDate(options.generatedAt ?? new Date(), "generatedAt");
-  const provider: ReleaseEvidenceProviderStatus = {
-    deepSeekConfigured: options.deepSeekConfigured
-  };
+  const provider = createReleaseEvidenceProviderStatus(workspaceConfig, options.deepSeekConfigured);
   const signedPolicyRequired = options.signedPolicyRequired ?? false;
   const reportBase = {
     generatedAt,
@@ -142,6 +150,37 @@ async function createReleaseEvidenceWorkspace(
   return createWorkspaceContext(workspaceRoot, policy);
 }
 
+function createReleaseEvidenceProviderStatus(
+  workspaceConfig: WorkspaceConfigReadResult,
+  deepSeekConfigured: boolean | undefined
+): ReleaseEvidenceProviderStatus {
+  const selection = resolveProviderSelection({
+    baseUrl: workspaceConfig.config.provider?.baseUrl,
+    model: workspaceConfig.config.model,
+    fallbackModels: workspaceConfig.config.provider?.fallbackModels,
+    thinking: workspaceConfig.config.provider?.thinking,
+    reasoningEffort: workspaceConfig.config.provider?.reasoningEffort
+  });
+  const provider: ReleaseEvidenceProviderStatus = {
+    deepSeekConfigured,
+    baseUrl: selection.baseUrl,
+    model: selection.model,
+    fallbackModels: selection.fallbackModels,
+    thinking: selection.thinking,
+    reasoningEffort: selection.reasoningEffort,
+    allowedBaseUrls: workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0,
+    allowedModels: workspaceConfig.config.provider?.allowedModels?.length ?? 0,
+    policyValid: true
+  };
+  try {
+    assertProviderAllowed(selection, workspaceConfig.config.provider);
+  } catch (error) {
+    provider.policyValid = false;
+    provider.policyReason = error instanceof Error ? error.message : String(error);
+  }
+  return provider;
+}
+
 function createReleaseEvidenceChecks(input: Omit<ReleaseEvidenceReport, "checks" | "summary">): ReleaseEvidenceCheck[] {
   const checks: ReleaseEvidenceCheck[] = [
     {
@@ -154,6 +193,19 @@ function createReleaseEvidenceChecks(input: Omit<ReleaseEvidenceReport, "checks"
           : input.provider.deepSeekConfigured
             ? "DeepSeek API key is configured for live demos."
             : "DeepSeek API key is missing; the product will use local demo mode."
+    },
+    {
+      id: "provider-policy",
+      label: "Provider policy",
+      status: input.provider.policyValid === false ? "fail" : "pass",
+      detail:
+        input.provider.policyValid === false
+          ? input.provider.policyReason ?? "Provider selection is not allowed by workspace policy."
+          : `Model ${input.provider.model ?? "unknown"} at ${input.provider.baseUrl ?? "unknown"}; ${
+              input.provider.fallbackModels?.length ?? 0
+            } fallback model(s); thinking ${input.provider.thinking ?? "unknown"}; allowlists ${
+              input.provider.allowedBaseUrls ?? 0
+            } URL(s) / ${input.provider.allowedModels ?? 0} model(s).`
     },
     {
       id: "workspace-config",
@@ -236,6 +288,16 @@ function renderReleaseEvidenceMarkdown(report: ReleaseEvidenceReport): string {
     `- Policy bundle: ${report.policyBundle.exists ? report.policyBundle.path : "missing"}`,
     `- Policy bundle status: ${report.policyBundle.ok ? "trusted" : report.policyBundle.signatureVerified ? "untrusted" : "failed"}`,
     `- Policy bundle reason: ${report.policyBundle.reason}`,
+    "",
+    "## Provider",
+    "",
+    `- API key: ${report.provider.deepSeekConfigured === undefined ? "not supplied" : report.provider.deepSeekConfigured ? "configured" : "missing"}`,
+    `- Base URL: ${report.provider.baseUrl ?? "unknown"}`,
+    `- Model: ${report.provider.model ?? "unknown"}`,
+    `- Fallback models: ${report.provider.fallbackModels?.length ?? 0}`,
+    `- Thinking: ${report.provider.thinking ?? "unknown"}`,
+    `- Reasoning effort: ${report.provider.reasoningEffort ?? "not set"}`,
+    `- Provider policy: ${report.provider.policyValid === false ? "failed" : "passed"}`,
     "",
     "## Evals",
     "",

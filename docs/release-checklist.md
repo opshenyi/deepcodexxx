@@ -65,7 +65,7 @@ Expected result:
 - CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.
 - CLI `providers models` reports the checked default model, V4 model ids, and legacy alias retirement status.
 - CLI `evals report --json` emits parseable aggregate evidence for recorded eval runs.
-- CLI `release evidence --json` emits parseable readiness evidence across config, policy, evals, security scan, and sessions.
+- CLI `release evidence --json` emits parseable readiness evidence across config, policy, provider selection, evals, security scan, and sessions.
 - CLI `release preflight --json` emits parseable delivery checks for root scripts, client build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, docs, and ignored local state.
 - CLI `security scan --json` emits parseable finding metadata without matched secret values.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.

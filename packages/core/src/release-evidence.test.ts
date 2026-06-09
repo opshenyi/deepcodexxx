@@ -56,6 +56,11 @@ describe("release evidence report", () => {
       sha256: workspaceConfig.sha256
     });
     expect(report.evals.totalRuns).toBe(1);
+    expect(report.provider).toMatchObject({
+      model: "deepseek-v4-flash",
+      thinking: "disabled",
+      policyValid: true
+    });
     expect(report.securityScan.findings).toHaveLength(1);
     expect(report.securityScan.findings[0]).toMatchObject({
       path: "src/config.txt",
@@ -64,8 +69,35 @@ describe("release evidence report", () => {
       label: "DEEPSEEK_API_KEY"
     });
     expect(report.checks.find((check) => check.id === "eval-evidence")?.status).toBe("pass");
+    expect(report.checks.find((check) => check.id === "provider-policy")?.status).toBe("pass");
     expect(report.checks.find((check) => check.id === "security-scan")?.status).toBe("warn");
     expect(JSON.stringify(report)).not.toContain("release-secret");
+  });
+
+  it("fails release readiness when provider selection violates workspace policy", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"), { recursive: true });
+    await writeFile(
+      path.join(tempDir, ".deepcodex", "config.json"),
+      JSON.stringify({
+        model: "deepseek-v4-flash",
+        provider: {
+          allowedModels: ["deepseek-v4-pro"]
+        }
+      }),
+      "utf8"
+    );
+
+    const report = await createReleaseEvidenceReport(tempDir, {
+      generatedAt: "2026-06-09T02:00:00.000Z"
+    });
+
+    expect(report.provider.policyValid).toBe(false);
+    expect(report.checks.find((check) => check.id === "provider-policy")).toMatchObject({
+      status: "fail",
+      label: "Provider policy"
+    });
+    expect(report.summary.ready).toBe(false);
   });
 
   it("marks untrusted policy bundles as failures when signed policy is required", async () => {

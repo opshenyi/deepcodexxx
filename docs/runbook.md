@@ -393,7 +393,7 @@ node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json
 
 CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs, and `evals report` to aggregate release evidence.
 
-`release evidence` aggregates workspace config provenance, policy-bundle verification, eval evidence, security scan metadata, provider-key status, and recent session summaries into one Markdown or JSON report. It is intended as an interview or CI evidence artifact; it does not replace the individual tests, eval runs, or security review.
+`release evidence` aggregates workspace config provenance, policy-bundle verification, eval evidence, security scan metadata, provider config/key/policy status, and recent session summaries into one Markdown or JSON report. It is intended as an interview or CI evidence artifact; it does not replace the individual tests, eval runs, or security review.
 
 Use `providers ping` before live demos:
 
