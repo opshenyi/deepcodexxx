@@ -63,6 +63,7 @@ node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
 - `DEEPCODEX_PRICING_PROFILE`: Optional default pricing profile id used for estimated cost budgets.
 - `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`: Optional trusted Ed25519 public key PEM for policy-bundle verification.
 - `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`: Optional path to a trusted Ed25519 public key PEM file.
+- `DEEPCODEX_REQUIRE_SIGNED_POLICY`: Defaults to `false`; set `true` to require a trusted signed policy bundle before CLI/server agent runs.
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 

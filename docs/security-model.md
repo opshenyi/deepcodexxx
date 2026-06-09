@@ -124,7 +124,7 @@ Current limitations:
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
-| Workspace configuration | `.deepcodex/config.json` in the selected workspace. | Non-secret team defaults only; explicit CLI/Web values and environment variables can override it. Config reads include a raw-file SHA-256 fingerprint. `.deepcodex/policy-bundle.json` can verify that fingerprint with a trusted Ed25519 public key, but signed-only enforcement is not enabled yet. |
+| Workspace configuration | `.deepcodex/config.json` in the selected workspace. | Non-secret team defaults only; explicit CLI/Web values and environment variables can override it. Config reads include a raw-file SHA-256 fingerprint. `.deepcodex/policy-bundle.json` can verify that fingerprint with a trusted Ed25519 public key, and `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` can require that verification before CLI/server agent runs. |
 | Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, redacted for common secret patterns before event persistence, and prunable by retention policy. | Add export review controls and broader DLP coverage. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |
@@ -137,7 +137,7 @@ The next security work should prioritize:
 - Signed policy bundles and policy provenance metadata.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Signed provider/team policy bundles.
-- Signed-only policy enforcement for agent runs after bundle verification is in place.
+- Policy bundle rotation, revocation, and audit workflows.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

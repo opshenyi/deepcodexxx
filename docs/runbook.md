@@ -43,6 +43,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
 | `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY` | Optional. | Empty. | Trusted Ed25519 public key PEM used to verify `.deepcodex/policy-bundle.json`. |
 | `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE` | Optional. | Empty. | Path to a trusted Ed25519 public key PEM file. Takes precedence over inline public key env. |
+| `DEEPCODEX_REQUIRE_SIGNED_POLICY` | Optional. | `false` | When `true`, CLI/server agent runs require a trusted signed policy bundle before model or tool execution starts. |
 
 ## Workspace Configuration
 
@@ -130,7 +131,7 @@ Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle si
 node apps/cli/dist/index.js config verify-bundle --workspace D:\Coding\DeepCodex --public-key D:\keys\deepcodex-policy.pub.pem
 ```
 
-The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY` or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`. This is provenance verification; signed-only enforcement is still a future hardening step.
+The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY` or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`. Set `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` to require a trusted signed bundle before CLI/server agent runs start. This enforcement switch is environment-only so an unsigned workspace config cannot disable it.
 
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
@@ -152,6 +153,7 @@ Expected checks:
 - Workspace config path and status print without crashing.
 - Workspace config SHA-256 prints when a config file exists.
 - Policy bundle status prints as missing, trusted, untrusted, or failed.
+- Signed policy required prints `yes` when `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`.
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
@@ -359,6 +361,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
 | Provider is rejected. | `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, or workspace defaults do not match `provider.allowedBaseUrls` or `provider.allowedModels`. | Run `deepcodex doctor --workspace <path>` and update the workspace provider policy or selected model. |
+| Run fails before the model call with signed policy required. | `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` and the policy bundle is missing, untrusted, expired, or does not match the active config SHA-256. | Run `deepcodex config verify-bundle --workspace <path> --public-key <pem>` and fix the bundle or trusted public key. |
 | Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON, unsupported values, or an invalid redaction regex. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |
 | Session history grows too large. | Retention variables are not set and pruning has not been run. | Use Web Audit retention controls or `deepcodex sessions prune --dry-run` before applying deletion. |

@@ -34,8 +34,10 @@ Expected result:
 - CLI `doctor` reports shell network access, defaulting to `blocked`.
 - CLI `doctor` reports a workspace config SHA-256 when a config file exists.
 - CLI `doctor` reports policy bundle status.
+- CLI `doctor` reports whether signed policy is required.
 - CLI `doctor` reports workspace config status, and `config show` reports either a valid config or a clear missing state.
 - CLI `config verify-bundle --workspace <path> --public-key <pem>` verifies a signed policy bundle when one is present.
+- With `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`, CLI/server runs fail before model execution when the signed bundle is missing or untrusted.
 - CLI `profiles list --workspace <path>` includes any workspace-defined team profiles.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
 - CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.

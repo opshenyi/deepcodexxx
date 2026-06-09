@@ -262,6 +262,7 @@ app.post("/api/agent/run", async (req, res) => {
   try {
     const workspacePath = readWorkspace(body.workspace);
     const workspaceConfig = await readWorkspaceConfig(workspacePath);
+    await assertSignedPolicyIfRequired(workspacePath);
     const profile = readPolicyProfile(body.profileId, workspaceConfig.config);
     const policy = createRunPolicy(body.mode, body.allowNetwork, profile, workspaceConfig.config);
     const provider = readProviderSelection(body.model, workspaceConfig.config);
@@ -386,6 +387,20 @@ async function readPolicyBundlePublicKey(): Promise<string | undefined> {
     return readFile(publicKeyPath, "utf8");
   }
   return process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY;
+}
+
+async function assertSignedPolicyIfRequired(workspace: string): Promise<void> {
+  if (!readRequireSignedPolicyFromEnv()) {
+    return;
+  }
+  const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+  if (!result.ok) {
+    throw new Error(`Signed policy is required but policy bundle verification failed: ${result.reason}`);
+  }
+}
+
+function readRequireSignedPolicyFromEnv(): boolean {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_REQUIRE_SIGNED_POLICY, "DEEPCODEX_REQUIRE_SIGNED_POLICY") ?? false;
 }
 
 function readAllowNetworkFromEnv(): boolean | undefined {

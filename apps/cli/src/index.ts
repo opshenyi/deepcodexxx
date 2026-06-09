@@ -85,6 +85,7 @@ program
       }
     ) => {
       const workspaceConfig = await readWorkspaceConfig(options.workspace);
+      await assertSignedPolicyIfRequired(options.workspace);
       const profile = resolveCliProfile(options.profile, workspaceConfig.config);
       const provider = readProviderSelection(workspaceConfig.config);
       assertProviderAllowed(provider, workspaceConfig.config.provider);
@@ -144,6 +145,7 @@ program
   }) => {
     const rl = createInterface({ input, output });
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    await assertSignedPolicyIfRequired(options.workspace);
     const profile = resolveCliProfile(options.profile, workspaceConfig.config);
     const provider = readProviderSelection(workspaceConfig.config);
     assertProviderAllowed(provider, workspaceConfig.config.provider);
@@ -409,6 +411,7 @@ program
     console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
     console.log(`Workspace config SHA-256: ${workspaceConfig.sha256 ? workspaceConfig.sha256.slice(0, 12) : "not available"}`);
     console.log(`Policy bundle: ${policyBundleStatus}`);
+    console.log(`Signed policy required: ${readRequireSignedPolicyFromEnv() ? "yes" : "no"}`);
     console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
     console.log(`Node: ${process.version}`);
   });
@@ -561,6 +564,20 @@ async function readPolicyBundleStatus(workspace: string): Promise<string> {
     const message = error instanceof Error ? error.message : String(error);
     return `failed ${message}`;
   }
+}
+
+async function assertSignedPolicyIfRequired(workspace: string): Promise<void> {
+  if (!readRequireSignedPolicyFromEnv()) {
+    return;
+  }
+  const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+  if (!result.ok) {
+    throw new Error(`Signed policy is required but policy bundle verification failed: ${result.reason}`);
+  }
+}
+
+function readRequireSignedPolicyFromEnv(): boolean {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_REQUIRE_SIGNED_POLICY, "DEEPCODEX_REQUIRE_SIGNED_POLICY") ?? false;
 }
 
 function printPolicyBundleVerification(result: PolicyBundleVerificationResult): void {
