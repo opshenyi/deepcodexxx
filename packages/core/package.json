@@ -13,6 +13,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "pdf-parse": "^2.4.5"
   }
 }
-

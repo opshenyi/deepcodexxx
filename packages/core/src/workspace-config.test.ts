@@ -56,6 +56,7 @@ describe("workspace config", () => {
               allowFileWrite: true,
               allowSecretWrites: false,
               allowArchiveListing: false,
+              allowPdfTextExtraction: false,
               shellEnvironment: "minimal",
               shellExecutionMode: "workspace-copy"
             },
@@ -85,6 +86,7 @@ describe("workspace config", () => {
           allowShell: false,
           allowSecretWrites: false,
           allowArchiveListing: false,
+          allowPdfTextExtraction: true,
           deniedPaths: ["secrets"],
           deniedFileExtensions: ["sqlite"],
           redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
@@ -123,6 +125,7 @@ describe("workspace config", () => {
             allowFileWrite: true,
             allowSecretWrites: false,
             allowArchiveListing: false,
+            allowPdfTextExtraction: false,
             shellEnvironment: "minimal",
             shellExecutionMode: "workspace-copy"
           },
@@ -152,6 +155,7 @@ describe("workspace config", () => {
         allowShell: false,
         allowSecretWrites: false,
         allowArchiveListing: false,
+        allowPdfTextExtraction: true,
         deniedPaths: ["secrets"],
         deniedFileExtensions: ["sqlite"],
         redactionPatterns: ["ACME_[A-Z0-9]{16,}"],

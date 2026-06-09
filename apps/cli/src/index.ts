@@ -164,6 +164,7 @@ program
   .option("--shell-execution-mode <mode>", "direct or workspace-copy")
   .option("--allow-network", "Allow shell commands that perform network access", false)
   .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
+  .option("--allow-pdf-text-extraction", "Allow bounded PDF text extraction without raw bytes", false)
   .option("--json", "Print newline-delimited JSON events", false)
   .action(
     async (
@@ -183,6 +184,7 @@ program
         shellExecutionMode?: string;
         allowNetwork?: boolean;
         allowArchiveListing?: boolean;
+        allowPdfTextExtraction?: boolean;
         json?: boolean;
       }
     ) => {
@@ -205,6 +207,7 @@ program
           options.shellExecutionMode,
           options.allowNetwork,
           options.allowArchiveListing,
+          options.allowPdfTextExtraction,
           profile,
           workspaceConfig.config
         );
@@ -246,6 +249,7 @@ program
   .option("--shell-execution-mode <mode>", "direct or workspace-copy")
   .option("--allow-network", "Allow shell commands that perform network access", false)
   .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
+  .option("--allow-pdf-text-extraction", "Allow bounded PDF text extraction without raw bytes", false)
   .option("--max-steps <number>", "Maximum agent loop count")
   .action(async (options: {
     workspace: string;
@@ -261,6 +265,7 @@ program
     shellExecutionMode?: string;
     allowNetwork?: boolean;
     allowArchiveListing?: boolean;
+    allowPdfTextExtraction?: boolean;
     maxSteps?: string;
   }) => {
     const rl = createInterface({ input, output });
@@ -285,6 +290,7 @@ program
           options.shellExecutionMode,
           options.allowNetwork,
           options.allowArchiveListing,
+          options.allowPdfTextExtraction,
           profile,
           workspaceConfig.config
         );
@@ -391,7 +397,7 @@ evals
       const profile = resolveCliProfile(task.profile, workspaceConfig.config);
       const provider = readProviderSelection(workspaceConfig.config);
       assertProviderAllowed(provider, workspaceConfig.config.provider);
-      const policy = createPolicy("suggest", undefined, undefined, false, false, profile, workspaceConfig.config);
+      const policy = createPolicy("suggest", undefined, undefined, false, false, false, profile, workspaceConfig.config);
       const workspace = await createWorkspaceContext(options.workspace, policy);
       const maxSteps = readOptionalInteger(options.maxSteps) ?? task.maxSteps;
       const scoreThreshold = options.requirePass ? 1 : readOptionalEvalScore(options.minScore);
@@ -872,6 +878,9 @@ program
       ),
       shellNetworkAccess: resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked",
       archiveListing: resolveAllowArchiveListingPolicy(false, basePolicy.allowArchiveListing) ? "allowed" : "blocked",
+      pdfTextExtraction: resolveAllowPdfTextExtractionPolicy(false, basePolicy.allowPdfTextExtraction)
+        ? "allowed"
+        : "blocked",
       workspaceConfig: {
         status: workspaceConfig.exists ? "present" : "missing",
         path: workspaceConfig.exists ? workspaceConfig.path : undefined,
@@ -910,6 +919,7 @@ program
     console.log(`Shell execution mode: ${diagnostics.shellExecutionMode}`);
     console.log(`Shell network access: ${diagnostics.shellNetworkAccess}`);
     console.log(`Archive listing: ${diagnostics.archiveListing}`);
+    console.log(`PDF text extraction: ${diagnostics.pdfTextExtraction}`);
     console.log(`Workspace config: ${diagnostics.workspaceConfig.status === "present" ? diagnostics.workspaceConfig.path : "missing"}`);
     console.log(
       `Workspace config SHA-256: ${diagnostics.workspaceConfig.sha256 ? diagnostics.workspaceConfig.sha256.slice(0, 12) : "not available"}`
@@ -1251,6 +1261,7 @@ function createPolicy(
   shellExecutionMode: string | undefined,
   allowNetwork: boolean | undefined,
   allowArchiveListing: boolean | undefined,
+  allowPdfTextExtraction: boolean | undefined,
   profile?: PolicyProfile,
   config?: WorkspaceConfig
 ): ApprovalPolicy {
@@ -1268,6 +1279,10 @@ function createPolicy(
     allowShell: selectedMode !== "suggest" && (base.allowShell ?? true),
     allowNetwork: selectedMode !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
     allowArchiveListing: resolveAllowArchiveListingPolicy(allowArchiveListing, base.allowArchiveListing),
+    allowPdfTextExtraction: resolveAllowPdfTextExtractionPolicy(
+      allowPdfTextExtraction,
+      base.allowPdfTextExtraction
+    ),
     allowStateWrite: selectedMode !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
@@ -1300,6 +1315,20 @@ function resolveAllowArchiveListingPolicy(
     return true;
   }
   return readAllowArchiveListingFromEnv() ?? configuredAllowArchiveListing ?? false;
+}
+
+function readAllowPdfTextExtractionFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION, "DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION");
+}
+
+function resolveAllowPdfTextExtractionPolicy(
+  cliAllowPdfTextExtraction: boolean | undefined,
+  configuredAllowPdfTextExtraction: boolean | undefined
+): boolean {
+  if (cliAllowPdfTextExtraction === true) {
+    return true;
+  }
+  return readAllowPdfTextExtractionFromEnv() ?? configuredAllowPdfTextExtraction ?? false;
 }
 
 function readProviderSelection(config?: WorkspaceConfig) {

@@ -44,6 +44,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_SHELL_EXECUTION_MODE` | Optional. | `direct` | `direct` runs shell commands in the selected workspace. `workspace-copy` runs them in a temporary copy that is removed after execution. |
 | `DEEPCODEX_ALLOW_NETWORK` | Optional. | `false` | Blocks common shell network commands by default. Set `true` only for trusted package install, remote git, or network utility tasks. |
 | `DEEPCODEX_ALLOW_ARCHIVE_LISTING` | Optional. | `false` | Enables ZIP-compatible archive entry metadata listing without extraction. Keep disabled unless a trusted workspace needs archive manifests. |
+| `DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION` | Optional. | `false` | Enables bounded local PDF text extraction. Keep disabled unless a trusted workspace needs document text in model context. |
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
 | `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
@@ -57,7 +58,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, shell environment mode, shell execution mode, shell network access, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment mode, shell execution mode, shell network access, and session retention defaults.
 
 Create a template:
 
@@ -115,6 +116,7 @@ Example:
         "allowStateWrite": true,
         "allowSecretWrites": false,
         "allowArchiveListing": false,
+        "allowPdfTextExtraction": false,
         "shellEnvironment": "minimal",
         "shellExecutionMode": "direct"
       },
@@ -130,6 +132,7 @@ Example:
     "allowNetwork": false,
     "allowSecretWrites": false,
     "allowArchiveListing": false,
+    "allowPdfTextExtraction": false,
     "shellEnvironment": "minimal",
     "shellExecutionMode": "direct",
     "maxFileBytes": 524288,
@@ -181,6 +184,8 @@ Write and edit tools also apply sensitive-text checks before producing diffs or 
 
 ZIP-compatible archive listing is disabled by default. When `policy.allowArchiveListing: true`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or CLI `--allow-archive-listing` is set, the agent can call `list_archive_entries` to read the ZIP central directory and return bounded entry metadata. It does not extract files, decompress data, return entry contents, return archive comments, or bypass denied workspace paths. Entries matching denied path policy are omitted from the manifest.
 
+PDF text extraction is disabled by default. When `policy.allowPdfTextExtraction: true`, `DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION=true`, Web `PDF text extraction`, or CLI `--allow-pdf-text-extraction` is set, the agent can call `extract_pdf_text` to read bounded text from a local PDF. It respects denied paths and `maxFileBytes`, requires a PDF header, caps pages and returned characters, and does not return raw bytes, base64 data, images, attachments, or embedded files.
+
 Shell execution defaults to `direct` for compatibility. Set `policy.shellExecutionMode: "workspace-copy"`, `DEEPCODEX_SHELL_EXECUTION_MODE=workspace-copy`, or CLI `--shell-execution-mode workspace-copy` to run shell commands from a temporary workspace snapshot. The snapshot skips denied paths, denied file extensions, symlinks, files above `maxFileBytes`, and stops at bounded file-count and total-byte caps. It is removed after the command, and shell tool events include a `Shell audit` block with copy statistics. This protects the real workspace from relative-path writes, but it is not a kernel sandbox; a command that explicitly reaches an absolute path can still use the user's OS permissions.
 
 ## Verify Configuration
@@ -205,6 +210,7 @@ Expected checks:
 - Shell network policy prints as blocked unless explicitly enabled.
 - Shell execution mode prints as `direct` unless a workspace copy is explicitly enabled.
 - Archive listing policy prints as blocked unless explicitly enabled.
+- PDF text extraction policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
 
 ## Web Client
@@ -402,6 +408,12 @@ Run a trusted task that needs package install or remote git access:
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --allow-network "Install the approved dependency and run the relevant verification."
 ```
 
+Run a trusted document-review task that needs local PDF text:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --allow-pdf-text-extraction "Extract the first pages of docs\example.pdf and summarize the implementation requirements."
+```
+
 Run with a token budget:
 
 ```powershell
@@ -445,9 +457,11 @@ For `run_command`, a zero exit code is required for a successful tool result. No
 
 When `shellExecutionMode` is `workspace-copy`, `run_command` executes from a temporary snapshot instead of the selected workspace path. The tool omits denied and oversized files from the snapshot, records copy statistics in `Shell audit`, and removes the snapshot after execution. Use this for safer test or inspection commands that should not write into the real repository.
 
-The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, PDF text, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
+The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
 
 The `list_archive_entries` tool can list ZIP-compatible archive entry metadata only when archive listing policy is explicitly enabled. It reads the end-of-central-directory record and a bounded central directory range, reports entry names, directory/file status, compressed and uncompressed sizes, compression method, unsafe-path flags, truncation status, and denied-entry counts. It never extracts archive members or returns member content.
+
+The `extract_pdf_text` tool can extract local PDF text only when PDF text extraction policy is explicitly enabled. It reads the PDF through the shared file policy, reports page and character bounds, and does not expose raw PDF bytes, base64 content, images, attachments, or embedded files.
 
 ## Troubleshooting
 
@@ -470,6 +484,8 @@ The `list_archive_entries` tool can list ZIP-compatible archive entry metadata o
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
 | A media or artifact file is denied unexpectedly. | The file extension matches the built-in media/artifact deny list or `DEEPCODEX_DENIED_EXTENSIONS`. | Use `inspect_artifact` for metadata-only inspection. For trusted ZIP manifests, enable `allowArchiveListing` and use `list_archive_entries`. |
 | Archive listing is blocked. | `allowArchiveListing` is false. | Use CLI `--allow-archive-listing`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or workspace policy `allowArchiveListing: true` only for trusted archive manifests. |
+| PDF text extraction is blocked. | `allowPdfTextExtraction` is false. | Use Web `PDF text extraction`, CLI `--allow-pdf-text-extraction`, `DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION=true`, or workspace policy `allowPdfTextExtraction: true` only for trusted PDFs. |
+| PDF text extraction says the header is missing. | The file is not a valid PDF or the content does not start with `%PDF-`. | Use `inspect_artifact` to check metadata and replace the file with a valid local PDF. |
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |

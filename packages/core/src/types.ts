@@ -169,6 +169,7 @@ export interface ApprovalPolicy {
   allowStateWrite?: boolean;
   allowSecretWrites?: boolean;
   allowArchiveListing?: boolean;
+  allowPdfTextExtraction?: boolean;
   deniedPaths?: string[];
   deniedFileExtensions?: string[];
   redactionPatterns?: string[];

@@ -98,6 +98,7 @@ type ServerPolicyProfile = {
     allowStateWrite?: boolean;
     allowSecretWrites?: boolean;
     allowArchiveListing?: boolean;
+    allowPdfTextExtraction?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
     redactionPatterns?: string[];
@@ -131,6 +132,7 @@ type WorkspaceConfig = {
     allowStateWrite?: boolean;
     allowSecretWrites?: boolean;
     allowArchiveListing?: boolean;
+    allowPdfTextExtraction?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
     redactionPatterns?: string[];
@@ -265,6 +267,7 @@ type WorkspaceProfile = {
   serverUrl: string;
   policyProfileId: string;
   shellExecutionMode: ShellExecutionMode;
+  allowPdfTextExtraction?: boolean;
   maxSteps: string;
   updatedAt: string;
 };
@@ -293,6 +296,7 @@ const defaultPolicyProfile =
 const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
 const defaultShellExecutionMode =
   (localStorage.getItem("deepcodex.shellExecutionMode") as ShellExecutionMode | null) ?? "direct";
+const defaultAllowPdfTextExtraction = localStorage.getItem("deepcodex.allowPdfTextExtraction") === "true";
 const defaultDiffViewMode = localStorage.getItem("deepcodex.diffViewMode") === "split" ? "split" : "unified";
 const configuredServerUrl = normalizeServerUrl(import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361");
 const defaultServerUrl = localStorage.getItem("deepcodex.serverUrl") ?? configuredServerUrl;
@@ -395,6 +399,7 @@ function App() {
   const [shellExecutionMode, setShellExecutionMode] = useState<ShellExecutionMode>(
     defaultShellExecutionMode === "workspace-copy" ? "workspace-copy" : "direct"
   );
+  const [allowPdfTextExtraction, setAllowPdfTextExtraction] = useState(defaultAllowPdfTextExtraction);
   const [maxSteps, setMaxSteps] = useState(defaultMaxSteps);
   const [maxSessionTokens, setMaxSessionTokens] = useState(defaultMaxSessionTokens);
   const [maxSessionUsd, setMaxSessionUsd] = useState(defaultMaxSessionUsd);
@@ -497,6 +502,7 @@ function App() {
     localStorage.setItem("deepcodex.workspace", workspace);
     localStorage.setItem("deepcodex.policyProfile", policyProfileId);
     localStorage.setItem("deepcodex.shellExecutionMode", shellExecutionMode);
+    localStorage.setItem("deepcodex.allowPdfTextExtraction", String(allowPdfTextExtraction));
     localStorage.setItem("deepcodex.maxSteps", maxSteps);
     localStorage.setItem("deepcodex.maxSessionTokens", maxSessionTokens);
     localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
@@ -521,6 +527,7 @@ function App() {
           mode,
           approvalMode,
           shellExecutionMode,
+          allowPdfTextExtraction,
           maxSteps: readOptionalRunInteger(maxSteps, "Max steps") ?? selectedPolicyProfile()?.maxSteps ?? 12,
           pricingProfileId: pricingProfileId === "custom" ? undefined : pricingProfileId,
           budget
@@ -924,6 +931,9 @@ function App() {
     if (config.policy?.shellExecutionMode) {
       setShellExecutionMode(config.policy.shellExecutionMode);
     }
+    if (config.policy?.allowPdfTextExtraction !== undefined) {
+      setAllowPdfTextExtraction(config.policy.allowPdfTextExtraction);
+    }
     if (config.maxSteps !== undefined) {
       setMaxSteps(String(config.maxSteps));
     }
@@ -979,6 +989,7 @@ function App() {
       serverUrl,
       policyProfileId,
       shellExecutionMode,
+      allowPdfTextExtraction,
       maxSteps,
       updatedAt: new Date().toISOString()
     };
@@ -1003,12 +1014,14 @@ function App() {
     setServerUrlDraft(normalizedServerUrl);
     setPolicyProfileId(toPolicyProfileOptionId(selectedWorkspaceProfile.policyProfileId) ?? "custom");
     setShellExecutionMode(selectedWorkspaceProfile.shellExecutionMode);
+    setAllowPdfTextExtraction(selectedWorkspaceProfile.allowPdfTextExtraction === true);
     setMaxSteps(selectedWorkspaceProfile.maxSteps || defaultMaxSteps);
     setWorkspaceProfileName(selectedWorkspaceProfile.label);
     localStorage.setItem("deepcodex.workspace", selectedWorkspaceProfile.workspace);
     localStorage.setItem("deepcodex.serverUrl", normalizedServerUrl);
     localStorage.setItem("deepcodex.policyProfile", selectedWorkspaceProfile.policyProfileId);
     localStorage.setItem("deepcodex.shellExecutionMode", selectedWorkspaceProfile.shellExecutionMode);
+    localStorage.setItem("deepcodex.allowPdfTextExtraction", String(selectedWorkspaceProfile.allowPdfTextExtraction === true));
     localStorage.setItem("deepcodex.maxSteps", selectedWorkspaceProfile.maxSteps || defaultMaxSteps);
     setWorkspaceProfileMessage(`Applied ${selectedWorkspaceProfile.label}.`);
   }
@@ -1194,6 +1207,15 @@ function App() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="toggleField" htmlFor="pdf-text-extraction">
+            <span>PDF text extraction</span>
+            <input
+              id="pdf-text-extraction"
+              type="checkbox"
+              checked={allowPdfTextExtraction}
+              onChange={(event) => setAllowPdfTextExtraction(event.target.checked)}
+            />
           </label>
         </section>
 
@@ -1951,6 +1973,7 @@ function isWorkspaceProfile(value: unknown): value is WorkspaceProfile {
     typeof entry.serverUrl === "string" &&
     typeof entry.policyProfileId === "string" &&
     (entry.shellExecutionMode === "direct" || entry.shellExecutionMode === "workspace-copy") &&
+    (entry.allowPdfTextExtraction === undefined || typeof entry.allowPdfTextExtraction === "boolean") &&
     typeof entry.maxSteps === "string" &&
     typeof entry.updatedAt === "string"
   );

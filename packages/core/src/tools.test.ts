@@ -278,6 +278,93 @@ describe("workspace tools", () => {
     expect(result.content).toContain("Denied path");
   });
 
+  it("blocks PDF text extraction by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "guide.pdf"), createPdf("DeepCodex PDF guide"));
+    const workspace = await createWorkspaceContext(tempDir);
+    const pdfTool = createDefaultTools().find((tool) => tool.definition.function.name === "extract_pdf_text");
+    expect(pdfTool).toBeDefined();
+
+    const result = await pdfTool!.run({ path: "guide.pdf" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("PDF text extraction is disabled by policy");
+  });
+
+  it("extracts bounded PDF text without returning raw bytes", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "guide.pdf"), createPdf("DeepCodex PDF guide"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowPdfTextExtraction: true
+    });
+    const pdfTool = createDefaultTools().find((tool) => tool.definition.function.name === "extract_pdf_text");
+    expect(pdfTool).toBeDefined();
+
+    const result = await pdfTool!.run({ path: "guide.pdf", maxPages: 1, maxCharacters: 200 }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("PDF: guide.pdf");
+    expect(result.content).toContain("Total pages: 1");
+    expect(result.content).toContain("Pages extracted: 1");
+    expect(result.content).toContain("Raw bytes: not returned by policy.");
+    expect(result.content).toContain("Page 1");
+    expect(result.content).toContain("DeepCodex PDF guide");
+    expect(result.content).not.toContain("base64");
+  });
+
+  it("does not allow PDF text extraction to bypass denied paths", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, "private"));
+    await writeFile(path.join(tempDir, "private", "guide.pdf"), createPdf("Denied text"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowPdfTextExtraction: true,
+      deniedPaths: ["private"]
+    });
+    const pdfTool = createDefaultTools().find((tool) => tool.definition.function.name === "extract_pdf_text");
+    expect(pdfTool).toBeDefined();
+
+    const result = await pdfTool!.run({ path: "private/guide.pdf" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied path");
+    expect(result.content).not.toContain("Denied text");
+  });
+
+  it("rejects PDF text extraction when the file exceeds the size limit", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "guide.pdf"), createPdf("DeepCodex PDF guide"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowPdfTextExtraction: true,
+      maxFileBytes: 20
+    });
+    const pdfTool = createDefaultTools().find((tool) => tool.definition.function.name === "extract_pdf_text");
+    expect(pdfTool).toBeDefined();
+
+    const result = await pdfTool!.run({ path: "guide.pdf" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("File exceeds maxFileBytes (20)");
+  });
+
+  it("rejects fake PDFs before parsing", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "guide.pdf"), "not a real pdf", "utf8");
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowPdfTextExtraction: true
+    });
+    const pdfTool = createDefaultTools().find((tool) => tool.definition.function.name === "extract_pdf_text");
+    expect(pdfTool).toBeDefined();
+
+    const result = await pdfTool!.run({ path: "guide.pdf" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("PDF header was not found");
+  });
+
   it("blocks archive listing by default", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     await writeFile(path.join(tempDir, "bundle.zip"), createZip([{ name: "src/app.ts", content: "console.log('hi')\n" }]));
@@ -603,6 +690,32 @@ describe("workspace tools", () => {
 
 function quoteCommandPath(value: string): string {
   return `"${value.replaceAll('"', '\\"')}"`;
+}
+
+function createPdf(text: string): Buffer {
+  const escapedText = text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  const stream = `BT /F1 18 Tf 72 720 Td (${escapedText}) Tj ET`;
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
+    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    `5 0 obj\n<< /Length ${Buffer.byteLength(stream, "ascii")} >>\nstream\n${stream}\nendstream\nendobj\n`
+  ];
+  let content = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(content, "ascii"));
+    content += object;
+  }
+  const xrefOffset = Buffer.byteLength(content, "ascii");
+  content += `xref\n0 ${objects.length + 1}\n`;
+  content += "0000000000 65535 f \n";
+  for (const offset of offsets) {
+    content += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  }
+  content += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(content, "ascii");
 }
 
 function createZip(entries: Array<{ name: string; content?: string | Buffer; directory?: boolean }>): Buffer {

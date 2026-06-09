@@ -2,6 +2,7 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:chil
 import { copyFile, lstat, mkdir, mkdtemp, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { PDFParse, VerbosityLevel } from "pdf-parse";
 import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
 import { findSensitiveText, type SensitiveTextFinding } from "./redaction.js";
@@ -19,12 +20,18 @@ const ZIP_EOCD_MAX_SEARCH_BYTES = ZIP_EOCD_MIN_BYTES + 0xffff;
 const ZIP_MAX_CENTRAL_DIRECTORY_BYTES = 512 * 1024;
 const ZIP_MAX_LISTED_ENTRIES = 200;
 const ZIP_MAX_PARSED_ENTRIES = 1000;
+const PDF_MAX_EXTRACTED_PAGES = 20;
+const PDF_DEFAULT_EXTRACTED_PAGES = 5;
+const PDF_MAX_EXTRACTED_CHARS = 40_000;
+const PDF_DEFAULT_EXTRACTED_CHARS = 20_000;
+const PDF_MAX_START_PAGE = 100_000;
 
 export function createDefaultTools(): RuntimeTool[] {
   return [
     listFilesTool,
     readFileTool,
     inspectArtifactTool,
+    extractPdfTextTool,
     listArchiveEntriesTool,
     writeFileTool,
     editFileTool,
@@ -147,6 +154,77 @@ const inspectArtifactTool: RuntimeTool = {
     ].filter(Boolean);
 
     return ok(lines.join("\n"));
+  }
+};
+
+const extractPdfTextTool: RuntimeTool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "extract_pdf_text",
+      description:
+        "Extract bounded text from a local PDF file when policy allows it. Does not return raw bytes, base64 content, images, attachments, or embedded files.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Relative PDF path." },
+          startPage: { type: "number", description: "First 1-based page to extract.", default: 1 },
+          maxPages: { type: "number", description: "Maximum pages to extract, up to 20.", default: PDF_DEFAULT_EXTRACTED_PAGES },
+          maxCharacters: {
+            type: "number",
+            description: "Maximum text characters returned, up to 40000.",
+            default: PDF_DEFAULT_EXTRACTED_CHARS
+          }
+        },
+        required: ["path"]
+      }
+    }
+  },
+  async run(input, runtime) {
+    if (runtime.workspace.policy.allowPdfTextExtraction !== true) {
+      return fail(
+        "PDF text extraction is disabled by policy. Enable policy.allowPdfTextExtraction only for trusted workspaces that need bounded PDF text."
+      );
+    }
+
+    const args = objectInput(input);
+    const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
+    const rel = workspaceRelative(runtime.workspace, target);
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+      return fail(`Denied path: ${rel}`);
+    }
+
+    const targetStat = await stat(target);
+    if (!targetStat.isFile()) {
+      return fail(`PDF text extraction requires a file: ${rel}`);
+    }
+    if (exceedsFileLimit(targetStat.size, runtime)) {
+      return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
+    }
+
+    const header = await readFileSample(target, Math.min(targetStat.size, 8));
+    const extension = path.extname(rel).toLowerCase();
+    if (extension !== ".pdf" && !startsWithAscii(header, "%PDF-")) {
+      return fail(`PDF text extraction requires a .pdf extension or PDF header: ${rel}`);
+    }
+    if (!startsWithAscii(header, "%PDF-")) {
+      return fail(`PDF header was not found: ${rel}`);
+    }
+
+    const startPage = clampPositiveInteger(args.startPage, 1, 1, PDF_MAX_START_PAGE);
+    const maxPages = clampPositiveInteger(args.maxPages, PDF_DEFAULT_EXTRACTED_PAGES, 1, PDF_MAX_EXTRACTED_PAGES);
+    const maxCharacters = clampPositiveInteger(
+      args.maxCharacters,
+      PDF_DEFAULT_EXTRACTED_CHARS,
+      1,
+      PDF_MAX_EXTRACTED_CHARS
+    );
+    const buffer = await readFile(target);
+    const extraction = await extractPdfText(buffer, { startPage, maxPages, maxCharacters });
+    if (!extraction.ok) {
+      return fail(`PDF text extraction failed for ${rel}: ${extraction.content}`);
+    }
+    return ok(formatPdfTextExtraction(rel, targetStat.size, extension, extraction.result));
   }
 };
 
@@ -520,6 +598,14 @@ function numberValue(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function clampPositiveInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const requested = Math.floor(numberValue(value, fallback));
+  if (!Number.isFinite(requested)) {
+    return fallback;
+  }
+  return Math.min(Math.max(requested, min), max);
+}
+
 function normalizeShellTimeout(value: unknown): number {
   const requested = Math.floor(numberValue(value, 60_000));
   if (requested <= 0) {
@@ -851,6 +937,90 @@ async function readFileRange(target: string, offset: number, bytes: number): Pro
   } finally {
     await handle.close();
   }
+}
+
+interface PdfTextExtractionOptions {
+  startPage: number;
+  maxPages: number;
+  maxCharacters: number;
+}
+
+interface PdfTextExtractionResult {
+  totalPages: number;
+  pagesExtracted: number;
+  requestedStartPage: number;
+  requestedEndPage: number;
+  originalCharacters: number;
+  returnedCharacters: number;
+  truncated: boolean;
+  text: string;
+}
+
+async function extractPdfText(
+  buffer: Buffer,
+  options: PdfTextExtractionOptions
+): Promise<{ ok: true; result: PdfTextExtractionResult } | { ok: false; content: string }> {
+  const parser = new PDFParse({
+    data: new Uint8Array(buffer),
+    verbosity: VerbosityLevel.ERRORS,
+    stopAtErrors: true,
+    isEvalSupported: false,
+    useWorkerFetch: false,
+    disableFontFace: true
+  });
+  try {
+    const requestedEndPage = options.startPage + options.maxPages - 1;
+    const textResult = await parser.getText({ first: options.startPage, last: requestedEndPage });
+    const text = textResult.pages
+      .map((page) => `Page ${page.num}\n${page.text.trimEnd()}`)
+      .join("\n\n")
+      .trim();
+    const truncatedText = truncateForModel(text, options.maxCharacters);
+    const truncated = text.length > options.maxCharacters;
+    return {
+      ok: true,
+      result: {
+        totalPages: textResult.total,
+        pagesExtracted: textResult.pages.length,
+        requestedStartPage: options.startPage,
+        requestedEndPage,
+        originalCharacters: text.length,
+        returnedCharacters: truncatedText.length,
+        truncated,
+        text: truncatedText
+      }
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, content: message };
+  } finally {
+    await parser.destroy().catch(() => undefined);
+  }
+}
+
+function formatPdfTextExtraction(
+  relativePath: string,
+  bytes: number,
+  extension: string,
+  result: PdfTextExtractionResult
+): string {
+  const text = result.text || "(no text extracted)";
+  return [
+    `PDF: ${relativePath}`,
+    `Bytes: ${bytes}`,
+    `Extension: ${extension || "(none)"}`,
+    `Total pages: ${result.totalPages}`,
+    `Pages requested: ${result.requestedStartPage}-${result.requestedEndPage}`,
+    `Pages extracted: ${result.pagesExtracted}`,
+    `Characters returned: ${result.returnedCharacters}`,
+    `Characters before truncation: ${result.originalCharacters}`,
+    `Truncated: ${result.truncated ? "yes" : "no"}`,
+    "Raw bytes: not returned by policy.",
+    "Images and attachments: not extracted.",
+    "",
+    "Text:",
+    text
+  ].join("\n");
 }
 
 interface ZipEndOfCentralDirectory {

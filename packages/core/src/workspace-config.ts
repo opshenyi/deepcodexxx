@@ -147,6 +147,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
           allowStateWrite: true,
           allowSecretWrites: false,
           allowArchiveListing: false,
+          allowPdfTextExtraction: false,
           shellEnvironment: "minimal",
           shellExecutionMode: "direct"
         },
@@ -161,6 +162,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     policy: {
       allowSecretWrites: false,
       allowArchiveListing: false,
+      allowPdfTextExtraction: false,
       shellEnvironment: "minimal",
       shellExecutionMode: "direct",
       maxFileBytes: 512 * 1024,
@@ -308,6 +310,7 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     allowStateWrite: readOptionalBoolean(entry.allowStateWrite, "policy.allowStateWrite"),
     allowSecretWrites: readOptionalBoolean(entry.allowSecretWrites, "policy.allowSecretWrites"),
     allowArchiveListing: readOptionalBoolean(entry.allowArchiveListing, "policy.allowArchiveListing"),
+    allowPdfTextExtraction: readOptionalBoolean(entry.allowPdfTextExtraction, "policy.allowPdfTextExtraction"),
     deniedPaths: readOptionalStringArray(entry.deniedPaths, "policy.deniedPaths"),
     deniedFileExtensions: readOptionalStringArray(entry.deniedFileExtensions, "policy.deniedFileExtensions"),
     redactionPatterns: readOptionalRegexArray(entry.redactionPatterns, "policy.redactionPatterns"),

@@ -24,7 +24,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Paths cannot escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, env files, and session audit state are denied by default.
 - File read, write, edit, and search tools enforce a configurable 512 KiB default size limit.
-- `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, pricing profile, and retention.
+- `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, pricing profile, and retention.
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
 - `.deepcodex/policy-bundle.json` can bind the active config SHA-256 to an Ed25519 signature. CLI can generate a policy keypair, sign the active config with an external private key, CLI/API verification checks bundles against one or more trusted public keys, optional issuer allowlists, and bundle/key revocation lists, and Web/Desktop can display the selected workspace trust status from the local server.
 - `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` makes CLI/server agent runs require a trusted policy bundle before model or tool execution starts.
@@ -36,6 +36,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Shell command failures, timeouts, signals, and output overflows are reported as failed tool results so verification failures remain visible to the agent and user.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.
 - ZIP archive entry listing is blocked unless `allowArchiveListing` is explicitly enabled, and even then returns only bounded central-directory metadata without extraction.
+- PDF text extraction is blocked unless `allowPdfTextExtraction` is explicitly enabled, and even then returns only bounded text without raw bytes, images, attachments, embedded files, or base64 content.
 - Missing API keys trigger demo mode instead of crashing the product.
 
 ## DeepSeek Integration

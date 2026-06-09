@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, run-level token or estimated-cost budgets, and CLI CI preflight diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, run-level token or estimated-cost budgets, and CLI CI preflight diagnostics.
 
 ## Quick Start
 
@@ -39,7 +39,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-to
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
-Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, pricing profile, and session retention defaults:
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, pricing profile, and session retention defaults:
 
 ```powershell
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
@@ -63,6 +63,7 @@ node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
 - `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
 - `DEEPCODEX_SHELL_ENV`: Defaults to `minimal`; set `inherit` only for trusted shell tasks that need parent environment variables.
 - `DEEPCODEX_ALLOW_NETWORK`: Defaults to `false`; set `true` only for trusted shell tasks that need package installs, git fetch/pull/push, or network utilities.
+- `DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION`: Defaults to `false`; set `true` only for trusted local PDFs that need bounded text extraction.
 - `DEEPCODEX_POLICY_PROFILE`: Optional default profile: `inspection`, `guarded-write`, or `full-access-review`.
 - `DEEPCODEX_PRICING_PROFILES`: Optional JSON array/object of caller-managed pricing profiles.
 - `DEEPCODEX_PRICING_PROFILE`: Optional default pricing profile id used for estimated cost budgets.

@@ -295,6 +295,37 @@ label,
   padding: 9px 10px;
 }
 
+.toggleField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 10px;
+}
+
+.toggleField span {
+  min-width: 0;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.toggleField input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
 .budgetFields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

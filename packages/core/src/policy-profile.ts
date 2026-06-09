@@ -15,6 +15,7 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: false,
       allowNetwork: false,
       allowStateWrite: false,
+      allowPdfTextExtraction: false,
       shellEnvironment: "minimal",
       shellExecutionMode: "direct"
     }
@@ -31,6 +32,7 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: true,
       allowNetwork: false,
       allowStateWrite: true,
+      allowPdfTextExtraction: false,
       shellEnvironment: "minimal",
       shellExecutionMode: "direct"
     }
@@ -47,6 +49,7 @@ const POLICY_PROFILES: PolicyProfile[] = [
       allowFileWrite: true,
       allowNetwork: false,
       allowStateWrite: true,
+      allowPdfTextExtraction: false,
       shellEnvironment: "minimal",
       shellExecutionMode: "direct"
     }

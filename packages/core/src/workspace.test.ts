@@ -85,6 +85,13 @@ describe("workspace boundaries", () => {
     expect(workspace.policy.maxFileBytes).toBe(512 * 1024);
   });
 
+  it("blocks PDF text extraction by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+
+    expect(workspace.policy.allowPdfTextExtraction).toBe(false);
+  });
+
   it("supports configurable file size limits", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir, {

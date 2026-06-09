@@ -242,6 +242,7 @@ app.post("/api/agent/run", async (req, res) => {
     model?: string;
     allowNetwork?: boolean;
     allowArchiveListing?: boolean;
+    allowPdfTextExtraction?: boolean;
     shellExecutionMode?: unknown;
   };
   const prompt = String(body.prompt ?? "").trim();
@@ -270,6 +271,7 @@ app.post("/api/agent/run", async (req, res) => {
       body.mode,
       body.allowNetwork,
       body.allowArchiveListing,
+      body.allowPdfTextExtraction,
       readShellExecutionModeFromRequest(body.shellExecutionMode),
       profile,
       workspaceConfig.config
@@ -372,6 +374,7 @@ function createRunPolicy(
   mode: ApprovalMode | undefined,
   allowNetwork: boolean | undefined,
   allowArchiveListing: boolean | undefined,
+  allowPdfTextExtraction: boolean | undefined,
   shellExecutionMode: ShellExecutionMode | undefined,
   profile: ReturnType<typeof readPolicyProfile>,
   config?: WorkspaceConfig
@@ -386,6 +389,10 @@ function createRunPolicy(
     allowFileWrite: selected !== "suggest" && (base.allowFileWrite ?? true),
     allowNetwork: selected !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
     allowArchiveListing: resolveAllowArchiveListingPolicy(allowArchiveListing, base.allowArchiveListing),
+    allowPdfTextExtraction: resolveAllowPdfTextExtractionPolicy(
+      allowPdfTextExtraction,
+      base.allowPdfTextExtraction
+    ),
     allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
@@ -498,6 +505,20 @@ function resolveAllowArchiveListingPolicy(
     return true;
   }
   return readAllowArchiveListingFromEnv() ?? configuredAllowArchiveListing ?? false;
+}
+
+function readAllowPdfTextExtractionFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION, "DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION");
+}
+
+function resolveAllowPdfTextExtractionPolicy(
+  requestAllowPdfTextExtraction: boolean | undefined,
+  configuredAllowPdfTextExtraction: boolean | undefined
+): boolean {
+  if (requestAllowPdfTextExtraction === true) {
+    return true;
+  }
+  return readAllowPdfTextExtractionFromEnv() ?? configuredAllowPdfTextExtraction ?? false;
 }
 
 function createRetentionPolicy(input?: {

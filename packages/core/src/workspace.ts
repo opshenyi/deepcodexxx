@@ -10,6 +10,7 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowStateWrite: true,
   allowSecretWrites: false,
   allowArchiveListing: false,
+  allowPdfTextExtraction: false,
   deniedPaths: [
     ".git",
     "**/.git",

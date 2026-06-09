@@ -38,6 +38,7 @@ Expected result:
 - CLI `doctor` reports shell execution mode, defaulting to `direct`.
 - CLI `doctor` reports shell network access, defaulting to `blocked`.
 - CLI `doctor` reports archive listing, defaulting to `blocked`.
+- CLI `doctor` reports PDF text extraction, defaulting to `blocked`.
 - CLI `doctor` reports a workspace config SHA-256 when a config file exists.
 - CLI `doctor` reports policy bundle status.
 - CLI `doctor` reports whether signed policy is required.
@@ -84,6 +85,7 @@ Checklist:
 - Write/edit tools block probable secret content before showing a diff or applying a file change.
 - Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
 - Archive listing remains blocked by default; when enabled for a trusted ZIP fixture, entry manifests omit denied entries and do not expose member contents.
+- PDF text extraction remains blocked by default; when enabled for a trusted PDF fixture, returned text is page/character bounded and raw bytes, images, attachments, and embedded files are not exposed.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - A deliberately failing verification command appears as a failed tool result, not a successful tool event with stderr text.
 - With `shellExecutionMode` set to `workspace-copy` for a trusted fixture, shell commands run from a temporary snapshot, leave the real workspace unchanged for relative-path writes, and show `Shell audit` metadata.
@@ -148,6 +150,7 @@ Checklist:
 - Safer verification demos can use `--shell-execution-mode workspace-copy` when command side effects should stay out of the selected workspace.
 - Network-capable shell demos use `--allow-network` only after the command has been reviewed.
 - Archive manifest demos use `--allow-archive-listing` only for trusted ZIP-compatible fixtures.
+- PDF text extraction demos use `--allow-pdf-text-extraction` only for trusted local PDF fixtures.
 
 ## Write-Mode Demo Verification
 

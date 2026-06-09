@@ -12,7 +12,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Desktop production-like startup can bootstrap the built local server and load the built Web client.
 - Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, a saved runtime Server URL from the sidebar, or saved local workspace profiles for repeated workspace/server/policy setup.
 - Server CORS can remain permissive for local development or be restricted by `DEEPCODEX_CORS_ORIGINS` for controlled demos.
-- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, and retention.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
 - CLI policy-bundle key generation and signing workflow for creating an Ed25519 keypair and signing `.deepcodex/policy-bundle.json` from the active workspace config with an external private key.
@@ -46,6 +46,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Configurable denied media/artifact extensions with default protection for common binary, archive, Office/PDF, executable, library, and WebAssembly file types.
 - Safe `inspect_artifact` tool for metadata-only inspection of non-text artifacts without exposing raw bytes to the model.
 - Default-off `list_archive_entries` tool for bounded ZIP-compatible archive manifests without extraction, decompression, or member content exposure.
+- Default-off `extract_pdf_text` tool for bounded local PDF text extraction without raw bytes, images, attachments, embedded files, or base64 content.
 - Configurable file-size limits for read, write, edit, and search tools.
 - Binary-aware read, edit, and search handling for non-text files.
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
@@ -79,7 +80,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 ## Next Commercial Milestones
 
 - Add higher-level policy-bundle distribution workflows and richer provider fallback policy.
-- Add richer DLP classification and policy-controlled OCR/PDF extraction.
+- Add richer DLP classification and policy-controlled OCR.
 - Add richer generated-asset handling and file-type policies.
 - Add kernel-level shell sandboxing or remote isolated execution workers.
 - Add packaged desktop installers, signed releases, and auto-update policy.
