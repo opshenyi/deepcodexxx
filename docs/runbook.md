@@ -25,6 +25,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPSEEK_API_KEY` | Required for live model runs. | Empty. | If missing, DeepCodex runs in local demo mode and does not call DeepSeek. |
 | `DEEPSEEK_BASE_URL` | Optional. | `https://api.deepseek.com` | The client calls `${DEEPSEEK_BASE_URL}/chat/completions`; trailing slash is stripped. |
 | `DEEPSEEK_MODEL` | Optional. | `deepseek-chat` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
+| `DEEPCODEX_PROVIDER_FALLBACK_MODELS` | Optional. | Empty. | Comma-separated fallback model ids. Fallback is tried only after retryable failures exhaust the retry budget for the current model. |
 | `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
 | `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
 | `DEEPCODEX_PORT` | Optional for server. | `17361` | Port used by the local server. |
@@ -58,7 +59,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment mode, shell execution mode, shell network access, shell command allow/deny regex patterns, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, approved provider fallback models, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment mode, shell execution mode, shell network access, shell command allow/deny regex patterns, and session retention defaults.
 
 Create a template:
 
@@ -80,6 +81,7 @@ Example:
   "model": "deepseek-chat",
   "provider": {
     "baseUrl": "https://api.deepseek.com",
+    "fallbackModels": [],
     "allowedBaseUrls": ["https://api.deepseek.com"],
     "allowedModels": ["deepseek-chat"]
   },
@@ -150,9 +152,9 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. `allowedShellCommands` and `deniedShellCommands` entries are JavaScript regular expression sources applied to the raw shell command before execution; deny matches block immediately, allowlists restrict commands when non-empty, and built-in dangerous/network gates still apply after allowlist matching. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL, primary model, and fallback models are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. `allowedShellCommands` and `deniedShellCommands` entries are JavaScript regular expression sources applied to the raw shell command before execution; deny matches block immediately, allowlists restrict commands when non-empty, and built-in dangerous/network gates still apply after allowlist matching. Do not put provider keys or secrets in workspace config.
 
-The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; 400-class request errors and invalid JSON are surfaced without retry.
+The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; when those retryable failures exhaust the retry budget for a model, the next approved fallback model is tried. 400-class request errors and invalid JSON are surfaced without retry or fallback.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
@@ -214,6 +216,7 @@ Expected checks:
 
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
+- Fallback model count reflects `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`.
 - Provider retry settings print with their effective environment/default values.
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
@@ -537,8 +540,8 @@ The Security scan panel and CLI `security scan` command use the same detector as
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
-| Provider is rejected. | `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, or workspace defaults do not match `provider.allowedBaseUrls` or `provider.allowedModels`. | Run `deepcodex doctor --workspace <path>` and update the workspace provider policy or selected model. |
-| Provider call fails after several attempts. | DeepSeek-compatible provider returned retryable failures or the network remained unavailable through the retry budget. | Run `doctor`, verify network/API status, and tune `DEEPCODEX_PROVIDER_MAX_RETRIES` or `DEEPCODEX_PROVIDER_RETRY_BASE_MS` only for trusted demos. |
+| Provider is rejected. | `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPCODEX_PROVIDER_FALLBACK_MODELS`, or workspace defaults do not match `provider.allowedBaseUrls` or `provider.allowedModels`. | Run `deepcodex doctor --workspace <path>` and update the workspace provider policy, selected model, or fallback model list. |
+| Provider call fails after several attempts. | DeepSeek-compatible provider returned retryable failures or the network remained unavailable through the retry budget for every configured fallback model. | Run `doctor`, verify network/API status, remove unhealthy fallbacks, or tune `DEEPCODEX_PROVIDER_MAX_RETRIES` and `DEEPCODEX_PROVIDER_RETRY_BASE_MS` only for trusted demos. |
 | Run fails before the model call with signed policy required. | `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` and the policy bundle is missing, untrusted, expired, revoked, has an untrusted issuer, or does not match the active config SHA-256. | Run `deepcodex config verify-bundle --workspace <path> --public-key <pem>` and fix the bundle, trusted key list, revocation list, or issuer allowlist. |
 | Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON, unsupported values, or an invalid redaction regex. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |

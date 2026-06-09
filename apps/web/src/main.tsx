@@ -117,6 +117,7 @@ type WorkspaceConfig = {
   model?: string;
   provider?: {
     baseUrl?: string;
+    fallbackModels?: string[];
     allowedBaseUrls?: string[];
     allowedModels?: string[];
   };
@@ -3310,7 +3311,8 @@ function formatWorkspaceConfigMessage(result: WorkspaceConfigResult | null, fall
 function formatProviderPolicySummary(config: WorkspaceConfig): string {
   const baseUrls = config.provider?.allowedBaseUrls?.length ?? 0;
   const models = config.provider?.allowedModels?.length ?? 0;
-  return `${baseUrls} URLs / ${models} models`;
+  const fallbackModels = config.provider?.fallbackModels?.length ?? 0;
+  return `${baseUrls} URLs / ${models} models / ${fallbackModels} fallback`;
 }
 
 function formatShellPolicySummary(config: WorkspaceConfig): string {

@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists with approved fallback models, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
 
 ## Quick Start
 
@@ -44,7 +44,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-to
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
-Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and session retention defaults:
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists and approved fallback models, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and session retention defaults:
 
 ```powershell
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
@@ -58,6 +58,7 @@ node apps/cli/dist/index.js config export-trust-package --workspace D:\Coding\De
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
 - `DEEPSEEK_BASE_URL`: Defaults to `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: Defaults to `deepseek-chat`.
+- `DEEPCODEX_PROVIDER_FALLBACK_MODELS`: Optional comma-separated fallback models. Each fallback must be allowed by workspace `provider.allowedModels` when an allowlist is configured.
 - `DEEPCODEX_PROVIDER_MAX_RETRIES`: Defaults to `2`; retries retryable provider failures before surfacing an error.
 - `DEEPCODEX_PROVIDER_RETRY_BASE_MS`: Defaults to `500`; exponential backoff base delay for provider retries.
 - `DEEPCODEX_PORT`: Defaults to `17361`.
@@ -91,7 +92,7 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
 - CLI completion: `node apps/cli/dist/index.js completion powershell`, `completion bash`, or `completion zsh`.
 - Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
-- Web/Desktop workspace policy: use `Load config` to review config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
+- Web/Desktop workspace policy: use `Load config` to review config hash, provider allowlists, fallback-model count, shell controls, DLP counts, artifact controls, retention, and config path.
 - Web/Desktop evidence: use the right-rail `Download` buttons to save Markdown release evidence and distribution preflight reports.
 - Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.
 - Health check: `http://127.0.0.1:17361/api/health`.

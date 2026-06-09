@@ -170,6 +170,30 @@ describe("agent approval risk", () => {
     );
   });
 
+  it("emits usage for the chat client's last model when a fallback model responded", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const events: AgentEvent[] = [];
+
+    await runDeepCodexAgent({
+      prompt: "inspect only",
+      workspace: tempDir,
+      chatClient: fallbackUsageClient(),
+      onEvent: (event) => {
+        events.push(event);
+      }
+    });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "model_usage",
+        model: "fallback-model",
+        promptTokens: 3,
+        completionTokens: 2,
+        totalTokens: 5
+      })
+    );
+  });
+
   it("redacts sensitive assistant content before emitting or returning it", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const events: AgentEvent[] = [];
@@ -307,6 +331,32 @@ function finalOnlyClient(): AgentChatClient {
           prompt_tokens: 10,
           completion_tokens: 5,
           total_tokens: 15
+        }
+      };
+    }
+  };
+}
+
+function fallbackUsageClient(): AgentChatClient {
+  return {
+    model: "primary-model",
+    lastModel: "fallback-model",
+    async chat(): Promise<DeepSeekChatResponse> {
+      return {
+        id: "test-fallback-usage",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "fallback response"
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 3,
+          completion_tokens: 2,
+          total_tokens: 5
         }
       };
     }

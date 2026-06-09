@@ -46,6 +46,7 @@ export interface BudgetPolicy {
 
 export interface ProviderPolicy {
   baseUrl?: string;
+  fallbackModels?: string[];
   allowedBaseUrls?: string[];
   allowedModels?: string[];
 }
@@ -198,6 +199,7 @@ export interface AgentRunOptions {
   maxSteps?: number;
   policy?: ApprovalPolicy;
   model?: string;
+  fallbackModels?: string[];
   baseUrl?: string;
   budget?: BudgetPolicy;
   chatClient?: AgentChatClient;
@@ -215,6 +217,7 @@ export interface DeepSeekConfig {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  fallbackModels?: string[];
   timeoutMs?: number;
   maxRetries?: number;
   retryBaseDelayMs?: number;
@@ -248,6 +251,7 @@ export interface DeepSeekChatResponse {
 
 export interface AgentChatClient {
   model: string;
+  lastModel?: string;
   chat(messages: ChatMessage[], tools?: ToolDefinition[]): Promise<DeepSeekChatResponse>;
 }
 

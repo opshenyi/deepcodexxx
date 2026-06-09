@@ -152,6 +152,7 @@ program
           workspace: workspace.root,
           baseUrl: provider.baseUrl,
           model: provider.model,
+          fallbackModels: provider.fallbackModels,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -235,6 +236,7 @@ program
           workspace: workspace.root,
           baseUrl: provider.baseUrl,
           model: provider.model,
+          fallbackModels: provider.fallbackModels,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -466,6 +468,7 @@ evals
         workspace: workspace.root,
         baseUrl: provider.baseUrl,
         model: provider.model,
+        fallbackModels: provider.fallbackModels,
         maxSteps,
         policy,
         budget: createBudgetPolicy(options, task.budget, options.pricingProfile, workspaceConfig.config),
@@ -961,6 +964,7 @@ program
       deepSeekApiKey,
       deepSeekBaseUrl: provider.baseUrl,
       deepSeekModel: provider.model,
+      deepSeekFallbackModels: provider.fallbackModels.length,
       providerMaxRetries: process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2",
       providerRetryBaseDelayMs: process.env.DEEPCODEX_PROVIDER_RETRY_BASE_MS ?? "500",
       allowedProviderBaseUrls: workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0,
@@ -1006,6 +1010,7 @@ program
     console.log(`DeepSeek API key: ${diagnostics.deepSeekApiKey}`);
     console.log(`DeepSeek base URL: ${diagnostics.deepSeekBaseUrl}`);
     console.log(`DeepSeek model: ${diagnostics.deepSeekModel}`);
+    console.log(`DeepSeek fallback models: ${diagnostics.deepSeekFallbackModels}`);
     console.log(`Provider max retries: ${diagnostics.providerMaxRetries}`);
     console.log(`Provider retry base delay ms: ${diagnostics.providerRetryBaseDelayMs}`);
     console.log(`Allowed provider base URLs: ${diagnostics.allowedProviderBaseUrls}`);
@@ -1515,8 +1520,16 @@ function resolveAllowPdfTextExtractionPolicy(
 function readProviderSelection(config?: WorkspaceConfig) {
   return resolveProviderSelection({
     baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
-    model: process.env.DEEPSEEK_MODEL || config?.model
+    model: process.env.DEEPSEEK_MODEL || config?.model,
+    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels
   });
+}
+
+function readProviderFallbackModelsFromEnv(): string[] | undefined {
+  if (process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS === undefined) {
+    return undefined;
+  }
+  return readCommaSeparatedEnv(process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS);
 }
 
 async function readPolicyBundleVerificationOptions(publicKeyPaths: string[] = []): Promise<PolicyBundleVerificationOptions> {

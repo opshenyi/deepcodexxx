@@ -5,7 +5,13 @@ import type {
   DeepSeekConfig,
   ToolDefinition
 } from "./types.js";
-import { DEFAULT_DEEPSEEK_BASE_URL, DEFAULT_DEEPSEEK_MODEL, normalizeBaseUrl } from "./provider-policy.js";
+import {
+  DEFAULT_DEEPSEEK_BASE_URL,
+  DEFAULT_DEEPSEEK_MODEL,
+  normalizeBaseUrl,
+  normalizeFallbackModels,
+  normalizeModel
+} from "./provider-policy.js";
 
 export class DeepSeekError extends Error {
   constructor(
@@ -22,15 +28,26 @@ export class DeepSeekError extends Error {
 export class DeepSeekClient {
   readonly baseUrl: string;
   readonly model: string;
+  readonly models: string[];
   readonly timeoutMs: number;
   readonly maxRetries: number;
   readonly retryBaseDelayMs: number;
   private readonly apiKey?: string;
+  private lastModelValue: string;
 
   constructor(config: DeepSeekConfig = {}) {
     this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY;
     this.baseUrl = normalizeBaseUrl(config.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_DEEPSEEK_BASE_URL);
-    this.model = config.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL;
+    const primaryModel = normalizeModel(config.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL);
+    this.models = [
+      primaryModel,
+      ...normalizeFallbackModels(
+        primaryModel,
+        config.fallbackModels ?? readCommaSeparatedEnv(process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS)
+      )
+    ];
+    this.model = primaryModel;
+    this.lastModelValue = this.model;
     this.timeoutMs = config.timeoutMs ?? 120_000;
     this.maxRetries = config.maxRetries ?? readNonNegativeIntegerEnv("DEEPCODEX_PROVIDER_MAX_RETRIES", 2);
     this.retryBaseDelayMs = config.retryBaseDelayMs ?? readNonNegativeNumberEnv("DEEPCODEX_PROVIDER_RETRY_BASE_MS", 500);
@@ -40,43 +57,57 @@ export class DeepSeekClient {
     return Boolean(this.apiKey);
   }
 
+  get lastModel(): string {
+    return this.lastModelValue;
+  }
+
   async chat(messages: ChatMessage[], tools: ToolDefinition[] = []): Promise<DeepSeekChatResponse> {
+    this.lastModelValue = this.model;
     if (!this.apiKey) {
       return this.mockResponse(messages);
     }
 
-    const payload: DeepSeekChatRequest = {
-      model: this.model,
-      messages,
-      tools,
-      tool_choice: tools.length > 0 ? "auto" : "none",
-      temperature: 0.2,
-      max_tokens: 4096,
-      stream: false
-    };
-
     let lastError: DeepSeekError | undefined;
     const maxAttempts = this.maxRetries + 1;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await this.sendChatRequest(payload);
-      } catch (error) {
-        const deepSeekError = toDeepSeekError(error);
-        lastError = deepSeekError;
-        if (!deepSeekError.retryable || attempt >= maxAttempts) {
-          throw attempt > 1 && deepSeekError.retryable
-            ? new DeepSeekError(
-                `DeepSeek request failed after ${attempt} attempts: ${deepSeekError.message}`,
-                deepSeekError.status,
-                deepSeekError.body,
-                deepSeekError.retryable
-              )
-            : deepSeekError;
+    const exhaustedModels: string[] = [];
+    for (const model of this.models) {
+      const payload: DeepSeekChatRequest = {
+        model,
+        messages,
+        tools,
+        tool_choice: tools.length > 0 ? "auto" : "none",
+        temperature: 0.2,
+        max_tokens: 4096,
+        stream: false
+      };
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        this.lastModelValue = model;
+        try {
+          return await this.sendChatRequest(payload);
+        } catch (error) {
+          const deepSeekError = toDeepSeekError(error);
+          lastError = deepSeekError;
+          if (!deepSeekError.retryable) {
+            throw deepSeekError;
+          }
+          if (attempt < maxAttempts) {
+            await delay(retryDelayMs(this.retryBaseDelayMs, attempt));
+          }
         }
-        await delay(retryDelayMs(this.retryBaseDelayMs, attempt));
       }
+      exhaustedModels.push(model);
     }
-    throw lastError ?? new DeepSeekError("DeepSeek request failed.");
+    const modelCount = exhaustedModels.length || this.models.length;
+    const modelsText = exhaustedModels.length > 0 ? exhaustedModels.join(", ") : this.models.join(", ");
+    throw new DeepSeekError(
+      `DeepSeek request failed after ${maxAttempts} attempts for ${modelCount} model(s) (${modelsText}): ${
+        lastError?.message ?? "unknown error"
+      }`,
+      lastError?.status,
+      lastError?.body,
+      lastError?.retryable ?? true
+    );
   }
 
   private async sendChatRequest(payload: DeepSeekChatRequest): Promise<DeepSeekChatResponse> {
@@ -191,4 +222,14 @@ function readNonNegativeNumberEnv(name: string, fallback: number): number {
     throw new Error(`${name} must be a non-negative number.`);
   }
   return parsed;
+}
+
+function readCommaSeparatedEnv(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

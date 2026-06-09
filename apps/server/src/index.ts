@@ -427,6 +427,7 @@ app.post("/api/agent/run", async (req, res) => {
       workspace: workspace.root,
       baseUrl: provider.baseUrl,
       model: provider.model,
+      fallbackModels: provider.fallbackModels,
       maxSteps: body.maxSteps ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps,
       policy,
       budget: createBudgetPolicy(body.budget, profile?.budget, body.pricingProfileId, workspaceConfig.config),
@@ -543,8 +544,16 @@ function createRunPolicy(
 function readProviderSelection(model: string | undefined, config?: WorkspaceConfig) {
   return resolveProviderSelection({
     baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
-    model: model?.trim() || process.env.DEEPSEEK_MODEL || config?.model
+    model: model?.trim() || process.env.DEEPSEEK_MODEL || config?.model,
+    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels
   });
+}
+
+function readProviderFallbackModelsFromEnv(): string[] | undefined {
+  if (process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS === undefined) {
+    return undefined;
+  }
+  return readCommaSeparatedEnv(process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS);
 }
 
 function resolveRunApprovalMode(

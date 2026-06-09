@@ -31,6 +31,7 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
+- CLI `doctor` reports the effective DeepSeek fallback model count.
 - CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
 - CLI `completion json` emits a parseable command spec, and shell-specific completion scripts include top-level commands, subcommands, and options.
 - CLI `doctor --json --require-*` exits non-zero when a requested API-key, workspace-config, or trusted-policy-bundle condition is not met; run the strict flags that match the planned demo workspace.
@@ -78,7 +79,7 @@ Checklist:
 - The Workspace profile panel can save the current setup, apply it, remove it, and keep the sidebar layout within the viewport on mobile.
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
-- The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
+- The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist and fallback counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.
@@ -87,7 +88,7 @@ Checklist:
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
-- A workspace provider allowlist rejects unapproved base URLs or models before a run starts.
+- A workspace provider allowlist rejects unapproved base URLs, primary models, or fallback models before a run starts.
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.

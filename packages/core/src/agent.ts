@@ -30,7 +30,9 @@ Operating model:
 export async function runDeepCodexAgent(options: AgentRunOptions): Promise<AgentRunResult> {
   const sessionId = options.sessionId ?? randomUUID();
   const workspace = await createWorkspaceContext(options.workspace, options.policy);
-  const client = options.chatClient ?? new DeepSeekClient({ baseUrl: options.baseUrl, model: options.model });
+  const client =
+    options.chatClient ??
+    new DeepSeekClient({ baseUrl: options.baseUrl, model: options.model, fallbackModels: options.fallbackModels });
   const redactionOptions: RedactionOptions = { additionalPatterns: workspace.policy.redactionPatterns };
   const budgetPolicy = normalizeBudgetPolicy(options.budget);
   const budgetEnabled = isBudgetPolicyEnabled(budgetPolicy);
@@ -81,7 +83,7 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
       const completionTokens = response.usage.completion_tokens ?? 0;
       usageEvent = {
         type: "model_usage",
-        model: client.model,
+        model: client.lastModel ?? client.model,
         promptTokens,
         completionTokens,
         totalTokens: response.usage.total_tokens ?? promptTokens + completionTokens

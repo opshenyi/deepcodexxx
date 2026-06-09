@@ -24,9 +24,9 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Paths cannot escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, env files, and session audit state are denied by default.
 - File read, write, edit, and search tools enforce a configurable 512 KiB default size limit.
-- `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and retention.
+- `.deepcodex/config.json` can define repository defaults for model, provider base URL, approved fallback models, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and retention.
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
-- Web/Desktop render the same workspace config API as a read-only policy summary, including config hash, active profile, provider allowlist counts, team profile/eval counts, shell controls, DLP counts, artifact controls, retention, and config path.
+- Web/Desktop render the same workspace config API as a read-only policy summary, including config hash, active profile, provider allowlist and fallback counts, team profile/eval counts, shell controls, DLP counts, artifact controls, retention, and config path.
 - `.deepcodex/state/evals` stores optional recorded eval runs; shared core helpers score exact expected signals, compare runs, aggregate reports, and expose the same evidence through CLI, server API, and Web/Desktop.
 - Release evidence reports compose workspace config provenance, policy-bundle verification, eval summaries, security-scan metadata, provider-key status, and recent session summaries through shared core helpers, CLI, server API, and Web/Desktop.
 - Distribution preflight reports check the product root for required scripts, package build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, docs, and ignored local-state paths through shared core helpers, CLI, server API, and Web/Desktop.
@@ -47,4 +47,4 @@ DeepCodex is a TypeScript monorepo with five production packages:
 
 ## DeepSeek Integration
 
-The client uses the OpenAI-compatible chat completions endpoint at `DEEPSEEK_BASE_URL`, defaulting to `https://api.deepseek.com`. The model is controlled by `DEEPSEEK_MODEL`, defaulting to `deepseek-chat` for compatibility with common DeepSeek examples.
+The client uses the OpenAI-compatible chat completions endpoint at `DEEPSEEK_BASE_URL`, defaulting to `https://api.deepseek.com`. The primary model is controlled by `DEEPSEEK_MODEL`, defaulting to `deepseek-chat` for compatibility with common DeepSeek examples. Optional fallback models can come from `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`; each fallback receives the same retry budget and is attempted only after retryable failures exhaust the current model.

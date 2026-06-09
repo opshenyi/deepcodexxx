@@ -6,23 +6,23 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 - Clean TypeScript monorepo structure.
 - DeepSeek-compatible agent loop with function tools.
-- DeepSeek-compatible provider retry/backoff for retryable status codes and network failures.
+- DeepSeek-compatible provider retry/backoff plus policy-controlled fallback models for retryable status codes and network failures.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
 - Desktop production-like startup can bootstrap the built local server and load the built Web client.
 - Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, a saved runtime Server URL from the sidebar, or saved local workspace profiles for repeated workspace/server/policy setup.
 - Server CORS can remain permissive for local development or be restricted by `DEEPCODEX_CORS_ORIGINS` for controlled demos.
-- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, approved fallback models, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, and retention.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
 - CLI policy-bundle key generation and signing workflow for creating an Ed25519 keypair and signing `.deepcodex/policy-bundle.json` from the active workspace config with an external private key.
 - CLI policy trust package export for distributing public-key trust metadata and local/CI env fragments without private key material.
 - Web/Desktop policy-bundle status panel that checks the selected workspace through the local server and shows trust, signature, issuer, expiry, config hash, bundle hash, signing-key hash, and verification reason.
-- Web/Desktop workspace policy summary panel that shows loaded config hash, selected profile, provider allowlist counts, team profile/eval counts, shell controls, DLP counts, artifact controls, retention, and config path.
+- Web/Desktop workspace policy summary panel that shows loaded config hash, selected profile, provider allowlist and fallback counts, team profile/eval counts, shell controls, DLP counts, artifact controls, retention, and config path.
 - Env-controlled signed-only policy enforcement for CLI/server agent runs.
 - Policy-bundle trust policy supports multiple trusted public keys, bundle revocation, signing-key revocation, and trusted issuer allowlists.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
-- Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
+- Provider/model allowlists that block unapproved base URLs, primary models, or fallback model selections before an agent run.
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
@@ -89,7 +89,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add richer provider fallback policy and managed trust package distribution channels.
+- Add managed trust package distribution channels, provider registry metadata, and stronger hosted operations.
 - Add richer DLP classification and policy-controlled OCR.
 - Add richer generated-asset handling and file-type policies.
 - Add kernel-level shell sandboxing or remote isolated execution workers.

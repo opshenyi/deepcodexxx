@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listPolicyProfiles } from "./policy-profile.js";
-import { normalizeBaseUrl } from "./provider-policy.js";
+import { normalizeBaseUrl, normalizeModel } from "./provider-policy.js";
 import type { SessionRetentionPolicy } from "./session-store.js";
 import type {
   ApprovalMode,
@@ -110,6 +110,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     model: "deepseek-chat",
     provider: {
       baseUrl: "https://api.deepseek.com",
+      fallbackModels: [],
       allowedBaseUrls: ["https://api.deepseek.com"],
       allowedModels: ["deepseek-chat"]
     },
@@ -218,6 +219,7 @@ function normalizeProviderConfig(value: unknown): ProviderPolicy | undefined {
   const entry = readObject(value, "provider");
   return removeUndefinedProviderValues({
     baseUrl: readOptionalBaseUrl(entry.baseUrl, "provider.baseUrl"),
+    fallbackModels: readOptionalModelArray(entry.fallbackModels, "provider.fallbackModels"),
     allowedBaseUrls: readOptionalBaseUrlArray(entry.allowedBaseUrls, "provider.allowedBaseUrls"),
     allowedModels: readOptionalStringArray(entry.allowedModels, "provider.allowedModels")
   });
@@ -436,6 +438,18 @@ function readOptionalBaseUrlArray(value: unknown, field: string): string[] | und
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`${field} contains an invalid URL: ${message}`);
+    }
+  });
+}
+
+function readOptionalModelArray(value: unknown, field: string): string[] | undefined {
+  const models = readOptionalStringArray(value, field);
+  return models?.map((model) => {
+    try {
+      return normalizeModel(model);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${field} contains an invalid model: ${message}`);
     }
   });
 }

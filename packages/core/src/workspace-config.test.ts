@@ -39,8 +39,9 @@ describe("workspace config", () => {
         model: "deepseek-coder",
         provider: {
           baseUrl: "https://api.deepseek.com/",
+          fallbackModels: ["deepseek-reasoner"],
           allowedBaseUrls: ["https://api.deepseek.com/"],
-          allowedModels: ["deepseek-coder", "deepseek-chat"]
+          allowedModels: ["deepseek-coder", "deepseek-chat", "deepseek-reasoner"]
         },
         policyProfileId: "inspection",
         policyProfiles: [
@@ -112,8 +113,9 @@ describe("workspace config", () => {
       model: "deepseek-coder",
       provider: {
         baseUrl: "https://api.deepseek.com",
+        fallbackModels: ["deepseek-reasoner"],
         allowedBaseUrls: ["https://api.deepseek.com"],
-        allowedModels: ["deepseek-coder", "deepseek-chat"]
+        allowedModels: ["deepseek-coder", "deepseek-chat", "deepseek-reasoner"]
       },
       policyProfileId: "inspection",
       policyProfiles: [
@@ -387,6 +389,18 @@ describe("workspace config", () => {
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.allowedBaseUrls/);
   });
 
+  it("rejects invalid provider fallback models", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ provider: { fallbackModels: ["deepseek-chat", ""] } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.fallbackModels/);
+  });
+
   it("writes a template without overwriting an existing config", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
 
@@ -394,6 +408,7 @@ describe("workspace config", () => {
 
     expect(created.exists).toBe(true);
     expect(created.config.policyProfileId).toBe("guarded-write");
+    expect(created.config.provider?.fallbackModels).toEqual([]);
     expect(created.config.evals?.[0]?.id).toBe("workspace-release-smoke");
     expect(created.config.policy?.deniedShellCommands).toContain("\\bterraform\\s+apply\\b");
     expect(created.config.policyProfiles?.[0]?.policy.deniedShellCommands).toContain("\\bkubectl\\s+delete\\b");
