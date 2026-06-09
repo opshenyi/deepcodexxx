@@ -21,6 +21,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - File write/edit approvals and tool results include SHA-256 file audit metadata when file paths can be resolved.
 - Token usage events are recorded when the provider returns usage metadata.
 - Run-level token and estimated cost budgets can stop additional tool or model work after provider usage reaches the configured limit.
+- Caller-managed pricing profiles can provide reusable input/output token prices for cost estimates without hard-coding provider prices.
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
@@ -56,7 +57,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add custom team policy profile storage.
 - Add project-specific DLP policies and richer media/artifact-type handling.
 - Add richer generated-asset handling and file-type policies.
-- Add managed pricing profiles and per-workspace budget policy templates.
+- Add per-workspace model and budget policy templates.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.

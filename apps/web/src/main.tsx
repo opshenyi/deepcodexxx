@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import "./styles.css";
 
@@ -66,6 +66,14 @@ type BudgetPolicy = {
   maxEstimatedUsd?: number;
   inputUsdPerMillionTokens?: number;
   outputUsdPerMillionTokens?: number;
+};
+
+type PricingProfile = {
+  id: string;
+  label: string;
+  description?: string;
+  inputUsdPerMillionTokens: number;
+  outputUsdPerMillionTokens: number;
 };
 
 type BudgetSnapshot = {
@@ -158,6 +166,7 @@ const defaultRetentionMaxSessions = localStorage.getItem("deepcodex.retentionMax
 const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxAgeDays") ?? "";
 const defaultPolicyProfile =
   (localStorage.getItem("deepcodex.policyProfile") as PolicyProfileOption["id"] | null) ?? "custom";
+const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -252,6 +261,8 @@ function App() {
   const [inputUsdPerMillionTokens, setInputUsdPerMillionTokens] = useState(defaultInputUsdPerMillionTokens);
   const [outputUsdPerMillionTokens, setOutputUsdPerMillionTokens] = useState(defaultOutputUsdPerMillionTokens);
   const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
+  const [pricingProfileId, setPricingProfileId] = useState(defaultPricingProfile);
+  const [pricingProfiles, setPricingProfiles] = useState<PricingProfile[]>([]);
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
   const [retentionState, setRetentionState] = useState<LoadState>("idle");
@@ -306,6 +317,10 @@ function App() {
     [selectedSession]
   );
 
+  useEffect(() => {
+    void loadPricingProfiles();
+  }, []);
+
   async function runAgent() {
     if (!prompt.trim()) {
       return;
@@ -322,6 +337,7 @@ function App() {
     localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
     localStorage.setItem("deepcodex.inputUsdPerMillionTokens", inputUsdPerMillionTokens);
     localStorage.setItem("deepcodex.outputUsdPerMillionTokens", outputUsdPerMillionTokens);
+    localStorage.setItem("deepcodex.pricingProfile", pricingProfileId);
 
     try {
       const budget = createBudgetPayload({
@@ -340,6 +356,7 @@ function App() {
           mode,
           approvalMode,
           maxSteps: selectedPolicyProfile()?.maxSteps ?? 12,
+          pricingProfileId: pricingProfileId === "custom" ? undefined : pricingProfileId,
           budget
         })
       });
@@ -400,6 +417,23 @@ function App() {
       setMemory(message);
       setMemoryPath("");
       setMemoryState("error");
+    }
+  }
+
+  async function loadPricingProfiles() {
+    try {
+      const response = await fetch(`${serverUrl}/api/pricing-profiles`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { profiles: PricingProfile[]; defaultProfileId?: string };
+      setPricingProfiles(body.profiles);
+      const defaultProfile = body.defaultProfileId && body.defaultProfileId !== "custom" ? body.defaultProfileId : "";
+      if (defaultProfile && !localStorage.getItem("deepcodex.pricingProfile")) {
+        setPricingProfileId(defaultProfile);
+      }
+    } catch {
+      setPricingProfiles([]);
     }
   }
 
@@ -762,6 +796,23 @@ function App() {
                 placeholder="0.00"
               />
             </label>
+            {pricingProfiles.length > 0 ? (
+              <label className="budgetField budgetFieldWide" htmlFor="pricing-profile">
+                <span>Pricing profile</span>
+                <select
+                  id="pricing-profile"
+                  value={pricingProfileId}
+                  onChange={(event) => setPricingProfileId(event.target.value)}
+                >
+                  <option value="custom">Manual prices</option>
+                  {pricingProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
         </section>
 

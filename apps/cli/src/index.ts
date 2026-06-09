@@ -8,12 +8,15 @@ import {
   createSessionRecorder,
   createWorkspaceContext,
   exportSessionHistory,
+  applyPricingProfileToBudget,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
+  parsePricingProfiles,
   pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
+  resolvePricingProfile,
   resolvePolicyProfile,
   runDeepCodexAgent
 } from "@deepcodex/core";
@@ -52,6 +55,7 @@ program
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
   .action(
     async (
@@ -66,6 +70,7 @@ program
         maxSessionUsd?: string;
         inputUsdPerMillionTokens?: string;
         outputUsdPerMillionTokens?: string;
+        pricingProfile?: string;
         shellEnv?: string;
       }
     ) => {
@@ -81,7 +86,7 @@ program
           workspace: workspace.root,
           maxSteps: readOptionalInteger(options.maxSteps) ?? profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options, profile?.budget),
+          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -102,6 +107,7 @@ program
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
   .action(async (options: {
     workspace: string;
@@ -112,6 +118,7 @@ program
     maxSessionUsd?: string;
     inputUsdPerMillionTokens?: string;
     outputUsdPerMillionTokens?: string;
+    pricingProfile?: string;
     shellEnv?: string;
   }) => {
     const rl = createInterface({ input, output });
@@ -132,7 +139,7 @@ program
           workspace: workspace.root,
           maxSteps: profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options, profile?.budget),
+          budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -153,6 +160,7 @@ program
 const sessions = program.command("sessions").description("Inspect persisted DeepCodex session history.");
 
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
+const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
 
 profiles
   .command("list")
@@ -174,6 +182,36 @@ profiles
   .argument("<profile>", "Profile id")
   .action((profileId: string) => {
     console.log(JSON.stringify(resolvePolicyProfile(profileId), null, 2));
+  });
+
+pricing
+  .command("list")
+  .option("--json", "Print JSON output", false)
+  .action((options: { json: boolean }) => {
+    const entries = readPricingProfilesFromEnv();
+    if (options.json) {
+      console.log(JSON.stringify(entries, null, 2));
+      return;
+    }
+    if (entries.length === 0) {
+      console.log("No pricing profiles configured.");
+      return;
+    }
+    for (const profile of entries) {
+      console.log(
+        `${profile.id}  ${profile.label}  ${profile.inputUsdPerMillionTokens} input / ${profile.outputUsdPerMillionTokens} output USD per 1M tokens`
+      );
+      if (profile.description) {
+        console.log(`  ${profile.description}`);
+      }
+    }
+  });
+
+pricing
+  .command("show")
+  .argument("<profile>", "Pricing profile id")
+  .action((profileId: string) => {
+    console.log(JSON.stringify(resolvePricingProfile(readPricingProfilesFromEnv(), profileId), null, 2));
   });
 
 sessions
@@ -274,6 +312,8 @@ program
       `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
     );
     console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? "custom"}`);
+    console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? "custom"}`);
+    console.log(`Configured pricing profiles: ${readPricingProfilesFromEnv().length}`);
     console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? "minimal"}`);
     console.log(`Node: ${process.version}`);
   });
@@ -393,9 +433,13 @@ function createBudgetPolicy(options: {
   maxSessionUsd?: string;
   inputUsdPerMillionTokens?: string;
   outputUsdPerMillionTokens?: string;
-}, profileBudget?: BudgetPolicy): BudgetPolicy | undefined {
+}, profileBudget?: BudgetPolicy, pricingProfileId?: string): BudgetPolicy | undefined {
+  const pricingProfile = resolvePricingProfile(
+    readPricingProfilesFromEnv(),
+    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE
+  );
   const merged: BudgetPolicy = {
-    ...profileBudget,
+    ...applyPricingProfileToBudget(profileBudget, pricingProfile),
     ...removeUndefinedBudgetValues({
     maxTokens: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_TOKENS),
     maxEstimatedUsd: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_USD),
@@ -413,6 +457,10 @@ function createBudgetPolicy(options: {
 
   const budget = { ...merged, ...removeUndefinedBudgetValues(cliBudget) };
   return Object.values(budget).some((value) => value !== undefined) ? budget : undefined;
+}
+
+function readPricingProfilesFromEnv() {
+  return parsePricingProfiles(process.env.DEEPCODEX_PRICING_PROFILES);
 }
 
 function removeUndefinedBudgetValues(policy: BudgetPolicy): BudgetPolicy {

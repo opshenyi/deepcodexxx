@@ -8,12 +8,15 @@ import {
   createSessionRecorder,
   createWorkspaceContext,
   exportSessionHistory,
+  applyPricingProfileToBudget,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
+  parsePricingProfiles,
   pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
+  resolvePricingProfile,
   resolvePolicyProfile,
   runDeepCodexAgent
 } from "@deepcodex/core";
@@ -62,6 +65,13 @@ app.get("/api/memory", async (req, res, next) => {
 
 app.get("/api/policy-profiles", (_req, res) => {
   res.json({ profiles: listPolicyProfiles(), defaultProfileId: process.env.DEEPCODEX_POLICY_PROFILE ?? "custom" });
+});
+
+app.get("/api/pricing-profiles", (_req, res) => {
+  res.json({
+    profiles: readPricingProfilesFromEnv(),
+    defaultProfileId: process.env.DEEPCODEX_PRICING_PROFILE ?? "custom"
+  });
 });
 
 app.post("/api/memory", async (req, res, next) => {
@@ -195,6 +205,7 @@ app.post("/api/agent/run", async (req, res) => {
     maxSteps?: number;
     budget?: BudgetPolicy;
     profileId?: string;
+    pricingProfileId?: string;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -234,7 +245,7 @@ app.post("/api/agent/run", async (req, res) => {
       workspace: workspace.root,
       maxSteps: body.maxSteps ?? profile?.maxSteps,
       policy,
-      budget: createBudgetPolicy(body.budget ?? profile?.budget),
+      budget: createBudgetPolicy(body.budget ?? profile?.budget, body.pricingProfileId),
       requestToolApproval: createToolApprovalHandler(body.approvalMode ?? profile?.approvalMode ?? "auto"),
       onEvent: async (event) => {
         send(event);
@@ -338,12 +349,20 @@ function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): Session
   return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as SessionRetentionPolicy;
 }
 
-function createBudgetPolicy(input?: BudgetPolicy): BudgetPolicy | undefined {
+function createBudgetPolicy(input?: BudgetPolicy, pricingProfileId?: string): BudgetPolicy | undefined {
+  const pricingProfile = resolvePricingProfile(
+    readPricingProfilesFromEnv(),
+    pricingProfileId ?? process.env.DEEPCODEX_PRICING_PROFILE
+  );
   const merged = removeUndefinedBudgetValues({
-    ...readBudgetPolicyFromEnv(),
+    ...applyPricingProfileToBudget(readBudgetPolicyFromEnv(), pricingProfile),
     ...removeUndefinedBudgetValues(readBudgetPolicyFromInput(input))
   });
   return Object.values(merged).some((value) => value !== undefined) ? merged : undefined;
+}
+
+function readPricingProfilesFromEnv() {
+  return parsePricingProfiles(process.env.DEEPCODEX_PRICING_PROFILES);
 }
 
 function readBudgetPolicyFromEnv(): BudgetPolicy {

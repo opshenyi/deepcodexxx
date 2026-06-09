@@ -41,6 +41,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added generated/build output path policy: default denied paths now cover nested env files, nested `node_modules`, and common generated folders (`dist`, `build`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.vite`, `.parcel-cache`), with `**` glob support for custom deny patterns like `**/*.map`.
 - Added event redaction for common secret assignments, bearer headers, and token literals before agent events are streamed/persisted; redacted tool output is also sent back into the model loop.
 - Added built-in reusable policy profiles across core/server/Web/Desktop/CLI: `inspection`, `guarded-write`, and `full-access-review`. Profiles bundle execution mode, approval default, max steps, and shell environment, with CLI `profiles list/show` and Web profile selector.
+- Added caller-managed pricing profiles across core/server/Web/Desktop/CLI. `DEEPCODEX_PRICING_PROFILES` supplies JSON profile definitions, `DEEPCODEX_PRICING_PROFILE` or run options select one, CLI has `pricing list/show`, server exposes `/api/pricing-profiles`, and Web shows a Budget pricing selector when profiles exist.
 
 ## Architecture Decisions
 
@@ -55,6 +56,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env, not a full sandbox.
 2. Add richer media/artifact-type policies beyond path-based generated output denial.
-3. Add managed pricing profiles, custom team policy profile storage, and project-specific DLP controls.
+3. Add per-workspace model/budget policy templates, custom team policy profile storage, and project-specific DLP controls.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

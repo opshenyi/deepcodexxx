@@ -27,6 +27,7 @@ CLI client:
 npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js profiles list
+node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
@@ -47,6 +48,8 @@ node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 - `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
 - `DEEPCODEX_SHELL_ENV`: Defaults to `minimal`; set `inherit` only for trusted shell tasks that need parent environment variables.
 - `DEEPCODEX_POLICY_PROFILE`: Optional default profile: `inspection`, `guarded-write`, or `full-access-review`.
+- `DEEPCODEX_PRICING_PROFILES`: Optional JSON array/object of caller-managed pricing profiles.
+- `DEEPCODEX_PRICING_PROFILE`: Optional default pricing profile id used for estimated cost budgets.
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 

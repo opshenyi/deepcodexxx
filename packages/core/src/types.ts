@@ -44,6 +44,14 @@ export interface BudgetPolicy {
   outputUsdPerMillionTokens?: number;
 }
 
+export interface PricingProfile {
+  id: string;
+  label: string;
+  description?: string;
+  inputUsdPerMillionTokens: number;
+  outputUsdPerMillionTokens: number;
+}
+
 export interface BudgetSnapshot {
   promptTokens: number;
   completionTokens: number;

@@ -262,6 +262,10 @@ label,
   min-width: 0;
 }
 
+.budgetFieldWide {
+  grid-column: 1 / -1;
+}
+
 .budgetField span {
   display: block;
   margin-bottom: 6px;

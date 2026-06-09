@@ -37,6 +37,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 | `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
+| `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
+| `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -113,6 +115,12 @@ List reusable policy profiles:
 node apps/cli/dist/index.js profiles list
 ```
 
+List configured pricing profiles:
+
+```powershell
+node apps/cli/dist/index.js pricing list
+```
+
 Read workspace memory:
 
 ```powershell
@@ -187,6 +195,13 @@ Run with a cost budget, using caller-provided sample pricing:
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-usd 0.25 --input-usd-per-million-tokens 0.10 --output-usd-per-million-tokens 0.20 "Inspect this repository and summarize the safest next step."
 ```
 
+Run with a managed pricing profile:
+
+```powershell
+$env:DEEPCODEX_PRICING_PROFILES='[{"id":"example","label":"Example pricing","inputUsdPerMillionTokens":0.10,"outputUsdPerMillionTokens":0.20}]'
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-usd 0.25 --pricing-profile example "Inspect this repository and summarize the safest next step."
+```
+
 Approval modes:
 
 | Mode | File writes | Shell | Intended use |
@@ -222,5 +237,6 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
+| Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |
 | Session history grows too large. | Retention variables are not set and pruning has not been run. | Use Web Audit retention controls or `deepcodex sessions prune --dry-run` before applying deletion. |

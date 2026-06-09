@@ -18,8 +18,8 @@ Primary audiences:
 
 | Area | Current capability | Evidence in product | Demo maturity | Commercial gap |
 | --- | --- | --- | --- | --- |
-| Agent loop | DeepSeek-compatible chat completions loop with tool calls, bounded steps, token usage events, and run-level token/cost budgets when the provider returns usage metadata. | `packages/core` agent, DeepSeek client, budget controls, and tool registry. | Demo-ready. | Add retry policy and richer provider failure handling. |
-| Provider setup | Environment-driven DeepSeek API key, base URL, model, policy profile, and optional budget variables. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry, per-workspace model policy, and managed pricing profiles. |
+| Agent loop | DeepSeek-compatible chat completions loop with tool calls, bounded steps, token usage events, and run-level token/cost budgets when the provider returns usage metadata. Cost budgets can use direct prices or caller-managed pricing profiles. | `packages/core` agent, DeepSeek client, budget controls, pricing profiles, and tool registry. | Demo-ready. | Add retry policy and richer provider failure handling. |
+| Provider setup | Environment-driven DeepSeek API key, base URL, model, policy profile, pricing profile, and optional budget variables. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry and per-workspace model policy. |
 | Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs plus before/after SHA-256 audit metadata; `suggest` mode previews without applying. File tools enforce a configurable size cap, avoid binary-looking files for read/edit/search, and skip common generated/build output paths by default. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add richer media/artifact-type policies. |
 | Execution transparency | Server sends event-stream updates for session, model usage, budget updates, budget stops, approval request, approval decision, tool start, tool result, final answer, and errors. Events are redacted for common secret patterns before streaming/persistence. Sessions are persisted locally, replayable in the Web client, exportable as Markdown or JSON, and prunable by count or age with dry-run support. | Local HTTP API, Web event timeline and replay view, CLI export/prune, and session store. | Demo-ready. | Add structured observability and broader DLP policy. |
 | Web client | Browser console for workspace path, execution mode, prompt, event stream, session replay, audit export, memory, and final output. | `apps/web`. | Demo-ready. | Add saved workspace profiles, diff viewer, and configurable server URL. |
@@ -62,6 +62,7 @@ An interview-ready build should satisfy these criteria:
 - Session history retention can be previewed and applied by count or age.
 - Write and edit approvals include file hash audit evidence in the run history.
 - Token and cost budgets can be configured from Web, CLI, or environment variables.
+- Pricing profiles can be listed from CLI/API and selected for cost-budget runs.
 - Missing DeepSeek key produces clear demo-mode behavior.
 - With a configured key, DeepSeek can perform a bounded workspace inspection.
 - The presenter can explain approval modes, path restrictions, memory persistence, and shell limitations.

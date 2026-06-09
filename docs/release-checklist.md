@@ -30,6 +30,7 @@ Expected result:
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
+- CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
 
 ## Web Demo Verification
@@ -49,6 +50,7 @@ Checklist:
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
+- Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
@@ -80,6 +82,7 @@ Checklist:
 npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js profiles list
+node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and list the main product surfaces."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-tokens 20000 "Inspect this repository with a token budget."
