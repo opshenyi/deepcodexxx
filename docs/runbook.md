@@ -41,6 +41,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
 | `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
+| `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY` | Optional. | Empty. | Trusted Ed25519 public key PEM used to verify `.deepcodex/policy-bundle.json`. |
+| `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE` | Optional. | Empty. | Path to a trusted Ed25519 public key PEM file. Takes precedence over inline public key env. |
 
 ## Workspace Configuration
 
@@ -120,7 +122,15 @@ The current DeepSeek client sends non-streaming chat completion requests with to
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
-Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records. This is a provenance check, not signed policy enforcement.
+Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records.
+
+Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle signs a payload containing the active config SHA-256, issuer, issue time, and optional expiry. Verify it with a trusted Ed25519 public key:
+
+```powershell
+node apps/cli/dist/index.js config verify-bundle --workspace D:\Coding\DeepCodex --public-key D:\keys\deepcodex-policy.pub.pem
+```
+
+The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY` or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`. This is provenance verification; signed-only enforcement is still a future hardening step.
 
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
@@ -141,6 +151,7 @@ Expected checks:
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
 - Workspace config SHA-256 prints when a config file exists.
+- Policy bundle status prints as missing, trusted, untrusted, or failed.
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.

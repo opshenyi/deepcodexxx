@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance, reusable policy profiles, provider/model allowlists, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, and run-level token or estimated-cost budgets.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, and run-level token or estimated-cost budgets.
 
 ## Quick Start
 
@@ -61,6 +61,8 @@ node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
 - `DEEPCODEX_POLICY_PROFILE`: Optional default profile: `inspection`, `guarded-write`, or `full-access-review`.
 - `DEEPCODEX_PRICING_PROFILES`: Optional JSON array/object of caller-managed pricing profiles.
 - `DEEPCODEX_PRICING_PROFILE`: Optional default pricing profile id used for estimated cost budgets.
+- `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`: Optional trusted Ed25519 public key PEM for policy-bundle verification.
+- `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`: Optional path to a trusted Ed25519 public key PEM file.
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 

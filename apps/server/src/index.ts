@@ -1,6 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
+import { readFile } from "node:fs/promises";
 import {
   InvalidSessionIdError,
   SessionNotFoundError,
@@ -21,7 +22,8 @@ import {
   resolvePolicyProfile,
   assertProviderAllowed,
   resolveProviderSelection,
-  runDeepCodexAgent
+  runDeepCodexAgent,
+  verifyWorkspacePolicyBundle
 } from "@deepcodex/core";
 import type {
   AgentEvent,
@@ -89,6 +91,16 @@ app.get("/api/pricing-profiles", (_req, res) => {
 app.get("/api/workspace-config", async (req, res, next) => {
   try {
     res.json(await readWorkspaceConfig(readWorkspace(req.query.workspace)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/policy-bundle", async (req, res, next) => {
+  try {
+    res.json(await verifyWorkspacePolicyBundle(readWorkspace(req.query.workspace), {
+      publicKey: await readPolicyBundlePublicKey()
+    }));
   } catch (error) {
     next(error);
   }
@@ -366,6 +378,14 @@ function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
     return value;
   }
   throw new Error("DEEPCODEX_SHELL_ENV must be minimal or inherit.");
+}
+
+async function readPolicyBundlePublicKey(): Promise<string | undefined> {
+  const publicKeyPath = process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE;
+  if (publicKeyPath) {
+    return readFile(publicKeyPath, "utf8");
+  }
+  return process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY;
 }
 
 function readAllowNetworkFromEnv(): boolean | undefined {

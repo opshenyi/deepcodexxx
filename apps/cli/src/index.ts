@@ -2,6 +2,7 @@
 import "dotenv/config";
 import chalk from "chalk";
 import { Command } from "commander";
+import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -19,6 +20,7 @@ import {
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
+  verifyWorkspacePolicyBundle,
   assertProviderAllowed,
   resolveProviderSelection,
   runDeepCodexAgent,
@@ -31,6 +33,7 @@ import type {
   BudgetSnapshot,
   FileAuditEntry,
   FileHashSnapshot,
+  PolicyBundleVerificationResult,
   PolicyProfile,
   SessionRetentionPolicy,
   ShellEnvironmentMode,
@@ -215,6 +218,25 @@ config
     console.log(`Created workspace config: ${result.path}`);
   });
 
+config
+  .command("verify-bundle")
+  .description("Verify a signed workspace policy bundle against the active workspace config.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--public-key <path>", "Trusted Ed25519 public key PEM path")
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; publicKey?: string; json: boolean }) => {
+    const publicKey = await readPolicyBundlePublicKey(options.publicKey);
+    const result = await verifyWorkspacePolicyBundle(options.workspace, { publicKey });
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    printPolicyBundleVerification(result);
+    if (!result.ok) {
+      process.exitCode = 1;
+    }
+  });
+
 profiles
   .command("list")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
@@ -363,6 +385,7 @@ program
     const profile = resolveCliProfile(undefined, workspaceConfig.config);
     const basePolicy: Partial<ApprovalPolicy> = { ...profile?.policy, ...(workspaceConfig.config.policy ?? {}) };
     const provider = readProviderSelection(workspaceConfig.config);
+    const policyBundleStatus = await readPolicyBundleStatus(options.workspace);
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
     console.log(`DeepSeek base URL: ${provider.baseUrl}`);
     console.log(`DeepSeek model: ${provider.model}`);
@@ -385,6 +408,7 @@ program
     console.log(`Shell network access: ${resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked"}`);
     console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
     console.log(`Workspace config SHA-256: ${workspaceConfig.sha256 ? workspaceConfig.sha256.slice(0, 12) : "not available"}`);
+    console.log(`Policy bundle: ${policyBundleStatus}`);
     console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
     console.log(`Node: ${process.version}`);
   });
@@ -510,6 +534,53 @@ function readProviderSelection(config?: WorkspaceConfig) {
     baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
     model: process.env.DEEPSEEK_MODEL || config?.model
   });
+}
+
+async function readPolicyBundlePublicKey(publicKeyPath?: string): Promise<string | undefined> {
+  const selectedPath = publicKeyPath || process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE;
+  if (selectedPath) {
+    return readFile(selectedPath, "utf8");
+  }
+  return process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY;
+}
+
+async function readPolicyBundleStatus(workspace: string): Promise<string> {
+  try {
+    const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+    if (!result.exists) {
+      return "missing";
+    }
+    if (result.ok) {
+      return `trusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
+    }
+    if (result.signatureVerified) {
+      return `untrusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
+    }
+    return `failed ${result.reason}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `failed ${message}`;
+  }
+}
+
+function printPolicyBundleVerification(result: PolicyBundleVerificationResult): void {
+  console.log(`Policy bundle: ${result.exists ? result.path : "missing"}`);
+  console.log(`Status: ${result.ok ? "trusted" : result.signatureVerified ? "untrusted" : "failed"}`);
+  console.log(`Signature verified: ${result.signatureVerified ? "yes" : "no"}`);
+  console.log(`Trusted key: ${result.trusted ? "yes" : "no"}`);
+  console.log(`Reason: ${result.reason}`);
+  if (result.issuer) {
+    console.log(`Issuer: ${result.issuer}`);
+  }
+  if (result.configSha256) {
+    console.log(`Config SHA-256: ${result.configSha256}`);
+  }
+  if (result.bundleSha256) {
+    console.log(`Bundle SHA-256: ${result.bundleSha256}`);
+  }
+  if (result.publicKeySha256) {
+    console.log(`Public key SHA-256: ${result.publicKeySha256}`);
+  }
 }
 
 function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {
