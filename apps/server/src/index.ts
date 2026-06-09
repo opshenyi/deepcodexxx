@@ -6,18 +6,23 @@ import {
   InvalidSessionIdError,
   SessionNotFoundError,
   appendWorkspaceMemory,
+  compareEvalRunRecords,
+  createEvalRunReport,
   createSessionRecorder,
   createWorkspaceContext,
   exportSessionHistory,
   applyPricingProfileToBudget,
+  listEvalRunRecords,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
   parsePricingProfiles,
   pruneSessionHistories,
+  readEvalRunRecord,
   readSessionHistory,
   readWorkspaceConfig,
   readWorkspaceMemory,
+  resolveEvalTasks,
   resolvePricingProfile,
   resolvePolicyProfile,
   scanWorkspaceSensitiveText,
@@ -123,6 +128,64 @@ app.get("/api/security/scan", async (req, res, next) => {
         maxFindings: readOptionalInteger(req.query.maxFindings)
       })
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/evals", async (req, res, next) => {
+  try {
+    const workspaceConfig = await readWorkspaceConfig(readWorkspace(req.query.workspace));
+    res.json({ tasks: resolveEvalTasks(workspaceConfig.config) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/evals/report", async (req, res, next) => {
+  try {
+    const workspace = await createWorkspaceContext(readWorkspace(req.query.workspace), { mode: "suggest" });
+    res.json({
+      report: await createEvalRunReport(workspace, {
+        recentLimit: readOptionalInteger(req.query.recentLimit)
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/evals/history", async (req, res, next) => {
+  try {
+    const workspace = await createWorkspaceContext(readWorkspace(req.query.workspace), { mode: "suggest" });
+    res.json({ records: await listEvalRunRecords(workspace) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/evals/runs/:runId", async (req, res, next) => {
+  try {
+    const { runId } = req.params;
+    if (!runId) {
+      res.status(400).json({ error: "runId is required" });
+      return;
+    }
+    const workspace = await createWorkspaceContext(readWorkspace(req.query.workspace), { mode: "suggest" });
+    res.json({ record: await readEvalRunRecord(workspace, runId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/evals/compare", async (req, res, next) => {
+  try {
+    const leftRunId = readRequiredQueryString(req.query.leftRunId, "leftRunId");
+    const rightRunId = readRequiredQueryString(req.query.rightRunId, "rightRunId");
+    const workspace = await createWorkspaceContext(readWorkspace(req.query.workspace), { mode: "suggest" });
+    const left = await readEvalRunRecord(workspace, leftRunId);
+    const right = await readEvalRunRecord(workspace, rightRunId);
+    res.json({ left, right, comparison: compareEvalRunRecords(left, right) });
   } catch (error) {
     next(error);
   }
@@ -354,6 +417,13 @@ function readWorkspace(value: unknown): string {
       ? value
       : process.env.DEEPCODEX_WORKSPACE || process.env.INIT_CWD || process.cwd();
   return input && input.trim() ? input : process.cwd();
+}
+
+function readRequiredQueryString(value: unknown, field: string): string {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  throw new Error(`${field} is required.`);
 }
 
 function createCorsMiddleware() {

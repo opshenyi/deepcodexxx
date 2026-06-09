@@ -1138,6 +1138,87 @@ pre {
   line-height: 1.35;
 }
 
+.evalReportBody {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.evalTaskList,
+.evalRunList {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.evalTaskReport,
+.evalRunSummary {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 10px;
+}
+
+.evalTaskHeader {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.evalTaskHeader strong,
+.evalRunSummary strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.evalTaskHeader span,
+.evalRunSummary span,
+.evalTaskReport p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.evalTaskHeader span {
+  flex: 0 0 auto;
+}
+
+.evalTaskReport p {
+  margin: 7px 0 0;
+}
+
+.scoreMeter {
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-strong);
+}
+
+.scoreMeter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+
+.evalRunSummary strong,
+.evalRunSummary span {
+  display: block;
+}
+
+.evalRunSummary span {
+  margin-top: 5px;
+}
+
 .railFoot {
   border-top: 1px solid var(--line);
   color: var(--muted);

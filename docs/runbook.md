@@ -242,10 +242,11 @@ Recommended demo flow:
 5. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
 6. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
 7. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-8. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
-9. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-10. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-11. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+8. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
+9. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+10. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+11. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+12. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -325,11 +326,12 @@ node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex -
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --record
 node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json --fail-on-findings
 ```
 
-CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs.
+CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs, and `evals report` to aggregate release evidence.
 
 `security scan` is a read-only preflight for existing probable secrets. Use `--json` for CI artifacts and `--fail-on-findings` when a workspace should fail the gate if any finding metadata is reported. The command reports finding type and label only; it does not print matched values.
 

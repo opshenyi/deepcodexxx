@@ -3,31 +3,41 @@ import "dotenv/config";
 import chalk from "chalk";
 import { Command } from "commander";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
+  compareEvalRunRecords,
   createSessionRecorder,
+  createEvalRunRecord,
+  createEvalRunReport,
   createWorkspaceContext,
   exportSessionHistory,
+  evalScoreFailed,
   applyPricingProfileToBudget,
+  listEvalRunRecords,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
   parsePricingProfiles,
   pruneSessionHistories,
+  readEvalRunRecord,
   readSessionHistory,
   readWorkspaceConfig,
   readWorkspaceMemory,
   resolvePricingProfile,
+  resolveEvalTask,
+  resolveEvalTasks,
   resolvePolicyProfile,
   scanWorkspaceSensitiveText,
+  scoreEvalResult,
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
   createWorkspacePolicyBundle,
   resolveProviderSelection,
   runDeepCodexAgent,
+  writeEvalRunRecord,
   writeWorkspaceConfigTemplate
 } from "@deepcodex/core";
 import type {
@@ -47,102 +57,16 @@ import type {
   SessionEventRecorder,
   ToolApprovalDecision,
   ToolApprovalRequest,
-  WorkspaceContext,
   WorkspaceConfig,
-  WorkspaceEvalTask,
+  EvalRunComparison,
+  EvalRunRecord,
+  EvalRunReport,
+  EvalScore,
+  EvalTask,
   SensitiveTextScanResult
 } from "@deepcodex/core";
 
 const program = new Command();
-
-type EvalTaskSource = "built-in" | "workspace";
-
-type EvalTask = WorkspaceEvalTask & {
-  source: EvalTaskSource;
-};
-
-type EvalScore = {
-  matchedSignals: string[];
-  missingSignals: string[];
-  totalSignals: number;
-  score: number;
-  passed: boolean;
-};
-
-type EvalRunRecord = {
-  id: string;
-  evalId: string;
-  source?: EvalTaskSource;
-  label: string;
-  workspace: string;
-  model: string;
-  sessionId: string;
-  createdAt: string;
-  prompt: string;
-  expectedSignals: string[];
-  score: EvalScore;
-  scoreThreshold?: number;
-  thresholdPassed: boolean;
-  finalText: string;
-};
-
-type EvalRunComparison = {
-  leftRunId: string;
-  rightRunId: string;
-  sameEval: boolean;
-  evalId: string;
-  rightEvalId: string;
-  leftScore: number;
-  rightScore: number;
-  scoreDelta: number;
-  leftPassed: boolean;
-  rightPassed: boolean;
-  thresholdStatusChanged: boolean;
-  matchedSignalsAdded: string[];
-  matchedSignalsRemoved: string[];
-  missingSignalsAdded: string[];
-  missingSignalsRemoved: string[];
-  finalTextLengthDelta: number;
-};
-
-const builtInEvalTasks: EvalTask[] = [
-  {
-    source: "built-in",
-    id: "repo-map",
-    label: "Repository map",
-    description: "Read-only inventory of package layout, clients, and core runtime boundaries.",
-    prompt:
-      "Inspect this repository in read-only mode. Summarize the package layout, clients, shared core, and runtime boundaries. Do not modify files.",
-    profile: "inspection",
-    maxSteps: 6,
-    budget: { maxTokens: 60000 },
-    expectedSignals: ["packages/core", "apps/web", "apps/desktop", "apps/cli", "apps/server"]
-  },
-  {
-    source: "built-in",
-    id: "safety-smoke",
-    label: "Safety controls",
-    description: "Read-only review of policy, approval, shell, DLP, and audit controls.",
-    prompt:
-      "Inspect this repository in read-only mode. Summarize the implemented safety controls and identify the highest-risk remaining safety gap. Do not modify files.",
-    profile: "inspection",
-    maxSteps: 8,
-    budget: { maxTokens: 80000 },
-    expectedSignals: ["approval", "DLP", "shell", "policy", "audit"]
-  },
-  {
-    source: "built-in",
-    id: "release-evidence",
-    label: "Release evidence",
-    description: "Read-only check of docs, scripts, and demo readiness evidence.",
-    prompt:
-      "Inspect this repository in read-only mode. Summarize the release and demo evidence available to an interviewer, including verification commands and documented limitations. Do not modify files.",
-    profile: "inspection",
-    maxSteps: 6,
-    budget: { maxTokens: 60000 },
-    expectedSignals: ["runbook", "release checklist", "product readiness", "security model"]
-  }
-];
 
 program
   .name("deepcodex")
@@ -583,6 +507,21 @@ evals
     printEvalRunComparison(comparison);
   });
 
+evals
+  .command("report")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .option("--recent-limit <number>", "Number of recent runs to include", "8")
+  .action(async (options: { workspace: string; json: boolean; recentLimit?: string }) => {
+    const workspace = await createWorkspaceContext(options.workspace, { mode: "suggest" });
+    const report = await createEvalRunReport(workspace, { recentLimit: readOptionalInteger(options.recentLimit) });
+    if (options.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    printEvalRunReport(report);
+  });
+
 config
   .command("show")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
@@ -983,25 +922,6 @@ try {
   process.exitCode = 1;
 }
 
-function resolveEvalTasks(config?: WorkspaceConfig): EvalTask[] {
-  const builtInIds = new Set(builtInEvalTasks.map((task) => task.id));
-  const workspaceTasks = (config?.evals ?? []).map((task): EvalTask => ({ ...task, source: "workspace" }));
-  for (const task of workspaceTasks) {
-    if (builtInIds.has(task.id)) {
-      throw new Error(`Workspace eval '${task.id}' cannot replace a built-in eval.`);
-    }
-  }
-  return [...builtInEvalTasks, ...workspaceTasks];
-}
-
-function resolveEvalTask(evalId: string, config?: WorkspaceConfig): EvalTask {
-  const task = resolveEvalTasks(config).find((entry) => entry.id === evalId);
-  if (!task) {
-    throw new Error(`Unknown eval '${evalId}'. Run 'deepcodex evals list --workspace <path>' to see available evals.`);
-  }
-  return task;
-}
-
 function printEvalTask(task: EvalTask): void {
   console.log(`${task.id}  ${task.label}`);
   console.log(`Source: ${task.source}`);
@@ -1034,123 +954,10 @@ function printSensitiveScanResult(result: SensitiveTextScanResult): void {
   }
 }
 
-function scoreEvalResult(task: EvalTask, finalText: string): EvalScore {
-  const normalizedFinalText = normalizeEvalText(finalText);
-  const matchedSignals = task.expectedSignals.filter((signal) => normalizedFinalText.includes(normalizeEvalText(signal)));
-  const missingSignals = task.expectedSignals.filter((signal) => !matchedSignals.includes(signal));
-  const totalSignals = task.expectedSignals.length;
-  const score = totalSignals === 0 ? 1 : matchedSignals.length / totalSignals;
-  return {
-    matchedSignals,
-    missingSignals,
-    totalSignals,
-    score,
-    passed: missingSignals.length === 0
-  };
-}
-
-function normalizeEvalText(value: string): string {
-  return value.toLocaleLowerCase();
-}
-
-function evalScoreFailed(score: EvalScore, scoreThreshold: number | undefined): boolean {
-  return scoreThreshold !== undefined && score.score < scoreThreshold;
-}
-
 function formatEvalScore(score: EvalScore): string {
   return `${score.matchedSignals.length}/${score.totalSignals} (${score.score.toFixed(2)}) ${
     score.passed ? "passed" : "not passed"
   }`;
-}
-
-function createEvalRunRecord(
-  task: EvalTask,
-  input: {
-    workspaceRoot: string;
-    model: string;
-    sessionId: string;
-    finalText: string;
-    score: EvalScore;
-    scoreThreshold?: number;
-  }
-): EvalRunRecord {
-  const createdAt = new Date().toISOString();
-  return {
-    id: createEvalRunId(task.id, input.sessionId, createdAt),
-    evalId: task.id,
-    source: task.source,
-    label: task.label,
-    workspace: input.workspaceRoot,
-    model: input.model,
-    sessionId: input.sessionId,
-    createdAt,
-    prompt: task.prompt,
-    expectedSignals: task.expectedSignals,
-    score: input.score,
-    scoreThreshold: input.scoreThreshold,
-    thresholdPassed: !evalScoreFailed(input.score, input.scoreThreshold),
-    finalText: input.finalText
-  };
-}
-
-async function writeEvalRunRecord(
-  workspace: WorkspaceContext,
-  record: EvalRunRecord
-): Promise<{ path: string; record: EvalRunRecord }> {
-  const filePath = evalRunFilePath(workspace, record.id);
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  return { path: filePath, record };
-}
-
-async function listEvalRunRecords(workspace: WorkspaceContext): Promise<EvalRunRecord[]> {
-  const directory = evalRunDirectory(workspace);
-  const entries = await readdir(directory, { withFileTypes: true }).catch((error: unknown) => {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  });
-  const records = await Promise.all(
-    entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map(async (entry): Promise<EvalRunRecord | undefined> => {
-        try {
-          return await readEvalRunRecord(workspace, entry.name.slice(0, -".json".length));
-        } catch {
-          return undefined;
-        }
-      })
-  );
-  return records
-    .filter((record): record is EvalRunRecord => Boolean(record))
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-}
-
-async function readEvalRunRecord(workspace: WorkspaceContext, runId: string): Promise<EvalRunRecord> {
-  const filePath = evalRunFilePath(workspace, runId);
-  const raw = await readFile(filePath, "utf8").catch((error: unknown) => {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      throw new Error(`Eval run not found: ${runId}`);
-    }
-    throw error;
-  });
-  return parseEvalRunRecord(raw, filePath);
-}
-
-function parseEvalRunRecord(raw: string, filePath: string): EvalRunRecord {
-  const parsed = JSON.parse(raw) as Partial<EvalRunRecord>;
-  if (
-    !parsed.id ||
-    !parsed.evalId ||
-    !parsed.sessionId ||
-    !parsed.createdAt ||
-    !Array.isArray(parsed.expectedSignals) ||
-    !parsed.score
-  ) {
-    throw new Error(`Invalid eval run record: ${filePath}`);
-  }
-  return parsed as EvalRunRecord;
 }
 
 function printEvalRunRecord(record: EvalRunRecord): void {
@@ -1169,27 +976,6 @@ function printEvalRunRecord(record: EvalRunRecord): void {
   console.log(record.finalText);
 }
 
-function compareEvalRunRecords(left: EvalRunRecord, right: EvalRunRecord): EvalRunComparison {
-  return {
-    leftRunId: left.id,
-    rightRunId: right.id,
-    sameEval: left.evalId === right.evalId,
-    evalId: left.evalId,
-    rightEvalId: right.evalId,
-    leftScore: left.score.score,
-    rightScore: right.score.score,
-    scoreDelta: right.score.score - left.score.score,
-    leftPassed: left.score.passed,
-    rightPassed: right.score.passed,
-    thresholdStatusChanged: left.thresholdPassed !== right.thresholdPassed,
-    matchedSignalsAdded: listAdded(left.score.matchedSignals, right.score.matchedSignals),
-    matchedSignalsRemoved: listRemoved(left.score.matchedSignals, right.score.matchedSignals),
-    missingSignalsAdded: listAdded(left.score.missingSignals, right.score.missingSignals),
-    missingSignalsRemoved: listRemoved(left.score.missingSignals, right.score.missingSignals),
-    finalTextLengthDelta: right.finalText.length - left.finalText.length
-  };
-}
-
 function printEvalRunComparison(comparison: EvalRunComparison): void {
   console.log(`${comparison.leftRunId} -> ${comparison.rightRunId}`);
   console.log(`Eval: ${comparison.evalId}${comparison.sameEval ? "" : ` -> ${comparison.rightEvalId}`}`);
@@ -1203,43 +989,53 @@ function printEvalRunComparison(comparison: EvalRunComparison): void {
   printSignalDelta("Missing removed", comparison.missingSignalsRemoved);
 }
 
+function printEvalRunReport(report: EvalRunReport): void {
+  console.log(chalk.bold("eval evidence report"));
+  console.log(`workspace ${report.workspace}`);
+  console.log(`generated ${report.generatedAt}`);
+  console.log(`runs ${report.totalRuns}`);
+  console.log(`average score ${report.averageScore.toFixed(2)}`);
+  console.log(`pass rate ${(report.passRate * 100).toFixed(0)}%`);
+  console.log(`threshold pass rate ${(report.thresholdPassRate * 100).toFixed(0)}%`);
+  if (report.latestComparison) {
+    console.log(
+      `latest delta ${report.latestComparison.leftRunId} -> ${report.latestComparison.rightRunId}: ${formatSignedNumber(
+        report.latestComparison.scoreDelta,
+        2
+      )}`
+    );
+  }
+  if (report.byEval.length > 0) {
+    console.log(chalk.bold("\nby eval"));
+    for (const entry of report.byEval) {
+      const delta =
+        entry.scoreDeltaFromPrevious === undefined ? "n/a" : formatSignedNumber(entry.scoreDeltaFromPrevious, 2);
+      console.log(
+        `${entry.evalId}  runs ${entry.totalRuns}  latest ${(entry.latestScore ?? 0).toFixed(2)}  avg ${entry.averageScore.toFixed(
+          2
+        )}  delta ${delta}`
+      );
+    }
+  }
+  if (report.recentRuns.length > 0) {
+    console.log(chalk.bold("\nrecent runs"));
+    for (const run of report.recentRuns) {
+      console.log(
+        `${run.id}  ${run.evalId}  score ${formatEvalScore(run.score)}  ${run.createdAt}  ${
+          run.thresholdPassed ? "threshold passed" : "threshold failed"
+        }`
+      );
+    }
+  }
+}
+
 function printSignalDelta(label: string, signals: string[]): void {
   console.log(`${label}: ${signals.length > 0 ? signals.join(", ") : "none"}`);
-}
-
-function listAdded(left: string[], right: string[]): string[] {
-  const leftSet = new Set(left);
-  return right.filter((value) => !leftSet.has(value));
-}
-
-function listRemoved(left: string[], right: string[]): string[] {
-  const rightSet = new Set(right);
-  return left.filter((value) => !rightSet.has(value));
 }
 
 function formatSignedNumber(value: number, fractionDigits?: number): string {
   const text = fractionDigits === undefined ? String(value) : value.toFixed(fractionDigits);
   return value > 0 ? `+${text}` : text;
-}
-
-function evalRunDirectory(workspace: WorkspaceContext): string {
-  return path.join(workspace.root, ".deepcodex", "state", "evals");
-}
-
-function evalRunFilePath(workspace: WorkspaceContext, runId: string): string {
-  assertValidEvalRunId(runId);
-  return path.join(evalRunDirectory(workspace), `${runId}.json`);
-}
-
-function createEvalRunId(evalId: string, sessionId: string, createdAt: string): string {
-  const timestamp = createdAt.replace(/[^0-9A-Za-z]/g, "");
-  return `${timestamp}-${evalId}-${sessionId.slice(0, 8)}`;
-}
-
-function assertValidEvalRunId(runId: string): void {
-  if (!/^[A-Za-z0-9._-]+$/.test(runId)) {
-    throw new Error(`Invalid eval run id: ${runId}`);
-  }
 }
 
 function printEvent(event: AgentEvent): void {

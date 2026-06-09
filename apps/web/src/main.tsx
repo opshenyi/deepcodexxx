@@ -273,6 +273,79 @@ type SecurityScanResult = {
   };
 };
 
+type EvalScore = {
+  matchedSignals: string[];
+  missingSignals: string[];
+  totalSignals: number;
+  score: number;
+  passed: boolean;
+};
+
+type EvalRunSummary = {
+  id: string;
+  evalId: string;
+  source?: "built-in" | "workspace";
+  label: string;
+  model: string;
+  sessionId: string;
+  createdAt: string;
+  expectedSignals: string[];
+  score: EvalScore;
+  scoreThreshold?: number;
+  thresholdPassed: boolean;
+  finalTextLength: number;
+};
+
+type EvalTaskReport = {
+  evalId: string;
+  label: string;
+  source?: "built-in" | "workspace";
+  totalRuns: number;
+  averageScore: number;
+  bestScore: number;
+  worstScore: number;
+  latestRunId?: string;
+  latestCreatedAt?: string;
+  latestScore?: number;
+  latestPassed?: boolean;
+  latestThresholdPassed?: boolean;
+  previousRunId?: string;
+  scoreDeltaFromPrevious?: number;
+  passChangedFromPrevious?: boolean;
+  thresholdStatusChangedFromPrevious?: boolean;
+};
+
+type EvalRunComparison = {
+  leftRunId: string;
+  rightRunId: string;
+  sameEval: boolean;
+  evalId: string;
+  rightEvalId: string;
+  leftScore: number;
+  rightScore: number;
+  scoreDelta: number;
+  leftPassed: boolean;
+  rightPassed: boolean;
+  thresholdStatusChanged: boolean;
+  matchedSignalsAdded: string[];
+  matchedSignalsRemoved: string[];
+  missingSignalsAdded: string[];
+  missingSignalsRemoved: string[];
+  finalTextLengthDelta: number;
+};
+
+type EvalRunReport = {
+  workspace: string;
+  generatedAt: string;
+  totalRuns: number;
+  averageScore: number;
+  passRate: number;
+  thresholdPassRate: number;
+  recentRuns: EvalRunSummary[];
+  byEval: EvalTaskReport[];
+  latestComparison?: EvalRunComparison;
+};
+
 type PolicyProfileOption = {
   id: string;
   label: string;
@@ -437,6 +510,9 @@ function App() {
   const [securityScanState, setSecurityScanState] = useState<LoadState>("idle");
   const [securityScan, setSecurityScan] = useState<SecurityScanResult | null>(null);
   const [securityScanMessage, setSecurityScanMessage] = useState("");
+  const [evalReportState, setEvalReportState] = useState<LoadState>("idle");
+  const [evalReport, setEvalReport] = useState<EvalRunReport | null>(null);
+  const [evalReportMessage, setEvalReportMessage] = useState("");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [configMessage, setConfigMessage] = useState("");
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
@@ -491,6 +567,8 @@ function App() {
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
   const securityScanStatus = formatSecurityScanStatus(securityScan, securityScanState);
   const securityScanTone = formatSecurityScanTone(securityScan, securityScanState);
+  const evalReportStatus = formatEvalReportStatus(evalReport, evalReportState);
+  const evalReportTone = formatEvalReportTone(evalReport, evalReportState);
   const selectedWorkspaceProfile = workspaceProfiles.find((profile) => profile.id === selectedWorkspaceProfileId);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
@@ -517,6 +595,9 @@ function App() {
     setSecurityScan(null);
     setSecurityScanState("idle");
     setSecurityScanMessage("");
+    setEvalReport(null);
+    setEvalReportState("idle");
+    setEvalReportMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -753,6 +834,31 @@ function App() {
       setSecurityScan(null);
       setSecurityScanMessage(message);
       setSecurityScanState("error");
+    }
+  }
+
+  async function loadEvalReport() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    params.set("recentLimit", "8");
+    setEvalReportState("loading");
+    setEvalReportMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/evals/report?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { report: EvalRunReport };
+      setEvalReport(body.report);
+      setEvalReportMessage(formatEvalReportMessage(body.report));
+      setEvalReportState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setEvalReport(null);
+      setEvalReportMessage(message);
+      setEvalReportState("error");
     }
   }
 
@@ -1810,6 +1916,75 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Eval evidence</span>
+              <h2>Release report</h2>
+            </div>
+            <span className={`outputStatus ${evalReportTone}`}>{evalReportStatus}</span>
+          </div>
+          <div className="evalReportBody">
+            <p className={evalReportState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {evalReportMessage || "No eval report loaded."}
+            </p>
+            {evalReport ? (
+              <dl className="policyBundleFacts">
+                <div>
+                  <dt>Runs</dt>
+                  <dd>{evalReport.totalRuns}</dd>
+                </div>
+                <div>
+                  <dt>Average</dt>
+                  <dd>{formatScoreValue(evalReport.averageScore)}</dd>
+                </div>
+                <div>
+                  <dt>Pass rate</dt>
+                  <dd>{formatPercent(evalReport.passRate)}</dd>
+                </div>
+              </dl>
+            ) : null}
+            {evalReport?.byEval.length ? (
+              <div className="evalTaskList">
+                {evalReport.byEval.slice(0, 6).map((entry) => (
+                  <article key={entry.evalId} className="evalTaskReport">
+                    <div className="evalTaskHeader">
+                      <strong>{entry.evalId}</strong>
+                      <span>{entry.totalRuns} runs</span>
+                    </div>
+                    <div className="scoreMeter" aria-label={`Latest score ${formatScoreValue(entry.latestScore ?? 0)}`}>
+                      <span style={{ width: formatMeterWidth(entry.latestScore ?? 0) }} />
+                    </div>
+                    <p>
+                      latest {formatScoreValue(entry.latestScore ?? 0)} / avg {formatScoreValue(entry.averageScore)} /
+                      delta {formatOptionalDelta(entry.scoreDeltaFromPrevious)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {evalReport?.recentRuns.length ? (
+              <div className="evalRunList">
+                {evalReport.recentRuns.slice(0, 4).map((run) => (
+                  <article key={run.id} className="evalRunSummary">
+                    <strong>{run.evalId}</strong>
+                    <span>
+                      {formatStoredDateTime(run.createdAt)} / {formatEvalRunScore(run.score)}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={loadEvalReport}
+              disabled={evalReportState === "loading"}
+            >
+              {evalReportState === "loading" ? "Loading report" : "Load report"}
+            </button>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Workspace memory</span>
               <h2>Memory</h2>
             </div>
@@ -2505,6 +2680,66 @@ function formatSecurityScanMessage(scan: SecurityScanResult): string {
   }
   const suffix = scan.truncated ? " Results are truncated." : "";
   return `Found ${scan.findings.length} probable secret signals in ${scan.filesWithFindings} files.${suffix}`;
+}
+
+function formatEvalReportStatus(report: EvalRunReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Loading";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!report) {
+    return "Not loaded";
+  }
+  return report.totalRuns > 0 ? `${report.totalRuns} runs` : "No runs";
+}
+
+function formatEvalReportTone(report: EvalRunReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error") {
+    return "error";
+  }
+  if (!report) {
+    return "idle";
+  }
+  if (report.totalRuns === 0) {
+    return "idle";
+  }
+  return report.passRate < 1 ? "error" : "ready";
+}
+
+function formatEvalReportMessage(report: EvalRunReport): string {
+  if (report.totalRuns === 0) {
+    return "No recorded eval evidence.";
+  }
+  return `${report.totalRuns} recorded runs. Average score ${formatScoreValue(report.averageScore)}.`;
+}
+
+function formatEvalRunScore(score: EvalScore): string {
+  return `${score.matchedSignals.length}/${score.totalSignals} (${formatScoreValue(score.score)})`;
+}
+
+function formatScoreValue(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatMeterWidth(value: number): string {
+  const clamped = Math.min(Math.max(value, 0), 1);
+  return `${Math.round(clamped * 100)}%`;
+}
+
+function formatOptionalDelta(value: number | undefined): string {
+  if (value === undefined) {
+    return "n/a";
+  }
+  return value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2);
 }
 
 function formatPolicyBundleTone(policyBundle: PolicyBundleVerificationResult | null, state: LoadState): string {

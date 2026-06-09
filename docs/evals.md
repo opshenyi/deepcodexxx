@@ -1,8 +1,8 @@
-# CLI Evals
+# Evals
 
-DeepCodex includes a small CLI eval surface for repeatable smoke tasks. Evals are read-only prompts that run through the same shared agent core as normal CLI tasks. They are intended for demo regression checks and product review, not as a full benchmark suite.
+DeepCodex includes a small eval surface for repeatable smoke tasks. Evals are read-only prompts that run through the same shared agent core as normal tasks. They are intended for demo regression checks and product review, not as a full benchmark suite.
 
-The CLI includes built-in tasks and can also load workspace-defined tasks from `.deepcodex/config.json` under the `evals` array.
+The product includes built-in tasks and can also load workspace-defined tasks from `.deepcodex/config.json` under the `evals` array.
 
 ## Commands
 
@@ -16,6 +16,7 @@ node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex -
 node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals show-run <run-id> --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 ```
 
 `evals run` forces `suggest` mode and uses the task's configured profile for budget and policy defaults, so it does not write files, run shell commands, append memory, or persist session state. The JSON mode emits newline-delimited records: an `eval_started` record, normal agent event records, and an `eval_result` record with the final text, expected signal list, source, and score.
@@ -25,6 +26,10 @@ Scoring is intentionally transparent: DeepCodex checks whether the final answer 
 Use `--record` when you want local eval evidence. Recorded evals are written to `.deepcodex/state/evals` in the selected workspace. That path is denied to agent file tools by default, and evals do not write records unless the flag is explicit.
 
 Use `evals compare` to inspect two recorded runs. The comparison reports score delta, pass-state changes, expected-signal additions/removals, and final-answer length delta. It is a compact regression report for review and CI artifacts.
+
+Use `evals report` to aggregate recorded runs into release evidence: total runs, average score, pass rate, threshold pass rate, recent run summaries, per-eval latest score, average score, and score delta from the previous run. The report omits final answer text from summaries.
+
+The local server exposes the same evidence through read-only endpoints: `GET /api/evals`, `GET /api/evals/report`, `GET /api/evals/history`, `GET /api/evals/runs/:runId`, and `GET /api/evals/compare`. The Web/Desktop right rail uses `/api/evals/report` for the Eval evidence panel.
 
 ## Tasks
 
@@ -62,5 +67,5 @@ Workspace eval ids must be unique, file-name safe, and cannot replace built-in e
 ## Current Limits
 
 - Scoring is exact expected-signal matching, not semantic grading.
-- Comparison charts and richer benchmark reports are future work.
+- Semantic grading, larger benchmark suites, and hosted trend analytics are future work.
 - Live DeepSeek-backed evals require `DEEPSEEK_API_KEY`; without it, the same commands run in local demo mode.

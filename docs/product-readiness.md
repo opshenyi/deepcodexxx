@@ -27,7 +27,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Structured Web diff rendering for live event output, approval details, and session replay, with multi-file unified diffs split into readable blocks and a split before/after review mode for focused file changes.
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
-- Built-in and workspace-defined read-only CLI smoke evals for repository mapping, safety review, release-evidence review, and team-specific checks, with exact expected-signal scoring, CI threshold flags, optional recorded local eval history, and cross-run comparison reports.
+- Built-in and workspace-defined read-only smoke evals for repository mapping, safety review, release-evidence review, and team-specific checks, with exact expected-signal scoring, CI threshold flags, optional recorded local eval history, cross-run comparison reports, shared server APIs, CLI report aggregation, and a Web/Desktop Eval evidence panel.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
 - Workspace-specific custom redaction regex patterns for project identifiers or secret formats not covered by built-ins.
@@ -67,14 +67,14 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Release checklist | `docs/release-checklist.md` | Repeatable demo and smoke-test path. |
 | Roadmap | `docs/roadmap.md` | Sequenced path from interview artifact to pilot and hosted product. |
 | Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
-| CLI evals | `docs/evals.md` | Repeatable built-in and workspace-defined read-only CLI smoke tasks, scoring behavior, CI thresholds, optional local history, cross-run comparison, and current scoring limits. |
+| Eval evidence | `docs/evals.md` | Repeatable built-in and workspace-defined read-only smoke tasks, scoring behavior, CI thresholds, optional local history, cross-run comparison, CLI/API report aggregation, Web/Desktop visibility, and current scoring limits. |
 
 ## Readiness Levels
 
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, Web unified/split diff review, existing-secret preflight scan, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, eval evidence reports, retention pruning, diff-producing tools, Web unified/split diff review, existing-secret preflight scan, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
 | Desktop release | Closer, but not installer-ready. | Has production-like local server bootstrap; still needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
@@ -85,5 +85,5 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add richer generated-asset handling and file-type policies.
 - Add kernel-level shell sandboxing or remote isolated execution workers.
 - Add packaged desktop installers, signed releases, and auto-update policy.
-- Add benchmark tasks and regression evals inspired by the reference repos.
+- Add semantic eval scoring, benchmark tasks, and regression suites inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.
