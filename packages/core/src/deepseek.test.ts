@@ -156,12 +156,43 @@ describe("DeepSeekClient", () => {
     expect(requestedModels(fetchMock)).toEqual(["deepseek-v4-flash"]);
   });
 
+  it("classifies provider authentication failures", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("bad key", { status: 401 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = new DeepSeekClient({ apiKey: "test-key", maxRetries: 0 });
+    const promise = client.chat([{ role: "user", content: "hello" }]);
+
+    await expect(promise).rejects.toMatchObject({
+      kind: "authentication",
+      status: 401,
+      retryable: false
+    });
+    await expect(promise).rejects.toThrow(/authentication/);
+  });
+
+  it("classifies provider rate limits as retryable", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("slow down", { status: 429 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = new DeepSeekClient({ apiKey: "test-key", maxRetries: 0, retryBaseDelayMs: 0 });
+
+    await expect(client.chat([{ role: "user", content: "hello" }])).rejects.toMatchObject({
+      kind: "rate_limit",
+      status: 429,
+      retryable: true
+    });
+  });
+
   it("reports the final attempt count when retryable failures are exhausted", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response("busy", { status: 503 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(new Response("still busy", { status: 503 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const client = new DeepSeekClient({ apiKey: "test-key", maxRetries: 1, retryBaseDelayMs: 0 });
+    const promise = client.chat([{ role: "user", content: "hello" }]);
 
-    await expect(client.chat([{ role: "user", content: "hello" }])).rejects.toThrow(/after 2 attempts/);
+    await expect(promise).rejects.toMatchObject({ kind: "server" });
+    await expect(promise).rejects.toThrow(/after 2 attempts/);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -177,9 +208,21 @@ describe("DeepSeekClient", () => {
 
     const promise = client.chat([{ role: "user", content: "hello" }]);
     await expect(promise).rejects.toBeInstanceOf(DeepSeekError);
+    await expect(promise).rejects.toMatchObject({ kind: "invalid_json", retryable: false });
     await expect(promise).rejects.toThrow(/invalid JSON/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(requestedModels(fetchMock)).toEqual(["deepseek-v4-flash"]);
+  });
+
+  it("classifies transport failures as retryable network errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("socket closed"));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = new DeepSeekClient({ apiKey: "test-key", maxRetries: 0 });
+
+    await expect(client.chat([{ role: "user", content: "hello" }])).rejects.toMatchObject({
+      kind: "network",
+      retryable: true
+    });
   });
 });
 

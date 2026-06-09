@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { readFile } from "node:fs/promises";
 import {
+  DeepSeekError,
   InvalidSessionIdError,
   SessionNotFoundError,
   appendWorkspaceMemory,
@@ -462,6 +463,17 @@ app.post("/api/agent/run", async (req, res) => {
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof DeepSeekError) {
+    res.status(502).json({
+      error: message,
+      providerError: {
+        kind: error.kind,
+        status: error.status,
+        retryable: error.retryable
+      }
+    });
+    return;
+  }
   res.status(500).json({ error: message });
 });
 

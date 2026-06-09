@@ -18,12 +18,25 @@ import {
   normalizeOptionalReasoningEffort
 } from "./provider-policy.js";
 
+export type DeepSeekErrorKind =
+  | "authentication"
+  | "authorization"
+  | "rate_limit"
+  | "request"
+  | "not_found"
+  | "server"
+  | "network"
+  | "timeout"
+  | "invalid_json"
+  | "unknown";
+
 export class DeepSeekError extends Error {
   constructor(
     message: string,
     readonly status?: number,
     readonly body?: string,
-    readonly retryable = false
+    readonly retryable = false,
+    readonly kind: DeepSeekErrorKind = status === undefined ? "unknown" : classifyStatusKind(status)
   ) {
     super(message);
     this.name = "DeepSeekError";
@@ -122,7 +135,8 @@ export class DeepSeekClient {
       }`,
       lastError?.status,
       lastError?.body,
-      lastError?.retryable ?? true
+      lastError?.retryable ?? true,
+      lastError?.kind ?? "unknown"
     );
   }
 
@@ -143,11 +157,13 @@ export class DeepSeekClient {
 
       const body = await response.text();
       if (!response.ok) {
+        const kind = classifyStatusKind(response.status);
         throw new DeepSeekError(
-          `DeepSeek request failed with ${response.status}`,
+          `DeepSeek request failed with ${response.status} (${formatErrorKind(kind)})`,
           response.status,
           body,
-          isRetryableStatus(response.status)
+          isRetryableStatus(response.status),
+          kind
         );
       }
 
@@ -155,14 +171,15 @@ export class DeepSeekClient {
         return JSON.parse(body) as DeepSeekChatResponse;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new DeepSeekError(`DeepSeek returned invalid JSON: ${message}`, response.status, body);
+        throw new DeepSeekError(`DeepSeek returned invalid JSON: ${message}`, response.status, body, false, "invalid_json");
       }
     } catch (error) {
       if (error instanceof DeepSeekError) {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      throw new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true);
+      const kind = isAbortError(error) ? "timeout" : "network";
+      throw new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true, kind);
     } finally {
       clearTimeout(timer);
     }
@@ -200,11 +217,45 @@ function toDeepSeekError(error: unknown): DeepSeekError {
     return error;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true);
+  const kind = isAbortError(error) ? "timeout" : "network";
+  return new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true, kind);
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function classifyStatusKind(status: number): DeepSeekErrorKind {
+  if (status === 401) {
+    return "authentication";
+  }
+  if (status === 403) {
+    return "authorization";
+  }
+  if (status === 404) {
+    return "not_found";
+  }
+  if (status === 408) {
+    return "timeout";
+  }
+  if (status === 429) {
+    return "rate_limit";
+  }
+  if (status >= 400 && status < 500) {
+    return "request";
+  }
+  if (status >= 500 && status < 600) {
+    return "server";
+  }
+  return "unknown";
+}
+
+function formatErrorKind(kind: DeepSeekErrorKind): string {
+  return kind.replace("_", " ");
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function retryDelayMs(baseDelayMs: number, failedAttempt: number): number {

@@ -7,6 +7,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Clean TypeScript monorepo structure.
 - DeepSeek-compatible agent loop with function tools.
 - DeepSeek-compatible provider retry/backoff plus policy-controlled fallback models for retryable status codes and network failures.
+- Classified DeepSeek provider errors for authentication, authorization, request, rate-limit, timeout, server, network, and invalid-JSON failures.
 - Explicit DeepSeek V4 thinking-mode control that defaults to `disabled` for predictable demos, with internal `reasoning_content` replay and optional `high` or `max` reasoning effort when thinking mode is enabled.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
