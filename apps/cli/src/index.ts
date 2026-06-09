@@ -34,6 +34,7 @@ import type {
   FileAuditEntry,
   FileHashSnapshot,
   PolicyBundleVerificationResult,
+  PolicyBundleVerificationOptions,
   PolicyProfile,
   SessionRetentionPolicy,
   ShellEnvironmentMode,
@@ -232,11 +233,13 @@ config
   .command("verify-bundle")
   .description("Verify a signed workspace policy bundle against the active workspace config.")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
-  .option("--public-key <path>", "Trusted Ed25519 public key PEM path")
+  .option("--public-key <path...>", "Trusted Ed25519 public key PEM path(s)")
   .option("--json", "Print JSON output", false)
-  .action(async (options: { workspace: string; publicKey?: string; json: boolean }) => {
-    const publicKey = await readPolicyBundlePublicKey(options.publicKey);
-    const result = await verifyWorkspacePolicyBundle(options.workspace, { publicKey });
+  .action(async (options: { workspace: string; publicKey?: string[]; json: boolean }) => {
+    const result = await verifyWorkspacePolicyBundle(
+      options.workspace,
+      await readPolicyBundleVerificationOptions(options.publicKey)
+    );
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
       return;
@@ -581,17 +584,29 @@ function readProviderSelection(config?: WorkspaceConfig) {
   });
 }
 
-async function readPolicyBundlePublicKey(publicKeyPath?: string): Promise<string | undefined> {
-  const selectedPath = publicKeyPath || process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE;
-  if (selectedPath) {
-    return readFile(selectedPath, "utf8");
+async function readPolicyBundleVerificationOptions(publicKeyPaths: string[] = []): Promise<PolicyBundleVerificationOptions> {
+  const publicKeys: string[] = [];
+  for (const publicKeyPath of [
+    ...publicKeyPaths,
+    ...readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES),
+    ...readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE)
+  ]) {
+    publicKeys.push(await readFile(publicKeyPath, "utf8"));
   }
-  return process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY;
+  if (process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY) {
+    publicKeys.push(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY);
+  }
+  return {
+    publicKeys,
+    revokedBundleSha256: readCommaSeparatedEnv(process.env.DEEPCODEX_REVOKED_POLICY_BUNDLES),
+    revokedPublicKeySha256: readCommaSeparatedEnv(process.env.DEEPCODEX_REVOKED_POLICY_KEYS),
+    trustedIssuers: readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS)
+  };
 }
 
 async function readPolicyBundleStatus(workspace: string): Promise<string> {
   try {
-    const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+    const result = await verifyWorkspacePolicyBundle(workspace, await readPolicyBundleVerificationOptions());
     if (!result.exists) {
       return "missing";
     }
@@ -612,7 +627,7 @@ async function assertSignedPolicyIfRequired(workspace: string): Promise<void> {
   if (!readRequireSignedPolicyFromEnv()) {
     return;
   }
-  const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+  const result = await verifyWorkspacePolicyBundle(workspace, await readPolicyBundleVerificationOptions());
   if (!result.ok) {
     throw new Error(`Signed policy is required but policy bundle verification failed: ${result.reason}`);
   }
@@ -800,6 +815,16 @@ function readOptionalBooleanEnv(value: string | undefined, name: string): boolea
     return false;
   }
   throw new Error(`${name} must be true or false.`);
+}
+
+function readCommaSeparatedEnv(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {

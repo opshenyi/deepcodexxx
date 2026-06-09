@@ -40,7 +40,8 @@ Expected result:
 - CLI `doctor` reports whether signed policy is required.
 - CLI `doctor` reports workspace config status, and `config show` reports either a valid config or a clear missing state.
 - If `DEEPCODEX_CORS_ORIGINS` is configured, allowed browser origins receive a CORS allow header and unlisted origins do not.
-- CLI `config verify-bundle --workspace <path> --public-key <pem>` verifies a signed policy bundle when one is present.
+- CLI `config verify-bundle --workspace <path> --public-key <pem> [<pem>...]` verifies a signed policy bundle when one is present.
+- Policy-bundle trust policy can be tested with multiple trusted keys, revoked bundle hashes, revoked key hashes, and trusted issuer filters.
 - With `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`, CLI/server runs fail before model execution when the signed bundle is missing or untrusted.
 - CLI `profiles list --workspace <path>` includes any workspace-defined team profiles.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.

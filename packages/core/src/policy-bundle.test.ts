@@ -1,4 +1,4 @@
-import { generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -54,6 +54,69 @@ describe("policy bundle verification", () => {
     expect(result.reason).toContain("embedded public key");
   });
 
+  it("verifies policy bundles with any trusted key during key rotation", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const oldKeys = createSigningKeys();
+    const newKeys = createSigningKeys();
+    await writeSignedBundle(tempDir, workspaceConfig.sha256!, newKeys.privateKeyPem);
+
+    const result = await verifyWorkspacePolicyBundle(tempDir, {
+      publicKeys: [oldKeys.publicKeyPem, newKeys.publicKeyPem]
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.signatureVerified).toBe(true);
+    expect(result.publicKeySha256).toBe(createSha256(newKeys.publicKeyPem.trim()));
+  });
+
+  it("rejects revoked policy bundle hashes", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+    await writeSignedBundle(tempDir, workspaceConfig.sha256!, keys.privateKeyPem);
+    const firstResult = await verifyWorkspacePolicyBundle(tempDir, { publicKey: keys.publicKeyPem });
+
+    const revoked = await verifyWorkspacePolicyBundle(tempDir, {
+      publicKey: keys.publicKeyPem,
+      revokedBundleSha256: [firstResult.bundleSha256!]
+    });
+
+    expect(revoked.ok).toBe(false);
+    expect(revoked.reason).toContain("revoked");
+  });
+
+  it("rejects revoked trusted signing keys", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+    await writeSignedBundle(tempDir, workspaceConfig.sha256!, keys.privateKeyPem);
+
+    const result = await verifyWorkspacePolicyBundle(tempDir, {
+      publicKey: keys.publicKeyPem,
+      revokedPublicKeySha256: [createSha256(keys.publicKeyPem.trim())]
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.signatureVerified).toBe(true);
+    expect(result.reason).toContain("signing key has been revoked");
+  });
+
+  it("rejects policy bundles from untrusted issuers", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+    await writeSignedBundle(tempDir, workspaceConfig.sha256!, keys.privateKeyPem);
+
+    const result = await verifyWorkspacePolicyBundle(tempDir, {
+      publicKey: keys.publicKeyPem,
+      trustedIssuers: ["Security Team"]
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain("issuer is not trusted");
+  });
+
   it("rejects bundles that do not match the active config hash", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     await writeWorkspaceConfigTemplate(tempDir);
@@ -85,6 +148,10 @@ function createSigningKeys() {
     publicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
     privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }).toString()
   };
+}
+
+function createSha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 async function writeSignedBundle(

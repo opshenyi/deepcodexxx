@@ -16,6 +16,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
 - Env-controlled signed-only policy enforcement for CLI/server agent runs.
+- Policy-bundle trust policy supports multiple trusted public keys, bundle revocation, signing-key revocation, and trusted issuer allowlists.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
 - Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
 - Local event stream for transparent tool execution.
@@ -71,7 +72,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add policy bundle rotation/revocation workflow and richer provider fallback policy.
+- Add higher-level policy-bundle administration UI and richer provider fallback policy.
 - Add richer DLP classification and policy-controlled OCR/PDF/archive extraction.
 - Add richer generated-asset handling and file-type policies.
 - Add packaged desktop installers, signed releases, and auto-update policy.

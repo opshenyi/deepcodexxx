@@ -26,7 +26,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - File read, write, edit, and search tools enforce a configurable 512 KiB default size limit.
 - `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, pricing profile, and retention.
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
-- `.deepcodex/policy-bundle.json` can bind the active config SHA-256 to an Ed25519 signature that CLI/API verification checks against a trusted public key.
+- `.deepcodex/policy-bundle.json` can bind the active config SHA-256 to an Ed25519 signature that CLI/API verification checks against one or more trusted public keys, optional issuer allowlists, and bundle/key revocation lists.
 - `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` makes CLI/server agent runs require a trusted policy bundle before model or tool execution starts.
 - Server CORS is permissive by default for local development and can be restricted with `DEEPCODEX_CORS_ORIGINS`.
 - Desktop production-like launches start the built server automatically when `DEEPCODEX_WEB_URL` is not set, wait for local health, then load the built Web client.

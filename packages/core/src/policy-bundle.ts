@@ -26,6 +26,11 @@ export interface PolicyBundle {
 
 export interface PolicyBundleVerificationOptions {
   publicKey?: string;
+  publicKeys?: string[];
+  revokedBundleSha256?: string[];
+  revokedPublicKeySha256?: string[];
+  trustedIssuers?: string[];
+  now?: Date;
 }
 
 export interface PolicyBundleVerificationResult {
@@ -70,9 +75,13 @@ export async function verifyWorkspacePolicyBundle(
   const bundleSha256 = createSha256(raw);
   const parsed = parsePolicyBundle(raw);
   const payload = parsed.payload;
-  const externalPublicKey = options.publicKey?.trim();
-  const publicKey = externalPublicKey || parsed.signature.publicKey?.trim();
-  const trusted = Boolean(externalPublicKey);
+  const externalPublicKeys = uniqueStrings([options.publicKey, ...(options.publicKeys ?? [])]);
+  const embeddedPublicKey = parsed.signature.publicKey?.trim();
+  const candidatePublicKeys = externalPublicKeys.length > 0 ? externalPublicKeys : uniqueStrings([embeddedPublicKey]);
+  const trusted = externalPublicKeys.length > 0;
+  const revokedBundleSha256 = new Set(normalizeSha256List(options.revokedBundleSha256));
+  const revokedPublicKeySha256 = new Set(normalizeSha256List(options.revokedPublicKeySha256));
+  const trustedIssuers = new Set(uniqueStrings(options.trustedIssuers));
   const base = {
     path: bundlePath,
     exists: true,
@@ -81,10 +90,30 @@ export async function verifyWorkspacePolicyBundle(
     expiresAt: payload.expiresAt,
     configSha256: payload.configSha256,
     bundleSha256,
-    publicKeySha256: publicKey ? createSha256(publicKey) : undefined
+    publicKeySha256: candidatePublicKeys[0] ? createSha256(candidatePublicKeys[0]) : undefined
   };
 
-  if (!publicKey) {
+  if (revokedBundleSha256.has(bundleSha256)) {
+    return {
+      ...base,
+      ok: false,
+      signatureVerified: false,
+      trusted,
+      reason: "Policy bundle has been revoked."
+    };
+  }
+
+  if (trustedIssuers.size > 0 && !trustedIssuers.has(payload.issuer)) {
+    return {
+      ...base,
+      ok: false,
+      signatureVerified: false,
+      trusted,
+      reason: "Policy bundle issuer is not trusted."
+    };
+  }
+
+  if (candidatePublicKeys.length === 0) {
     return {
       ...base,
       ok: false,
@@ -115,7 +144,7 @@ export async function verifyWorkspacePolicyBundle(
     };
   }
 
-  if (payload.expiresAt && Date.parse(payload.expiresAt) < Date.now()) {
+  if (payload.expiresAt && Date.parse(payload.expiresAt) < (options.now?.getTime() ?? Date.now())) {
     return {
       ...base,
       ok: false,
@@ -125,18 +154,44 @@ export async function verifyWorkspacePolicyBundle(
     };
   }
 
-  const signatureVerified = verifySignature(
-    null,
-    Buffer.from(createPolicyBundleSigningPayload(payload)),
-    publicKey,
-    Buffer.from(parsed.signature.value, "base64")
-  );
+  const signingPayload = Buffer.from(createPolicyBundleSigningPayload(payload));
+  const signature = Buffer.from(parsed.signature.value, "base64");
+  let signatureVerified = false;
+  let verifiedPublicKeySha256: string | undefined;
+  let revokedVerifiedKey = false;
+  for (const publicKey of candidatePublicKeys) {
+    const keySha256 = createSha256(publicKey);
+    const verified = verifySignature(null, signingPayload, publicKey, signature);
+    if (!verified) {
+      continue;
+    }
+    signatureVerified = true;
+    verifiedPublicKeySha256 = keySha256;
+    if (revokedPublicKeySha256.has(keySha256)) {
+      revokedVerifiedKey = true;
+      continue;
+    }
+    revokedVerifiedKey = false;
+    break;
+  }
+
+  if (signatureVerified && revokedVerifiedKey) {
+    return {
+      ...base,
+      ok: false,
+      signatureVerified,
+      trusted,
+      publicKeySha256: verifiedPublicKeySha256,
+      reason: "Policy bundle signing key has been revoked."
+    };
+  }
 
   return {
     ...base,
     ok: signatureVerified && trusted,
     signatureVerified,
     trusted,
+    publicKeySha256: verifiedPublicKeySha256 ?? base.publicKeySha256,
     reason: signatureVerified
       ? trusted
         ? "Policy bundle signature verified with a trusted public key."
@@ -273,6 +328,14 @@ function readBase64(value: unknown, field: string): string {
 
 function createSha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function uniqueStrings(values: Array<string | undefined> | undefined): string[] {
+  return [...new Set((values ?? []).map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
+}
+
+function normalizeSha256List(values: string[] | undefined): string[] {
+  return uniqueStrings(values).map((value) => value.toLowerCase());
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

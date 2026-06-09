@@ -65,6 +65,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Verified CLI JSON output with `npm run build -w @deepcodex/cli`, `node apps/cli/dist/index.js doctor --json | ConvertFrom-Json`, and `node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "..."` parsed line-by-line as JSON.
 - Added optional server CORS origin allowlist through `DEEPCODEX_CORS_ORIGINS`. When unset the local development server keeps permissive CORS; when set, matching browser origins receive `Access-Control-Allow-Origin`, non-matching origins receive no CORS allow header, and no-origin local clients still work.
 - Verified CORS allowlisting by launching a temporary built server on port 17461 with `DEEPCODEX_CORS_ORIGINS=http://allowed.test`; allowed origin returned the CORS header, blocked origin did not, both health checks returned 200, and the temporary process was stopped.
+- Added policy-bundle key rotation and revocation foundations. Core verification now accepts multiple trusted public keys, revoked bundle SHA-256 hashes, revoked signing-key SHA-256 hashes, trusted issuer allowlists, and deterministic test clocks. CLI `config verify-bundle --public-key` accepts multiple key files, CLI/server honor `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`, `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS`, and signed-only enforcement uses the same trust policy.
+- Verified policy-bundle rotation/revocation with `npx vitest run packages/core/src/policy-bundle.test.ts` (8 tests), `npm run typecheck`, and final `npm run verify` (13 files / 99 tests).
 
 ## Architecture Decisions
 
@@ -79,6 +81,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env plus network-command pattern blocking, not a full sandbox.
 2. Add policy-controlled OCR/PDF/archive extraction if richer non-text artifact summaries are needed.
-3. Add policy bundle rotation/revocation workflow, richer DLP classification, and OS-level shell isolation.
+3. Add richer DLP classification, policy-controlled artifact extraction, OS-level shell isolation, and higher-level policy-bundle administration tooling.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

@@ -32,6 +32,7 @@ import type {
   ShellEnvironmentMode,
   ToolApprovalDecision,
   ToolApprovalRequest,
+  PolicyBundleVerificationOptions,
   WorkspaceConfig
 } from "@deepcodex/core";
 import type { BudgetPolicy, SessionRetentionPolicy } from "@deepcodex/core";
@@ -98,9 +99,7 @@ app.get("/api/workspace-config", async (req, res, next) => {
 
 app.get("/api/policy-bundle", async (req, res, next) => {
   try {
-    res.json(await verifyWorkspacePolicyBundle(readWorkspace(req.query.workspace), {
-      publicKey: await readPolicyBundlePublicKey()
-    }));
+    res.json(await verifyWorkspacePolicyBundle(readWorkspace(req.query.workspace), await readPolicyBundleVerificationOptions()));
   } catch (error) {
     next(error);
   }
@@ -408,19 +407,30 @@ function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
   throw new Error("DEEPCODEX_SHELL_ENV must be minimal or inherit.");
 }
 
-async function readPolicyBundlePublicKey(): Promise<string | undefined> {
-  const publicKeyPath = process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE;
-  if (publicKeyPath) {
-    return readFile(publicKeyPath, "utf8");
+async function readPolicyBundleVerificationOptions(): Promise<PolicyBundleVerificationOptions> {
+  const publicKeys: string[] = [];
+  for (const publicKeyPath of [
+    ...readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES),
+    ...readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE)
+  ]) {
+    publicKeys.push(await readFile(publicKeyPath, "utf8"));
   }
-  return process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY;
+  if (process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY) {
+    publicKeys.push(process.env.DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY);
+  }
+  return {
+    publicKeys,
+    revokedBundleSha256: readCommaSeparatedEnv(process.env.DEEPCODEX_REVOKED_POLICY_BUNDLES),
+    revokedPublicKeySha256: readCommaSeparatedEnv(process.env.DEEPCODEX_REVOKED_POLICY_KEYS),
+    trustedIssuers: readCommaSeparatedEnv(process.env.DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS)
+  };
 }
 
 async function assertSignedPolicyIfRequired(workspace: string): Promise<void> {
   if (!readRequireSignedPolicyFromEnv()) {
     return;
   }
-  const result = await verifyWorkspacePolicyBundle(workspace, { publicKey: await readPolicyBundlePublicKey() });
+  const result = await verifyWorkspacePolicyBundle(workspace, await readPolicyBundleVerificationOptions());
   if (!result.ok) {
     throw new Error(`Signed policy is required but policy bundle verification failed: ${result.reason}`);
   }
@@ -585,6 +595,16 @@ function readOptionalBooleanEnv(value: string | undefined, name: string): boolea
     return false;
   }
   throw new Error(`${name} must be true or false.`);
+}
+
+function readCommaSeparatedEnv(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {
