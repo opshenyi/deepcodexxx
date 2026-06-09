@@ -86,6 +86,20 @@ Example:
   "approvalMode": "manual",
   "maxSteps": 12,
   "pricingProfileId": "custom",
+  "evals": [
+    {
+      "id": "workspace-release-smoke",
+      "label": "Workspace release smoke",
+      "description": "Team-owned read-only release evidence check for this repository.",
+      "prompt": "Inspect this repository in read-only mode. Summarize release evidence, verification commands, and remaining documented risks. Do not modify files.",
+      "profile": "inspection",
+      "maxSteps": 6,
+      "budget": {
+        "maxTokens": 60000
+      },
+      "expectedSignals": ["release checklist", "runbook", "product readiness"]
+    }
+  ],
   "policyProfiles": [
     {
       "id": "team-review",
@@ -131,7 +145,7 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; 400-class request errors and invalid JSON are surfaced without retry.
 
@@ -292,11 +306,11 @@ List configured pricing profiles:
 node apps/cli/dist/index.js pricing list
 ```
 
-List and run built-in smoke evals:
+List and run built-in or workspace-defined smoke evals:
 
 ```powershell
-node apps/cli/dist/index.js evals list
-node apps/cli/dist/index.js evals show repo-map
+node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js evals show repo-map --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --min-score 0.8
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --record
@@ -304,7 +318,7 @@ node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
 ```
 
-Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring. Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs.
+CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs.
 
 Inspect workspace defaults:
 

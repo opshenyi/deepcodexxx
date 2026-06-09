@@ -47,20 +47,16 @@ import type {
   ToolApprovalDecision,
   ToolApprovalRequest,
   WorkspaceContext,
-  WorkspaceConfig
+  WorkspaceConfig,
+  WorkspaceEvalTask
 } from "@deepcodex/core";
 
 const program = new Command();
 
-type BuiltInEvalTask = {
-  id: string;
-  label: string;
-  description: string;
-  prompt: string;
-  profile: string;
-  maxSteps: number;
-  budget?: BudgetPolicy;
-  expectedSignals: string[];
+type EvalTaskSource = "built-in" | "workspace";
+
+type EvalTask = WorkspaceEvalTask & {
+  source: EvalTaskSource;
 };
 
 type EvalScore = {
@@ -74,6 +70,7 @@ type EvalScore = {
 type EvalRunRecord = {
   id: string;
   evalId: string;
+  source?: EvalTaskSource;
   label: string;
   workspace: string;
   model: string;
@@ -106,8 +103,9 @@ type EvalRunComparison = {
   finalTextLengthDelta: number;
 };
 
-const builtInEvalTasks: BuiltInEvalTask[] = [
+const builtInEvalTasks: EvalTask[] = [
   {
+    source: "built-in",
     id: "repo-map",
     label: "Repository map",
     description: "Read-only inventory of package layout, clients, and core runtime boundaries.",
@@ -119,6 +117,7 @@ const builtInEvalTasks: BuiltInEvalTask[] = [
     expectedSignals: ["packages/core", "apps/web", "apps/desktop", "apps/cli", "apps/server"]
   },
   {
+    source: "built-in",
     id: "safety-smoke",
     label: "Safety controls",
     description: "Read-only review of policy, approval, shell, DLP, and audit controls.",
@@ -130,6 +129,7 @@ const builtInEvalTasks: BuiltInEvalTask[] = [
     expectedSignals: ["approval", "DLP", "shell", "policy", "audit"]
   },
   {
+    source: "built-in",
     id: "release-evidence",
     label: "Release evidence",
     description: "Read-only check of docs, scripts, and demo readiness evidence.",
@@ -317,31 +317,36 @@ program
 
 const sessions = program.command("sessions").description("Inspect persisted DeepCodex session history.");
 
-const evals = program.command("evals").description("Run built-in DeepCodex smoke evaluation tasks.");
+const evals = program.command("evals").description("Run DeepCodex smoke evaluation tasks.");
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
 const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
 
 evals
   .command("list")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--json", "Print JSON output", false)
-  .action((options: { json: boolean }) => {
+  .action(async (options: { workspace: string; json: boolean }) => {
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const tasks = resolveEvalTasks(workspaceConfig.config);
     if (options.json) {
-      console.log(JSON.stringify(builtInEvalTasks, null, 2));
+      console.log(JSON.stringify(tasks, null, 2));
       return;
     }
-    for (const task of builtInEvalTasks) {
-      console.log(`${task.id}  ${task.label}  ${task.profile}  ${task.maxSteps} steps`);
+    for (const task of tasks) {
+      console.log(`${task.id}  ${task.label}  ${task.source}  ${task.profile}  ${task.maxSteps} steps`);
       console.log(`  ${task.description}`);
     }
   });
 
 evals
   .command("show")
-  .argument("<eval>", "Built-in eval id")
+  .argument("<eval>", "Eval id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--json", "Print JSON output", false)
-  .action((evalId: string, options: { json: boolean }) => {
-    const task = resolveEvalTask(evalId);
+  .action(async (evalId: string, options: { workspace: string; json: boolean }) => {
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const task = resolveEvalTask(evalId, workspaceConfig.config);
     if (options.json) {
       console.log(JSON.stringify(task, null, 2));
       return;
@@ -351,7 +356,7 @@ evals
 
 evals
   .command("run")
-  .argument("<eval>", "Built-in eval id")
+  .argument("<eval>", "Eval id")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--json", "Print newline-delimited JSON events", false)
   .option("--max-steps <number>", "Override the eval maximum agent loop count")
@@ -380,8 +385,8 @@ evals
         record: boolean;
       }
     ) => {
-      const task = resolveEvalTask(evalId);
       const workspaceConfig = await readWorkspaceConfig(options.workspace);
+      const task = resolveEvalTask(evalId, workspaceConfig.config);
       await assertSignedPolicyIfRequired(options.workspace);
       const profile = resolveCliProfile(task.profile, workspaceConfig.config);
       const provider = readProviderSelection(workspaceConfig.config);
@@ -398,6 +403,7 @@ evals
             eval: {
               id: task.id,
               label: task.label,
+              source: task.source,
               profile: task.profile,
               maxSteps,
               expectedSignals: task.expectedSignals,
@@ -408,7 +414,7 @@ evals
       } else {
         console.log(chalk.bold(`eval ${task.id}: ${task.label}`));
         console.log(chalk.gray(task.description));
-        console.log(chalk.gray(`profile ${task.profile} / mode suggest / max steps ${maxSteps}`));
+        console.log(chalk.gray(`source ${task.source} / profile ${task.profile} / mode suggest / max steps ${maxSteps}`));
         if (scoreThreshold !== undefined) {
           console.log(chalk.gray(`score threshold ${scoreThreshold}`));
         }
@@ -446,6 +452,7 @@ evals
           JSON.stringify({
             type: "eval_result",
             evalId: task.id,
+            source: task.source,
             label: task.label,
             sessionId: result.sessionId,
             finalText: result.finalText,
@@ -928,16 +935,28 @@ try {
   process.exitCode = 1;
 }
 
-function resolveEvalTask(evalId: string): BuiltInEvalTask {
-  const task = builtInEvalTasks.find((entry) => entry.id === evalId);
+function resolveEvalTasks(config?: WorkspaceConfig): EvalTask[] {
+  const builtInIds = new Set(builtInEvalTasks.map((task) => task.id));
+  const workspaceTasks = (config?.evals ?? []).map((task): EvalTask => ({ ...task, source: "workspace" }));
+  for (const task of workspaceTasks) {
+    if (builtInIds.has(task.id)) {
+      throw new Error(`Workspace eval '${task.id}' cannot replace a built-in eval.`);
+    }
+  }
+  return [...builtInEvalTasks, ...workspaceTasks];
+}
+
+function resolveEvalTask(evalId: string, config?: WorkspaceConfig): EvalTask {
+  const task = resolveEvalTasks(config).find((entry) => entry.id === evalId);
   if (!task) {
-    throw new Error(`Unknown eval '${evalId}'. Run 'deepcodex evals list' to see available evals.`);
+    throw new Error(`Unknown eval '${evalId}'. Run 'deepcodex evals list --workspace <path>' to see available evals.`);
   }
   return task;
 }
 
-function printEvalTask(task: BuiltInEvalTask): void {
+function printEvalTask(task: EvalTask): void {
   console.log(`${task.id}  ${task.label}`);
+  console.log(`Source: ${task.source}`);
   console.log(task.description);
   console.log(`Profile: ${task.profile}`);
   console.log(`Max steps: ${task.maxSteps}`);
@@ -947,7 +966,7 @@ function printEvalTask(task: BuiltInEvalTask): void {
   console.log(task.prompt);
 }
 
-function scoreEvalResult(task: BuiltInEvalTask, finalText: string): EvalScore {
+function scoreEvalResult(task: EvalTask, finalText: string): EvalScore {
   const normalizedFinalText = normalizeEvalText(finalText);
   const matchedSignals = task.expectedSignals.filter((signal) => normalizedFinalText.includes(normalizeEvalText(signal)));
   const missingSignals = task.expectedSignals.filter((signal) => !matchedSignals.includes(signal));
@@ -977,7 +996,7 @@ function formatEvalScore(score: EvalScore): string {
 }
 
 function createEvalRunRecord(
-  task: BuiltInEvalTask,
+  task: EvalTask,
   input: {
     workspaceRoot: string;
     model: string;
@@ -991,6 +1010,7 @@ function createEvalRunRecord(
   return {
     id: createEvalRunId(task.id, input.sessionId, createdAt),
     evalId: task.id,
+    source: task.source,
     label: task.label,
     workspace: input.workspaceRoot,
     model: input.model,
@@ -1067,6 +1087,7 @@ function parseEvalRunRecord(raw: string, filePath: string): EvalRunRecord {
 
 function printEvalRunRecord(record: EvalRunRecord): void {
   console.log(`${record.id}  ${record.evalId}  ${record.label}`);
+  console.log(`Source: ${record.source ?? "not recorded"}`);
   console.log(`Workspace: ${record.workspace}`);
   console.log(`Model: ${record.model}`);
   console.log(`Session: ${record.sessionId}`);

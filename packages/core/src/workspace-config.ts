@@ -26,9 +26,21 @@ export interface WorkspaceConfig {
   approvalMode?: ProfileApprovalMode;
   maxSteps?: number;
   policyProfiles?: PolicyProfile[];
+  evals?: WorkspaceEvalTask[];
   budget?: BudgetPolicy;
   policy?: Partial<ApprovalPolicy>;
   retention?: SessionRetentionPolicy;
+}
+
+export interface WorkspaceEvalTask {
+  id: string;
+  label: string;
+  description: string;
+  prompt: string;
+  profile: string;
+  maxSteps: number;
+  budget?: BudgetPolicy;
+  expectedSignals: string[];
 }
 
 export interface WorkspaceConfigReadResult {
@@ -60,7 +72,7 @@ export async function readWorkspaceConfig(workspaceInput: string): Promise<Works
     return {
       path: filePath,
       exists: true,
-      config: normalizeWorkspaceConfig(JSON.parse(raw)),
+      config: normalizeWorkspaceConfig(JSON.parse(stripJsonBom(raw))),
       sha256: createSha256(raw)
     };
   } catch (error) {
@@ -105,6 +117,21 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     approvalMode: "manual",
     maxSteps: 12,
     pricingProfileId: "custom",
+    evals: [
+      {
+        id: "workspace-release-smoke",
+        label: "Workspace release smoke",
+        description: "Team-owned read-only release evidence check for this repository.",
+        prompt:
+          "Inspect this repository in read-only mode. Summarize release evidence, verification commands, and remaining documented risks. Do not modify files.",
+        profile: "inspection",
+        maxSteps: 6,
+        budget: {
+          maxTokens: 60000
+        },
+        expectedSignals: ["release checklist", "runbook", "product readiness"]
+      }
+    ],
     policyProfiles: [
       {
         id: "team-review",
@@ -173,6 +200,7 @@ function normalizeWorkspaceConfig(value: unknown): WorkspaceConfig {
     approvalMode: readOptionalApprovalMode(entry.approvalMode),
     maxSteps: readOptionalInteger(entry.maxSteps, "maxSteps"),
     policyProfiles: normalizePolicyProfilesConfig(entry.policyProfiles),
+    evals: normalizeWorkspaceEvalsConfig(entry.evals),
     budget: normalizeBudgetConfig(entry.budget),
     policy: normalizePolicyConfig(entry.policy),
     retention: normalizeRetentionConfig(entry.retention)
@@ -212,6 +240,39 @@ function normalizePolicyProfilesConfig(value: unknown): PolicyProfile[] | undefi
   }
   listPolicyProfiles(profiles);
   return profiles;
+}
+
+function normalizeWorkspaceEvalsConfig(value: unknown): WorkspaceEvalTask[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error("evals must be an array.");
+  }
+
+  const tasks = value.map((entry, index) => normalizeWorkspaceEvalConfig(entry, `evals[${index}]`));
+  const seen = new Set<string>();
+  for (const task of tasks) {
+    if (seen.has(task.id)) {
+      throw new Error(`Duplicate evals id: ${task.id}`);
+    }
+    seen.add(task.id);
+  }
+  return tasks;
+}
+
+function normalizeWorkspaceEvalConfig(value: unknown, field: string): WorkspaceEvalTask {
+  const entry = readObject(value, field);
+  return {
+    id: readRequiredEvalId(entry.id, `${field}.id`),
+    label: readRequiredString(entry.label, `${field}.label`),
+    description: readRequiredString(entry.description, `${field}.description`),
+    prompt: readRequiredString(entry.prompt, `${field}.prompt`),
+    profile: readRequiredString(entry.profile, `${field}.profile`),
+    maxSteps: readRequiredInteger(entry.maxSteps, `${field}.maxSteps`),
+    budget: normalizeBudgetConfig(entry.budget),
+    expectedSignals: readRequiredStringArray(entry.expectedSignals, `${field}.expectedSignals`)
+  };
 }
 
 function normalizePolicyProfileConfig(value: unknown, field: string): PolicyProfile {
@@ -299,6 +360,30 @@ function readRequiredString(value: unknown, field: string): string {
   const parsed = readOptionalString(value, field);
   if (!parsed) {
     throw new Error(`${field} must be a non-empty string.`);
+  }
+  return parsed;
+}
+
+function readRequiredEvalId(value: unknown, field: string): string {
+  const parsed = readRequiredString(value, field);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(parsed)) {
+    throw new Error(`${field} must start with a letter or number and contain only letters, numbers, dots, underscores, or hyphens.`);
+  }
+  return parsed;
+}
+
+function readRequiredStringArray(value: unknown, field: string): string[] {
+  const parsed = readOptionalStringArray(value, field);
+  if (!parsed || parsed.length === 0) {
+    throw new Error(`${field} must be a non-empty array of strings.`);
+  }
+  return parsed;
+}
+
+function readRequiredInteger(value: unknown, field: string): number {
+  const parsed = readOptionalInteger(value, field);
+  if (parsed === undefined || parsed < 1) {
+    throw new Error(`${field} must be a positive whole number.`);
   }
   return parsed;
 }
@@ -466,4 +551,8 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 
 function createSha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function stripJsonBom(value: string): string {
+  return value.charCodeAt(0) === 0xfeff ? value.slice(1) : value;
 }

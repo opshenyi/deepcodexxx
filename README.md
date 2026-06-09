@@ -31,7 +31,7 @@ node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
-node apps/cli/dist/index.js evals list
+node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
@@ -39,7 +39,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-to
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
-Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists and team policy profiles, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, pricing profile, and session retention defaults:
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, pricing profile, and session retention defaults:
 
 ```powershell
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
@@ -106,7 +106,7 @@ Use Web `Tool approvals: Manual` or CLI `--approval prompt` to pause write, shel
 - Security model: `docs/security-model.md`
 - Release and demo checklist: `docs/release-checklist.md`
 - Roadmap: `docs/roadmap.md`
-- Built-in evals: `docs/evals.md`
+- CLI evals: `docs/evals.md`
 
 ## Reference Research
 

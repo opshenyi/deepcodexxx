@@ -64,6 +64,18 @@ describe("workspace config", () => {
             }
           }
         ],
+        evals: [
+          {
+            id: "repo-release-smoke",
+            label: "Repo release smoke",
+            description: "Repository-specific release evidence eval.",
+            prompt: "Inspect release evidence without modifying files.",
+            profile: "inspection",
+            maxSteps: "5",
+            budget: { maxTokens: "12000" },
+            expectedSignals: ["release checklist", "runbook"]
+          }
+        ],
         approvalMode: "deny",
         maxSteps: "6",
         pricingProfileId: "pilot",
@@ -119,6 +131,18 @@ describe("workspace config", () => {
           }
         }
       ],
+      evals: [
+        {
+          id: "repo-release-smoke",
+          label: "Repo release smoke",
+          description: "Repository-specific release evidence eval.",
+          prompt: "Inspect release evidence without modifying files.",
+          profile: "inspection",
+          maxSteps: 5,
+          budget: { maxTokens: 12000 },
+          expectedSignals: ["release checklist", "runbook"]
+        }
+      ],
       approvalMode: "deny",
       maxSteps: 6,
       pricingProfileId: "pilot",
@@ -138,6 +162,22 @@ describe("workspace config", () => {
       },
       retention: { maxSessions: 20, maxAgeDays: 14 }
     });
+  });
+
+  it("parses workspace config files with a UTF-8 BOM", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      `\uFEFF${JSON.stringify({ model: "deepseek-chat" })}`,
+      "utf8"
+    );
+
+    const result = await readWorkspaceConfig(tempDir);
+
+    expect(result.exists).toBe(true);
+    expect(result.config.model).toBe("deepseek-chat");
+    expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("rejects invalid workspace config values with the config path", async () => {
@@ -206,6 +246,111 @@ describe("workspace config", () => {
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/policyProfiles\[0\]\.policy\.mode/);
   });
 
+  it("rejects duplicate workspace eval ids", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({
+        evals: [
+          {
+            id: "release-smoke",
+            label: "Release smoke",
+            description: "First eval.",
+            prompt: "Inspect release evidence.",
+            profile: "inspection",
+            maxSteps: 4,
+            expectedSignals: ["release"]
+          },
+          {
+            id: "release-smoke",
+            label: "Release smoke copy",
+            description: "Duplicate eval.",
+            prompt: "Inspect release evidence again.",
+            profile: "inspection",
+            maxSteps: 4,
+            expectedSignals: ["release"]
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/Duplicate evals id/);
+  });
+
+  it("rejects unsafe workspace eval ids", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({
+        evals: [
+          {
+            id: "../release",
+            label: "Release smoke",
+            description: "Unsafe id.",
+            prompt: "Inspect release evidence.",
+            profile: "inspection",
+            maxSteps: 4,
+            expectedSignals: ["release"]
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/evals\[0\]\.id/);
+  });
+
+  it("rejects workspace evals without expected signals", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({
+        evals: [
+          {
+            id: "release-smoke",
+            label: "Release smoke",
+            description: "Missing signals.",
+            prompt: "Inspect release evidence.",
+            profile: "inspection",
+            maxSteps: 4,
+            expectedSignals: []
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/evals\[0\]\.expectedSignals/);
+  });
+
+  it("rejects workspace evals without a positive max step count", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({
+        evals: [
+          {
+            id: "release-smoke",
+            label: "Release smoke",
+            description: "Invalid max steps.",
+            prompt: "Inspect release evidence.",
+            profile: "inspection",
+            maxSteps: 0,
+            expectedSignals: ["release"]
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/evals\[0\]\.maxSteps/);
+  });
+
   it("rejects invalid provider base URLs", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     await mkdir(path.join(tempDir, ".deepcodex"));
@@ -225,6 +370,7 @@ describe("workspace config", () => {
 
     expect(created.exists).toBe(true);
     expect(created.config.policyProfileId).toBe("guarded-write");
+    expect(created.config.evals?.[0]?.id).toBe("workspace-release-smoke");
     expect(created.sha256).toMatch(/^[a-f0-9]{64}$/);
     await expect(writeWorkspaceConfigTemplate(tempDir)).rejects.toThrow(/already exists/);
   });
