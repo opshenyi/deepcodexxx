@@ -862,6 +862,64 @@ pre {
   color: var(--quiet);
 }
 
+.policyBundleBody {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.policyBundleReason {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.policyBundleReason.bad {
+  color: var(--bad);
+}
+
+.policyBundleFacts {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.policyBundleFacts div {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.policyBundleFacts dt {
+  min-width: 0;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.policyBundleFacts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.policyBundleButton {
+  width: 100%;
+  padding: 8px 10px;
+}
+
 .railFoot {
   border-top: 1px solid var(--line);
   color: var(--muted);

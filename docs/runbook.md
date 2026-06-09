@@ -159,6 +159,8 @@ node apps/cli/dist/index.js config verify-bundle --workspace D:\Coding\DeepCodex
 
 The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`. Use `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS` to narrow the trust policy during rotation or incident response. Set `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` to require a trusted signed bundle before CLI/server agent runs start. This enforcement switch is environment-only so an unsigned workspace config cannot disable it. Do not put signing private keys in `.deepcodex/config.json`, `.env`, repository files, session memory, or session history.
 
+The Web and Desktop clients include a Policy bundle panel in the right rail. `Load config` refreshes that panel for the selected workspace, and `Check bundle` can refresh it independently. The panel displays the server verification result only; key generation and signing stay in the CLI so private signing keys do not enter the browser runtime.
+
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
 Write and edit tools also apply sensitive-text checks before producing diffs or writing files. Probable secrets and workspace `dlpPatterns` matches are blocked by default and reported by finding type without returning raw secret values. Set `policy.allowSecretWrites: true` only in a trusted workspace policy when a fixture or migration intentionally needs secret-like text.
@@ -215,11 +217,12 @@ Recommended demo flow:
 2. Start with the `Inspection` policy profile for read-only prompts.
 3. Use `Guarded write` only on a disposable branch or sample workspace.
 4. Use `Load config` when the workspace has `.deepcodex/config.json`, then confirm profile, approval, max steps, budget, pricing, and retention values.
-5. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
-6. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-7. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-8. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-9. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+5. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
+6. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
+7. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
+8. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+9. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+10. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 

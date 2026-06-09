@@ -142,6 +142,21 @@ type WorkspaceConfigResult = {
   sha256?: string;
 };
 
+type PolicyBundleVerificationResult = {
+  path: string;
+  exists: boolean;
+  ok: boolean;
+  signatureVerified: boolean;
+  trusted: boolean;
+  reason: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  configSha256?: string;
+  bundleSha256?: string;
+  publicKeySha256?: string;
+};
+
 type PricingProfile = {
   id: string;
   label: string;
@@ -370,6 +385,9 @@ function App() {
   const [retentionState, setRetentionState] = useState<LoadState>("idle");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [configMessage, setConfigMessage] = useState("");
+  const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
+  const [policyBundle, setPolicyBundle] = useState<PolicyBundleVerificationResult | null>(null);
+  const [policyBundleMessage, setPolicyBundleMessage] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -410,6 +428,8 @@ function App() {
   const serverStatus = serverUrl === configuredServerUrl ? "Default" : "Custom";
   const serverDraftChanged = normalizeServerUrl(serverUrlDraft) !== serverUrl;
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
+  const policyBundleStatus = formatPolicyBundleStatus(policyBundle, policyBundleState);
+  const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
     () =>
@@ -427,6 +447,12 @@ function App() {
     void loadPricingProfiles();
     void loadPolicyProfiles();
   }, [serverUrl]);
+
+  useEffect(() => {
+    setPolicyBundle(null);
+    setPolicyBundleState("idle");
+    setPolicyBundleMessage("");
+  }, [workspace, serverUrl]);
 
   async function runAgent() {
     if (!prompt.trim()) {
@@ -602,10 +628,35 @@ function App() {
         setConfigMessage(`No config at ${result.path}`);
       }
       setConfigState("ready");
+      void loadPolicyBundle(workspace, serverUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setConfigMessage(message);
       setConfigState("error");
+    }
+  }
+
+  async function loadPolicyBundle(workspaceOverride = workspace, baseUrl = serverUrl) {
+    const params = new URLSearchParams();
+    if (workspaceOverride) {
+      params.set("workspace", workspaceOverride);
+    }
+    setPolicyBundleState("loading");
+    setPolicyBundleMessage("");
+    try {
+      const response = await fetch(`${baseUrl}/api/policy-bundle?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const result = (await response.json()) as PolicyBundleVerificationResult;
+      setPolicyBundle(result);
+      setPolicyBundleMessage(result.reason);
+      setPolicyBundleState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPolicyBundle(null);
+      setPolicyBundleMessage(message);
+      setPolicyBundleState("error");
     }
   }
 
@@ -1383,6 +1434,84 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Policy bundle</span>
+              <h2>Config trust</h2>
+            </div>
+            <span className={`outputStatus ${policyBundleTone}`}>{policyBundleStatus}</span>
+          </div>
+          <div className="policyBundleBody">
+            {policyBundle ? (
+              <>
+                <p className="policyBundleReason">{policyBundleMessage || policyBundle.reason}</p>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Signature</dt>
+                    <dd>{policyBundle.signatureVerified ? "Verified" : "Not verified"}</dd>
+                  </div>
+                  <div>
+                    <dt>Trust</dt>
+                    <dd>{policyBundle.trusted ? "Trusted key" : "No trusted key"}</dd>
+                  </div>
+                  {policyBundle.issuer ? (
+                    <div>
+                      <dt>Issuer</dt>
+                      <dd>{policyBundle.issuer}</dd>
+                    </div>
+                  ) : null}
+                  {policyBundle.issuedAt ? (
+                    <div>
+                      <dt>Issued</dt>
+                      <dd>{formatStoredDateTime(policyBundle.issuedAt)}</dd>
+                    </div>
+                  ) : null}
+                  {policyBundle.expiresAt ? (
+                    <div>
+                      <dt>Expires</dt>
+                      <dd>{formatStoredDateTime(policyBundle.expiresAt)}</dd>
+                    </div>
+                  ) : null}
+                  {policyBundle.configSha256 ? (
+                    <div>
+                      <dt>Config hash</dt>
+                      <dd>{shortFingerprint(policyBundle.configSha256)}</dd>
+                    </div>
+                  ) : null}
+                  {policyBundle.bundleSha256 ? (
+                    <div>
+                      <dt>Bundle hash</dt>
+                      <dd>{shortFingerprint(policyBundle.bundleSha256)}</dd>
+                    </div>
+                  ) : null}
+                  {policyBundle.publicKeySha256 ? (
+                    <div>
+                      <dt>Key hash</dt>
+                      <dd>{shortFingerprint(policyBundle.publicKeySha256)}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Path</dt>
+                    <dd>{policyBundle.path}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <p className={policyBundleMessage ? "policyBundleReason bad" : "sessionEmpty"}>
+                {policyBundleMessage || "No policy bundle check loaded."}
+              </p>
+            )}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={() => loadPolicyBundle()}
+              disabled={policyBundleState === "loading"}
+            >
+              {policyBundleState === "loading" ? "Checking bundle" : "Check bundle"}
+            </button>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Workspace memory</span>
               <h2>Memory</h2>
             </div>
@@ -1862,6 +1991,51 @@ function formatCostMetric(budget: BudgetSnapshot | null): string {
     return `${formatUsd(budget.estimatedUsd)} / ${formatUsd(budget.maxEstimatedUsd)}`;
   }
   return formatUsd(budget.estimatedUsd);
+}
+
+function formatPolicyBundleStatus(
+  policyBundle: PolicyBundleVerificationResult | null,
+  state: LoadState
+): string {
+  if (state === "loading") {
+    return "Checking";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!policyBundle) {
+    return "Not checked";
+  }
+  if (!policyBundle.exists) {
+    return "Missing";
+  }
+  if (policyBundle.ok) {
+    return "Trusted";
+  }
+  if (policyBundle.signatureVerified) {
+    return policyBundle.trusted ? "Failed" : "Untrusted";
+  }
+  return "Failed";
+}
+
+function formatPolicyBundleTone(policyBundle: PolicyBundleVerificationResult | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error") {
+    return "error";
+  }
+  if (policyBundle?.ok) {
+    return "ready";
+  }
+  if (policyBundle?.exists) {
+    return "error";
+  }
+  return "idle";
+}
+
+function shortFingerprint(value: string): string {
+  return `sha256:${value.slice(0, 12)}`;
 }
 
 function formatBudgetBody(budget: BudgetSnapshot): string {

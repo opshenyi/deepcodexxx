@@ -76,6 +76,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added policy-bundle signing workflow. Core now has `createWorkspacePolicyBundle`, and CLI `config sign-bundle` signs the active `.deepcodex/config.json` SHA-256 into `.deepcodex/policy-bundle.json` with an external Ed25519 private key. It records issuer, issuedAt, optional expiresAt, refuses accidental overwrite unless `--force`, can embed public-key metadata for audit, and keeps trusted enforcement dependent on external trusted public keys.
 - Verified policy-bundle signing with `npx vitest run packages/core/src/policy-bundle.test.ts` (11 tests), `npm run typecheck`, final `npm run verify` (13 files / 109 tests), and a real CLI smoke in a temporary workspace: `config init`, temporary Ed25519 key generation, `config sign-bundle`, and `config verify-bundle --public-key`, which reported trusted status and signature verified.
 - Added CLI `config generate-keypair` for policy-bundle Ed25519 key generation. It requires explicit private/public PEM output paths, refuses overwrite unless `--force`, prints the public key SHA-256 for trust-policy records, and never prints private key material. Verified with a CLI smoke that generated keys, signed a bundle, verified trusted status, confirmed overwrite rejection via non-zero exit, and final `npm run verify` stayed green (13 files / 109 tests).
+- Added a Web/Desktop Policy bundle status panel in the right rail. It calls the existing server `/api/policy-bundle` verification endpoint for the selected workspace, refreshes after `Load config` or the standalone `Check bundle` action, and shows missing/trusted/untrusted/failed status, verification reason, signature/trust state, issuer/expiry, config hash, bundle hash, signing-key hash, and bundle path without handling signing private keys in the browser runtime. Verified with `npm run build -w @deepcodex/web` and in-app browser smoke checks: missing-bundle state, trusted signed-bundle state through a temporary trusted server, `Load config` auto-refresh, 390px no horizontal overflow, and zero console errors.
 
 ## Architecture Decisions
 
@@ -90,6 +91,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add kernel-level shell sandboxing or remote isolated execution workers; current protection is command filtering, minimal env, network-command pattern blocking, and optional workspace-copy execution, not a full OS sandbox.
 2. Add policy-controlled OCR/PDF extraction and richer archive analysis if deeper non-text artifact summaries are needed.
-3. Add richer DLP classification, kernel-level shell isolation, and policy-bundle administration UI/distribution tooling.
+3. Add richer DLP classification, kernel-level shell isolation, and policy-bundle distribution tooling beyond the current Web/Desktop status panel.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

@@ -66,6 +66,7 @@ Checklist:
 - Server URL can be reviewed in the sidebar, saved, and used for memory/session/config calls without console errors.
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
+- The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.
 - `suggest` mode can run a repository inspection prompt.
