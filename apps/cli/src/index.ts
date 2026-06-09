@@ -2,7 +2,9 @@
 import "dotenv/config";
 import chalk from "chalk";
 import { Command } from "commander";
-import { readFile } from "node:fs/promises";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -254,6 +256,47 @@ config
     const result = await writeWorkspaceConfigTemplate(options.workspace, { overwrite: options.force });
     console.log(`Created workspace config: ${result.path}`);
   });
+
+config
+  .command("generate-keypair")
+  .description("Generate an Ed25519 keypair for signing DeepCodex policy bundles.")
+  .requiredOption("--private-key <path>", "Private key PEM output path")
+  .requiredOption("--public-key <path>", "Public key PEM output path")
+  .option("--force", "Overwrite existing key files", false)
+  .option("--json", "Print JSON output", false)
+  .action(
+    async (options: { privateKey: string; publicKey: string; force: boolean; json: boolean }) => {
+      const privateKeyPath = path.resolve(options.privateKey);
+      const publicKeyPath = path.resolve(options.publicKey);
+      if (privateKeyPath === publicKeyPath) {
+        throw new Error("Private key and public key paths must be different.");
+      }
+      if (!options.force) {
+        await assertOutputFileAvailable(privateKeyPath);
+        await assertOutputFileAvailable(publicKeyPath);
+      }
+
+      const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+      const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+      const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+      await writePemFile(privateKeyPath, privateKeyPem, 0o600);
+      await writePemFile(publicKeyPath, publicKeyPem, 0o644);
+
+      const result = {
+        privateKeyPath,
+        publicKeyPath,
+        publicKeySha256: createSha256(publicKeyPem.trim())
+      };
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`Private key written: ${result.privateKeyPath}`);
+      console.log(`Public key written: ${result.publicKeyPath}`);
+      console.log(`Public key SHA-256: ${result.publicKeySha256}`);
+      console.log("Keep the private key outside workspaces, repository files, environment files, memory, and session history.");
+    }
+  );
 
 config
   .command("sign-bundle")
@@ -771,6 +814,33 @@ function parseShellExecutionMode(value: string): ShellExecutionMode {
     return value;
   }
   throw new Error("shell-execution-mode must be direct or workspace-copy");
+}
+
+async function assertOutputFileAvailable(filePath: string): Promise<void> {
+  const exists = await stat(filePath)
+    .then(() => true)
+    .catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return false;
+      }
+      throw error;
+    });
+  if (exists) {
+    throw new Error(`Output file already exists: ${filePath}. Use --force to overwrite it.`);
+  }
+}
+
+async function writePemFile(filePath: string, content: string, mode: number): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, content, { encoding: "utf8", mode });
+}
+
+function createSha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function createRetentionPolicy(options: {

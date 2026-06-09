@@ -139,7 +139,13 @@ When the configured DeepSeek-compatible provider returns usage metadata, DeepCod
 
 Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records.
 
-Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle signs a payload containing the active config SHA-256, issuer, issue time, and optional expiry. Sign the active workspace config with an Ed25519 private key kept outside the workspace:
+Signed policy bundles can live at `.deepcodex/policy-bundle.json`. The bundle signs a payload containing the active config SHA-256, issuer, issue time, and optional expiry. Generate an Ed25519 keypair and keep the private key outside the workspace:
+
+```powershell
+node apps/cli/dist/index.js config generate-keypair --private-key D:\keys\policy-private.pem --public-key D:\keys\policy-public.pem
+```
+
+`config generate-keypair` refuses to overwrite existing key files unless `--force` is passed and prints the public key SHA-256 for trust-policy records. Sign the active workspace config with the private key:
 
 ```powershell
 node apps/cli/dist/index.js config sign-bundle --workspace D:\Coding\DeepCodex --private-key D:\keys\policy-private.pem --issuer "Security Team" --expires-at 2026-12-31T23:59:59.000Z
