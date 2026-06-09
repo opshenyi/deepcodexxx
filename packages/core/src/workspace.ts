@@ -8,7 +8,36 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowShell: true,
   allowNetwork: false,
   allowStateWrite: true,
-  deniedPaths: [".git", "node_modules", "references/agents", ".env", ".env.*", ".deepcodex/state"],
+  deniedPaths: [
+    ".git",
+    "**/.git",
+    "node_modules",
+    "**/node_modules",
+    "references/agents",
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
+    ".deepcodex/state",
+    "dist",
+    "**/dist",
+    "build",
+    "**/build",
+    "coverage",
+    "**/coverage",
+    ".next",
+    "**/.next",
+    ".nuxt",
+    "**/.nuxt",
+    ".turbo",
+    "**/.turbo",
+    ".cache",
+    "**/.cache",
+    ".vite",
+    "**/.vite",
+    ".parcel-cache",
+    "**/.parcel-cache"
+  ],
   maxFileBytes: 512 * 1024,
   shellEnvironment: "minimal"
 };
@@ -78,7 +107,7 @@ function matchesDeniedPattern(relativePath: string, pattern: string): boolean {
     return false;
   }
   if (normalizedPattern.includes("*")) {
-    const regex = new RegExp(`^${normalizedPattern.split("*").map(escapeRegex).join("[^/]*")}(?:/.*)?$`);
+    const regex = new RegExp(`^${globPatternToRegexSource(normalizedPattern)}(?:/.*)?$`);
     return regex.test(relativePath);
   }
   return relativePath === normalizedPattern || relativePath.startsWith(`${normalizedPattern}/`);
@@ -86,6 +115,13 @@ function matchesDeniedPattern(relativePath: string, pattern: string): boolean {
 
 function escapeRegex(value: string): string {
   return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+
+function globPatternToRegexSource(pattern: string): string {
+  return pattern
+    .split("**")
+    .map((part) => part.split("*").map(escapeRegex).join("[^/]*"))
+    .join(".*");
 }
 
 function uniqueDeniedPaths(values: string[]): string[] {

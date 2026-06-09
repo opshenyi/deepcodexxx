@@ -14,8 +14,8 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Phase | Goal | Work items | Exit criteria |
 | --- | --- | --- | --- |
-| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, tool loop, token accounting, budget controls, workspace guardrails, approval metadata, file hash auditing, audit export/retention, minimal shell environment, memory, Web session replay, Desktop, CLI, docs. | Checklist passes and limitations are documented. |
-| Phase 1: safer local agent | Make local write-mode use easier to trust. | OS-level shell sandboxing, generated-asset policies, reusable policy profiles. | User can approve each write or shell command with a visible diff or command body, and review the decision later. |
+| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, tool loop, token accounting, budget controls, workspace guardrails, generated/build output deny patterns, approval metadata, file hash auditing, audit export/retention, minimal shell environment, memory, Web session replay, Desktop, CLI, docs. | Checklist passes and limitations are documented. |
+| Phase 1: safer local agent | Make local write-mode use easier to trust. | OS-level shell sandboxing, richer media/artifact-type policies, reusable policy profiles. | User can approve each write or shell command with a visible diff or command body, and review the decision later. |
 | Phase 2: product operations | Make demos repeatable and measurable. | Structured run history, managed pricing profiles, benchmark tasks, regression evals. | A release can compare behavior across model/config changes. |
 | Phase 3: desktop release | Move beyond development Electron launch. | Packaged installers, signing, update policy, crash reporting plan, OS-specific smoke tests. | A reviewer can install and run Desktop without starting dev servers manually. |
 | Phase 4: team pilot | Support controlled internal use. | Config profiles, shared policy templates, secrets redaction, team documentation, pilot feedback loop. | A small team can run DeepCodex on approved repositories with documented support boundaries. |
@@ -26,7 +26,7 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 | Item | Why it matters | Suggested owner area |
 | --- | --- | --- |
 | Diff viewer UI | Lets users inspect generated diffs with better affordances. | Web, CLI. |
-| Generated-asset policies | Prevent generated assets and specialized file types from overwhelming model context or memory. | Core, config. |
+| Media/artifact-type policies | Prevent specialized binary/media artifacts from overwhelming model context or memory. | Core, config. |
 | Managed pricing profiles | Keeps cost controls current without hard-coding provider prices. | Provider config, clients. |
 | CLI JSON output | Enables automation and CI-style checks. | CLI. |
 | Desktop packaging | Turns the desktop client into a deliverable artifact. | Desktop, release. |

@@ -29,10 +29,15 @@ describe("workspace boundaries", () => {
   it("denies generated and reference directories", () => {
     expect(isDeniedWorkspacePath(".git/config")).toBe(true);
     expect(isDeniedWorkspacePath("node_modules/react/index.js")).toBe(true);
+    expect(isDeniedWorkspacePath("packages/core/node_modules/tool/index.js")).toBe(true);
     expect(isDeniedWorkspacePath("references/agents/openai-codex/README.md")).toBe(true);
     expect(isDeniedWorkspacePath(".env")).toBe(true);
     expect(isDeniedWorkspacePath(".env.local")).toBe(true);
+    expect(isDeniedWorkspacePath("apps/server/.env.local")).toBe(true);
     expect(isDeniedWorkspacePath(".deepcodex/state/sessions/run.json")).toBe(true);
+    expect(isDeniedWorkspacePath("apps/web/dist/assets/index.js")).toBe(true);
+    expect(isDeniedWorkspacePath("apps/web/build/index.html")).toBe(true);
+    expect(isDeniedWorkspacePath("coverage/lcov.info")).toBe(true);
     expect(isDeniedWorkspacePath("apps/web/src/main.tsx")).toBe(false);
   });
 
@@ -40,6 +45,7 @@ describe("workspace boundaries", () => {
     expect(isDeniedByPatterns("secrets/key.txt", ["secrets"])).toBe(true);
     expect(isDeniedByPatterns("logs/app.log", ["*.log"])).toBe(false);
     expect(isDeniedByPatterns("app.log", ["*.log"])).toBe(true);
+    expect(isDeniedByPatterns("apps/web/app.map", ["**/*.map"])).toBe(true);
     expect(isDeniedByPatterns("src/index.ts", ["secrets", "*.local"])).toBe(false);
   });
 

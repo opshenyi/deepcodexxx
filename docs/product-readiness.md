@@ -22,7 +22,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
-- Configurable denied path patterns, with default protection for env files and session audit state.
+- Configurable denied path patterns with `**` support, default protection for nested env files, generated/build output, reference repos, and session audit state.
 - Configurable file-size limits for read, write, edit, and search tools.
 - Binary-aware read, edit, and search handling for non-text files.
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
@@ -52,7 +52,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 ## Next Commercial Milestones
 
 - Add reusable policy profiles.
-- Add redaction policies.
+- Add redaction policies and richer media/artifact-type handling.
 - Add richer generated-asset handling and file-type policies.
 - Add managed pricing profiles and per-workspace budget policy templates.
 - Add packaged desktop installers and signed releases.
