@@ -158,6 +158,8 @@ program
           baseUrl: provider.baseUrl,
           model: provider.model,
           fallbackModels: provider.fallbackModels,
+          thinking: provider.thinking,
+          reasoningEffort: provider.reasoningEffort,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -242,6 +244,8 @@ program
           baseUrl: provider.baseUrl,
           model: provider.model,
           fallbackModels: provider.fallbackModels,
+          thinking: provider.thinking,
+          reasoningEffort: provider.reasoningEffort,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -505,6 +509,8 @@ evals
         baseUrl: provider.baseUrl,
         model: provider.model,
         fallbackModels: provider.fallbackModels,
+        thinking: provider.thinking,
+        reasoningEffort: provider.reasoningEffort,
         maxSteps,
         policy,
         budget: createBudgetPolicy(options, task.budget, options.pricingProfile, workspaceConfig.config),
@@ -1001,6 +1007,8 @@ program
       deepSeekBaseUrl: provider.baseUrl,
       deepSeekModel: provider.model,
       deepSeekFallbackModels: provider.fallbackModels.length,
+      deepSeekThinking: provider.thinking,
+      deepSeekReasoningEffort: provider.reasoningEffort ?? "not set",
       providerMaxRetries: process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2",
       providerRetryBaseDelayMs: process.env.DEEPCODEX_PROVIDER_RETRY_BASE_MS ?? "500",
       allowedProviderBaseUrls: workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0,
@@ -1047,6 +1055,8 @@ program
     console.log(`DeepSeek base URL: ${diagnostics.deepSeekBaseUrl}`);
     console.log(`DeepSeek model: ${diagnostics.deepSeekModel}`);
     console.log(`DeepSeek fallback models: ${diagnostics.deepSeekFallbackModels}`);
+    console.log(`DeepSeek thinking: ${diagnostics.deepSeekThinking}`);
+    console.log(`DeepSeek reasoning effort: ${diagnostics.deepSeekReasoningEffort}`);
     console.log(`Provider max retries: ${diagnostics.providerMaxRetries}`);
     console.log(`Provider retry base delay ms: ${diagnostics.providerRetryBaseDelayMs}`);
     console.log(`Allowed provider base URLs: ${diagnostics.allowedProviderBaseUrls}`);
@@ -1596,7 +1606,9 @@ function readProviderSelection(config?: WorkspaceConfig) {
   return resolveProviderSelection({
     baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
     model: process.env.DEEPSEEK_MODEL || config?.model,
-    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels
+    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels,
+    thinking: process.env.DEEPCODEX_PROVIDER_THINKING || config?.provider?.thinking,
+    reasoningEffort: process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT || config?.provider?.reasoningEffort
   });
 }
 

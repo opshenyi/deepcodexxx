@@ -3,14 +3,19 @@ import type {
   DeepSeekChatRequest,
   DeepSeekChatResponse,
   DeepSeekConfig,
+  DeepSeekReasoningEffort,
+  DeepSeekThinkingType,
   ToolDefinition
 } from "./types.js";
 import {
   DEFAULT_DEEPSEEK_BASE_URL,
   DEFAULT_DEEPSEEK_MODEL,
+  DEFAULT_DEEPSEEK_THINKING,
   normalizeBaseUrl,
+  normalizeDeepSeekThinking,
   normalizeFallbackModels,
-  normalizeModel
+  normalizeModel,
+  normalizeOptionalReasoningEffort
 } from "./provider-policy.js";
 
 export class DeepSeekError extends Error {
@@ -32,6 +37,8 @@ export class DeepSeekClient {
   readonly timeoutMs: number;
   readonly maxRetries: number;
   readonly retryBaseDelayMs: number;
+  readonly thinking: DeepSeekThinkingType;
+  readonly reasoningEffort?: DeepSeekReasoningEffort;
   private readonly apiKey?: string;
   private lastModelValue: string;
 
@@ -51,6 +58,12 @@ export class DeepSeekClient {
     this.timeoutMs = config.timeoutMs ?? 120_000;
     this.maxRetries = config.maxRetries ?? readNonNegativeIntegerEnv("DEEPCODEX_PROVIDER_MAX_RETRIES", 2);
     this.retryBaseDelayMs = config.retryBaseDelayMs ?? readNonNegativeNumberEnv("DEEPCODEX_PROVIDER_RETRY_BASE_MS", 500);
+    this.thinking = normalizeDeepSeekThinking(
+      config.thinking ?? process.env.DEEPCODEX_PROVIDER_THINKING ?? DEFAULT_DEEPSEEK_THINKING
+    );
+    this.reasoningEffort = normalizeOptionalReasoningEffort(
+      config.reasoningEffort ?? process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT
+    );
   }
 
   get configured(): boolean {
@@ -76,9 +89,13 @@ export class DeepSeekClient {
         messages,
         tools,
         tool_choice: tools.length > 0 ? "auto" : "none",
-        temperature: 0.2,
         max_tokens: 4096,
-        stream: false
+        stream: false,
+        thinking: { type: this.thinking },
+        ...(this.thinking === "disabled" ? { temperature: 0.2 } : {}),
+        ...(this.thinking === "enabled" && this.reasoningEffort
+          ? { reasoning_effort: this.reasoningEffort }
+          : {})
       };
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {

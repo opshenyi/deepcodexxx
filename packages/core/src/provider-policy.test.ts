@@ -4,19 +4,28 @@ import { assertProviderAllowed, normalizeBaseUrl, resolveProviderSelection } fro
 const originalProviderEnv = {
   DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL,
   DEEPSEEK_MODEL: process.env.DEEPSEEK_MODEL,
-  DEEPCODEX_PROVIDER_FALLBACK_MODELS: process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS
+  DEEPCODEX_PROVIDER_FALLBACK_MODELS: process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS,
+  DEEPCODEX_PROVIDER_THINKING: process.env.DEEPCODEX_PROVIDER_THINKING,
+  DEEPCODEX_PROVIDER_REASONING_EFFORT: process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT
 };
 
 beforeEach(() => {
   delete process.env.DEEPSEEK_BASE_URL;
   delete process.env.DEEPSEEK_MODEL;
   delete process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS;
+  delete process.env.DEEPCODEX_PROVIDER_THINKING;
+  delete process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT;
 });
 
 afterEach(() => {
   restoreEnvValue("DEEPSEEK_BASE_URL", originalProviderEnv.DEEPSEEK_BASE_URL);
   restoreEnvValue("DEEPSEEK_MODEL", originalProviderEnv.DEEPSEEK_MODEL);
   restoreEnvValue("DEEPCODEX_PROVIDER_FALLBACK_MODELS", originalProviderEnv.DEEPCODEX_PROVIDER_FALLBACK_MODELS);
+  restoreEnvValue("DEEPCODEX_PROVIDER_THINKING", originalProviderEnv.DEEPCODEX_PROVIDER_THINKING);
+  restoreEnvValue(
+    "DEEPCODEX_PROVIDER_REASONING_EFFORT",
+    originalProviderEnv.DEEPCODEX_PROVIDER_REASONING_EFFORT
+  );
 });
 
 describe("provider policy", () => {
@@ -24,7 +33,8 @@ describe("provider policy", () => {
     expect(resolveProviderSelection({})).toEqual({
       baseUrl: "https://api.deepseek.com",
       model: "deepseek-v4-flash",
-      fallbackModels: []
+      fallbackModels: [],
+      thinking: "disabled"
     });
   });
 
@@ -37,8 +47,24 @@ describe("provider policy", () => {
     ).toEqual({
       baseUrl: "https://api.deepseek.com",
       model: "deepseek-v4-flash",
-      fallbackModels: ["deepseek-v4-pro"]
+      fallbackModels: ["deepseek-v4-pro"],
+      thinking: "disabled"
     });
+  });
+
+  it("resolves DeepSeek V4 thinking and reasoning effort from env", () => {
+    process.env.DEEPCODEX_PROVIDER_THINKING = "enabled";
+    process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT = "max";
+
+    expect(resolveProviderSelection({})).toMatchObject({
+      thinking: "enabled",
+      reasoningEffort: "max"
+    });
+  });
+
+  it("rejects unsupported thinking settings", () => {
+    expect(() => resolveProviderSelection({ thinking: "maybe" as never })).toThrow(/thinking/);
+    expect(() => resolveProviderSelection({ reasoningEffort: "medium" as never })).toThrow(/reasoning effort/);
   });
 
   it("normalizes provider base URLs", () => {
@@ -48,7 +74,12 @@ describe("provider policy", () => {
   it("allows approved provider base URLs and models", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash", fallbackModels: ["deepseek-v4-pro"] },
+        {
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-flash",
+          fallbackModels: ["deepseek-v4-pro"],
+          thinking: "disabled"
+        },
         { allowedBaseUrls: ["https://api.deepseek.com/"], allowedModels: ["deepseek-v4-flash", "deepseek-v4-pro"] }
       )
     ).not.toThrow();
@@ -57,7 +88,7 @@ describe("provider policy", () => {
   it("rejects unapproved provider base URLs", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://unapproved.example.com", model: "deepseek-v4-flash", fallbackModels: [] },
+        { baseUrl: "https://unapproved.example.com", model: "deepseek-v4-flash", fallbackModels: [], thinking: "disabled" },
         { allowedBaseUrls: ["https://api.deepseek.com"] }
       )
     ).toThrow(/base URL is not allowed/);
@@ -66,7 +97,7 @@ describe("provider policy", () => {
   it("rejects unapproved provider models", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://api.deepseek.com", model: "experimental-model", fallbackModels: [] },
+        { baseUrl: "https://api.deepseek.com", model: "experimental-model", fallbackModels: [], thinking: "disabled" },
         { allowedModels: ["deepseek-v4-flash"] }
       )
     ).toThrow(/model is not allowed/);
@@ -75,7 +106,12 @@ describe("provider policy", () => {
   it("rejects unapproved provider fallback models", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash", fallbackModels: ["experimental-model"] },
+        {
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-flash",
+          fallbackModels: ["experimental-model"],
+          thinking: "disabled"
+        },
         { allowedModels: ["deepseek-v4-flash"] }
       )
     ).toThrow(/fallback model is not allowed/);

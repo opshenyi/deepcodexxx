@@ -26,6 +26,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPSEEK_BASE_URL` | Optional. | `https://api.deepseek.com` | The client calls `${DEEPSEEK_BASE_URL}/chat/completions`; trailing slash is stripped. |
 | `DEEPSEEK_MODEL` | Optional. | `deepseek-v4-flash` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
 | `DEEPCODEX_PROVIDER_FALLBACK_MODELS` | Optional. | Empty. | Comma-separated fallback model ids. Fallback is tried only after retryable failures exhaust the retry budget for the current model. |
+| `DEEPCODEX_PROVIDER_THINKING` | Optional. | `disabled` | DeepSeek V4 thinking toggle, `enabled` or `disabled`. DeepCodex defaults to `disabled` so tool-call loops do not require persisted `reasoning_content`. |
+| `DEEPCODEX_PROVIDER_REASONING_EFFORT` | Optional. | Empty. | `high` or `max`; sent only when thinking mode is enabled. |
 | `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
 | `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
 | `DEEPCODEX_PORT` | Optional for server. | `17361` | Port used by the local server. |
@@ -82,6 +84,7 @@ Example:
   "provider": {
     "baseUrl": "https://api.deepseek.com",
     "fallbackModels": [],
+    "thinking": "disabled",
     "allowedBaseUrls": ["https://api.deepseek.com"],
     "allowedModels": ["deepseek-v4-flash"]
   },
@@ -154,7 +157,9 @@ Example:
 
 Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL, primary model, and fallback models are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. `allowedShellCommands` and `deniedShellCommands` entries are JavaScript regular expression sources applied to the raw shell command before execution; deny matches block immediately, allowlists restrict commands when non-empty, and built-in dangerous/network gates still apply after allowlist matching. Do not put provider keys or secrets in workspace config.
 
-The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; when those retryable failures exhaust the retry budget for a model, the next approved fallback model is tried and a `provider_fallback` event is streamed and persisted. 400-class request errors and invalid JSON are surfaced without retry or fallback.
+The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `max_tokens: 4096`, and a 120 second timeout. In non-thinking mode it sends `temperature: 0.2`; in thinking mode it omits temperature and can send `reasoning_effort`. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; when those retryable failures exhaust the retry budget for a model, the next approved fallback model is tried and a `provider_fallback` event is streamed and persisted. 400-class request errors and invalid JSON are surfaced without retry or fallback.
+
+DeepCodex sends `thinking: { "type": "disabled" }` by default for DeepSeek V4. Official DeepSeek docs say thinking mode defaults to enabled and that tool-call turns in thinking mode require `reasoning_content` to be passed back in all subsequent requests; otherwise the API can return 400. Because DeepCodex is a tool-calling coding agent, the safer default is explicit non-thinking mode with `temperature: 0.2`. Set `DEEPCODEX_PROVIDER_THINKING=enabled` or workspace `provider.thinking: "enabled"` only for controlled experiments that can accept this current limitation; `DEEPCODEX_PROVIDER_REASONING_EFFORT` or `provider.reasoningEffort` can be `high` or `max`.
 
 As of 2026-06-09, official DeepSeek API docs list `deepseek-v4-flash` and `deepseek-v4-pro` for the OpenAI-format chat completions API, and the legacy `deepseek-chat` and `deepseek-reasoner` aliases are scheduled to stop working on 2026-07-24 15:59 UTC. DeepCodex keeps model ids configurable for migration, but new templates use V4 model ids.
 
@@ -227,6 +232,7 @@ Expected checks:
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
 - Fallback model count reflects `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`.
+- Thinking mode prints as `disabled` unless explicitly enabled by env or workspace provider policy.
 - `providers models` reports the checked DeepSeek V4 model ids, the default model, and legacy alias migration status.
 - Provider retry settings print with their effective environment/default values.
 - Budget variables print when they are configured.
@@ -561,6 +567,7 @@ The Security scan panel and CLI `security scan` command use the same detector as
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
 | Provider is rejected. | `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPCODEX_PROVIDER_FALLBACK_MODELS`, or workspace defaults do not match `provider.allowedBaseUrls` or `provider.allowedModels`. | Run `deepcodex doctor --workspace <path>` and update the workspace provider policy, selected model, or fallback model list. |
+| Thinking-mode run fails after tool calls. | DeepSeek V4 thinking mode requires `reasoning_content` to be returned in later requests after tool-call turns. | Keep `DEEPCODEX_PROVIDER_THINKING=disabled` for normal coding-agent runs until reasoning-content replay is implemented. |
 | Provider call fails after several attempts. | DeepSeek-compatible provider returned retryable failures or the network remained unavailable through the retry budget for every configured fallback model. | Run `doctor`, verify network/API status, remove unhealthy fallbacks, or tune `DEEPCODEX_PROVIDER_MAX_RETRIES` and `DEEPCODEX_PROVIDER_RETRY_BASE_MS` only for trusted demos. |
 | Run fails before the model call with signed policy required. | `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` and the policy bundle is missing, untrusted, expired, revoked, has an untrusted issuer, or does not match the active config SHA-256. | Run `deepcodex config verify-bundle --workspace <path> --public-key <pem>` and fix the bundle, trusted key list, revocation list, or issuer allowlist. |
 | Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON, unsupported values, or an invalid redaction regex. | Run `deepcodex config show --workspace <path>` and fix the reported field. |

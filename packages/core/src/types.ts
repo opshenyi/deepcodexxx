@@ -47,9 +47,14 @@ export interface BudgetPolicy {
 export interface ProviderPolicy {
   baseUrl?: string;
   fallbackModels?: string[];
+  thinking?: DeepSeekThinkingType;
+  reasoningEffort?: DeepSeekReasoningEffort;
   allowedBaseUrls?: string[];
   allowedModels?: string[];
 }
+
+export type DeepSeekThinkingType = "enabled" | "disabled";
+export type DeepSeekReasoningEffort = "high" | "max";
 
 export interface PricingProfile {
   id: string;
@@ -201,6 +206,8 @@ export interface AgentRunOptions {
   policy?: ApprovalPolicy;
   model?: string;
   fallbackModels?: string[];
+  thinking?: DeepSeekThinkingType;
+  reasoningEffort?: DeepSeekReasoningEffort;
   baseUrl?: string;
   budget?: BudgetPolicy;
   chatClient?: AgentChatClient;
@@ -219,6 +226,8 @@ export interface DeepSeekConfig {
   baseUrl?: string;
   model?: string;
   fallbackModels?: string[];
+  thinking?: DeepSeekThinkingType;
+  reasoningEffort?: DeepSeekReasoningEffort;
   timeoutMs?: number;
   maxRetries?: number;
   retryBaseDelayMs?: number;
@@ -232,6 +241,10 @@ export interface DeepSeekChatRequest {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  thinking?: {
+    type: DeepSeekThinkingType;
+  };
+  reasoning_effort?: DeepSeekReasoningEffort;
 }
 
 export interface DeepSeekChoice {

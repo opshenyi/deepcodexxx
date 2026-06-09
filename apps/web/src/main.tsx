@@ -129,6 +129,8 @@ type WorkspaceConfig = {
   provider?: {
     baseUrl?: string;
     fallbackModels?: string[];
+    thinking?: "enabled" | "disabled";
+    reasoningEffort?: "high" | "max";
     allowedBaseUrls?: string[];
     allowedModels?: string[];
   };
@@ -2082,6 +2084,10 @@ function App() {
                   <dd>{formatProviderPolicySummary(workspaceConfigResult.config)}</dd>
                 </div>
                 <div>
+                  <dt>Thinking</dt>
+                  <dd>{formatProviderThinkingSummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
                   <dt>Profiles</dt>
                   <dd>{workspaceConfigResult.config.policyProfiles?.length ?? 0}</dd>
                 </div>
@@ -3488,6 +3494,12 @@ function formatProviderPolicySummary(config: WorkspaceConfig): string {
   const models = config.provider?.allowedModels?.length ?? 0;
   const fallbackModels = config.provider?.fallbackModels?.length ?? 0;
   return `${baseUrls} URLs / ${models} models / ${fallbackModels} fallback`;
+}
+
+function formatProviderThinkingSummary(config: WorkspaceConfig): string {
+  const thinking = config.provider?.thinking ?? "disabled";
+  const effort = config.provider?.reasoningEffort ? ` / ${config.provider.reasoningEffort}` : "";
+  return `${thinking}${effort}`;
 }
 
 function formatShellPolicySummary(config: WorkspaceConfig): string {

@@ -40,6 +40,8 @@ describe("workspace config", () => {
         provider: {
           baseUrl: "https://api.deepseek.com/",
           fallbackModels: ["deepseek-v4-pro"],
+          thinking: "enabled",
+          reasoningEffort: "max",
           allowedBaseUrls: ["https://api.deepseek.com/"],
           allowedModels: ["deepseek-coder", "deepseek-v4-flash", "deepseek-v4-pro"]
         },
@@ -114,6 +116,8 @@ describe("workspace config", () => {
       provider: {
         baseUrl: "https://api.deepseek.com",
         fallbackModels: ["deepseek-v4-pro"],
+        thinking: "enabled",
+        reasoningEffort: "max",
         allowedBaseUrls: ["https://api.deepseek.com"],
         allowedModels: ["deepseek-coder", "deepseek-v4-flash", "deepseek-v4-pro"]
       },
@@ -401,6 +405,30 @@ describe("workspace config", () => {
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.fallbackModels/);
   });
 
+  it("rejects invalid provider thinking settings", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ provider: { thinking: "auto" } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.thinking/);
+  });
+
+  it("rejects invalid provider reasoning effort", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ provider: { reasoningEffort: "medium" } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.reasoningEffort/);
+  });
+
   it("writes a template without overwriting an existing config", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
 
@@ -410,6 +438,7 @@ describe("workspace config", () => {
     expect(created.config.model).toBe("deepseek-v4-flash");
     expect(created.config.policyProfileId).toBe("guarded-write");
     expect(created.config.provider?.fallbackModels).toEqual([]);
+    expect(created.config.provider?.thinking).toBe("disabled");
     expect(created.config.provider?.allowedModels).toEqual(["deepseek-v4-flash"]);
     expect(created.config.evals?.[0]?.id).toBe("workspace-release-smoke");
     expect(created.config.policy?.deniedShellCommands).toContain("\\bterraform\\s+apply\\b");

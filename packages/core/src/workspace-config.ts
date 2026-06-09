@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listPolicyProfiles } from "./policy-profile.js";
-import { normalizeBaseUrl, normalizeModel } from "./provider-policy.js";
+import {
+  normalizeBaseUrl,
+  normalizeDeepSeekThinking,
+  normalizeModel,
+  normalizeOptionalReasoningEffort
+} from "./provider-policy.js";
 import type { SessionRetentionPolicy } from "./session-store.js";
 import type {
   ApprovalMode,
@@ -111,6 +116,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     provider: {
       baseUrl: "https://api.deepseek.com",
       fallbackModels: [],
+      thinking: "disabled",
       allowedBaseUrls: ["https://api.deepseek.com"],
       allowedModels: ["deepseek-v4-flash"]
     },
@@ -220,6 +226,8 @@ function normalizeProviderConfig(value: unknown): ProviderPolicy | undefined {
   return removeUndefinedProviderValues({
     baseUrl: readOptionalBaseUrl(entry.baseUrl, "provider.baseUrl"),
     fallbackModels: readOptionalModelArray(entry.fallbackModels, "provider.fallbackModels"),
+    thinking: readOptionalDeepSeekThinking(entry.thinking, "provider.thinking"),
+    reasoningEffort: readOptionalReasoningEffort(entry.reasoningEffort, "provider.reasoningEffort"),
     allowedBaseUrls: readOptionalBaseUrlArray(entry.allowedBaseUrls, "provider.allowedBaseUrls"),
     allowedModels: readOptionalStringArray(entry.allowedModels, "provider.allowedModels")
   });
@@ -452,6 +460,29 @@ function readOptionalModelArray(value: unknown, field: string): string[] | undef
       throw new Error(`${field} contains an invalid model: ${message}`);
     }
   });
+}
+
+function readOptionalDeepSeekThinking(value: unknown, field: string): ProviderPolicy["thinking"] {
+  const raw = readOptionalString(value, field);
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    return normalizeDeepSeekThinking(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${field} is invalid: ${message}`);
+  }
+}
+
+function readOptionalReasoningEffort(value: unknown, field: string): ProviderPolicy["reasoningEffort"] {
+  const raw = readOptionalString(value, field);
+  try {
+    return normalizeOptionalReasoningEffort(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${field} is invalid: ${message}`);
+  }
 }
 
 function readOptionalRegexArray(value: unknown, field: string): string[] | undefined {

@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists with approved fallback models, a checked DeepSeek V4 model catalog, visible provider fallback events, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists with approved fallback models, a checked DeepSeek V4 model catalog, explicit DeepSeek V4 thinking-mode control that defaults to non-thinking mode for tool-loop compatibility, visible provider fallback events, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
 
 ## Quick Start
 
@@ -60,6 +60,8 @@ node apps/cli/dist/index.js config export-trust-package --workspace D:\Coding\De
 - `DEEPSEEK_BASE_URL`: Defaults to `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: Defaults to `deepseek-v4-flash`.
 - `DEEPCODEX_PROVIDER_FALLBACK_MODELS`: Optional comma-separated fallback models. Each fallback must be allowed by workspace `provider.allowedModels` when an allowlist is configured.
+- `DEEPCODEX_PROVIDER_THINKING`: Defaults to `disabled`; set `enabled` only when the caller also handles DeepSeek `reasoning_content` requirements for tool-call turns.
+- `DEEPCODEX_PROVIDER_REASONING_EFFORT`: Optional `high` or `max`, used only when thinking mode is enabled.
 - `DEEPCODEX_PROVIDER_MAX_RETRIES`: Defaults to `2`; retries retryable provider failures before surfacing an error.
 - `DEEPCODEX_PROVIDER_RETRY_BASE_MS`: Defaults to `500`; exponential backoff base delay for provider retries.
 - `DEEPCODEX_PORT`: Defaults to `17361`.

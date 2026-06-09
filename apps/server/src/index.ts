@@ -437,6 +437,8 @@ app.post("/api/agent/run", async (req, res) => {
       baseUrl: provider.baseUrl,
       model: provider.model,
       fallbackModels: provider.fallbackModels,
+      thinking: provider.thinking,
+      reasoningEffort: provider.reasoningEffort,
       maxSteps: body.maxSteps ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps,
       policy,
       budget: createBudgetPolicy(body.budget, profile?.budget, body.pricingProfileId, workspaceConfig.config),
@@ -554,7 +556,9 @@ function readProviderSelection(model: string | undefined, config?: WorkspaceConf
   return resolveProviderSelection({
     baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
     model: model?.trim() || process.env.DEEPSEEK_MODEL || config?.model,
-    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels
+    fallbackModels: readProviderFallbackModelsFromEnv() ?? config?.provider?.fallbackModels,
+    thinking: process.env.DEEPCODEX_PROVIDER_THINKING || config?.provider?.thinking,
+    reasoningEffort: process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT || config?.provider?.reasoningEffort
   });
 }
 

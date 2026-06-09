@@ -33,6 +33,7 @@ Expected result:
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor` reports the effective DeepSeek fallback model count.
+- CLI `doctor` reports DeepSeek thinking mode as `disabled` unless a planned demo explicitly enables it.
 - CLI `providers models --json` emits parseable checked DeepSeek model metadata with `deepseek-v4-flash` as the default and legacy aliases marked for migration.
 - CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
 - CLI `completion json` emits a parseable command spec, and shell-specific completion scripts include top-level commands, subcommands, and options.
@@ -83,6 +84,7 @@ Checklist:
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
 - The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist and fallback counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
+- The right-rail Workspace policy panel shows provider thinking mode when workspace config defines it.
 - The right-rail Provider catalog panel shows default model, checked source date, V4 model count, legacy alias count, and migration targets without horizontal overflow.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
@@ -93,6 +95,7 @@ Checklist:
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
 - A workspace provider allowlist rejects unapproved base URLs, primary models, or fallback models before a run starts.
+- DeepSeek V4 thinking mode stays disabled for normal coding-agent demos unless the presenter is intentionally testing reasoning-content behavior.
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.

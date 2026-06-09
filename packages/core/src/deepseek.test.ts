@@ -4,18 +4,27 @@ import { DeepSeekClient, DeepSeekError } from "./deepseek.js";
 const originalFetch = globalThis.fetch;
 const originalProviderEnv = {
   DEEPSEEK_MODEL: process.env.DEEPSEEK_MODEL,
-  DEEPCODEX_PROVIDER_FALLBACK_MODELS: process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS
+  DEEPCODEX_PROVIDER_FALLBACK_MODELS: process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS,
+  DEEPCODEX_PROVIDER_THINKING: process.env.DEEPCODEX_PROVIDER_THINKING,
+  DEEPCODEX_PROVIDER_REASONING_EFFORT: process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT
 };
 
 beforeEach(() => {
   delete process.env.DEEPSEEK_MODEL;
   delete process.env.DEEPCODEX_PROVIDER_FALLBACK_MODELS;
+  delete process.env.DEEPCODEX_PROVIDER_THINKING;
+  delete process.env.DEEPCODEX_PROVIDER_REASONING_EFFORT;
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   restoreEnvValue("DEEPSEEK_MODEL", originalProviderEnv.DEEPSEEK_MODEL);
   restoreEnvValue("DEEPCODEX_PROVIDER_FALLBACK_MODELS", originalProviderEnv.DEEPCODEX_PROVIDER_FALLBACK_MODELS);
+  restoreEnvValue("DEEPCODEX_PROVIDER_THINKING", originalProviderEnv.DEEPCODEX_PROVIDER_THINKING);
+  restoreEnvValue(
+    "DEEPCODEX_PROVIDER_REASONING_EFFORT",
+    originalProviderEnv.DEEPCODEX_PROVIDER_REASONING_EFFORT
+  );
   vi.restoreAllMocks();
 });
 
@@ -43,6 +52,39 @@ describe("DeepSeekClient", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(response.id).toBe("ok");
+  });
+
+  it("disables DeepSeek V4 thinking by default for tool-loop compatibility", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: "ok" }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = new DeepSeekClient({ apiKey: "test-key", maxRetries: 0 });
+
+    await client.chat([{ role: "user", content: "hello" }]);
+
+    expect(requestedPayloads(fetchMock)[0]).toMatchObject({
+      model: "deepseek-v4-flash",
+      thinking: { type: "disabled" },
+      temperature: 0.2
+    });
+  });
+
+  it("sends reasoning effort only when thinking mode is enabled", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: "ok-thinking" }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = new DeepSeekClient({
+      apiKey: "test-key",
+      thinking: "enabled",
+      reasoningEffort: "max",
+      maxRetries: 0
+    });
+
+    await client.chat([{ role: "user", content: "hello" }]);
+
+    expect(requestedPayloads(fetchMock)[0]).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "max"
+    });
+    expect(requestedPayloads(fetchMock)[0]).not.toHaveProperty("temperature");
   });
 
   it("retries network errors", async () => {
@@ -148,6 +190,10 @@ function jsonResponse(partial: { id: string }): Response {
 
 function requestedModels(fetchMock: ReturnType<typeof vi.fn>): string[] {
   return fetchMock.mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)).model as string);
+}
+
+function requestedPayloads(fetchMock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
+  return fetchMock.mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
 }
 
 function restoreEnvValue(name: string, value: string | undefined): void {
