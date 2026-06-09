@@ -36,6 +36,7 @@ node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js release preflight --root D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js completion powershell
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
@@ -88,6 +89,7 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - Desktop dev: `npm run dev:desktop`.
 - Desktop production-like smoke: `npm run start:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
+- CLI completion: `node apps/cli/dist/index.js completion powershell`, `completion bash`, or `completion zsh`.
 - Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
 - Web/Desktop workspace policy: use `Load config` to review config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
 - Web/Desktop evidence: use the right-rail `Download` buttons to save Markdown release evidence and distribution preflight reports.

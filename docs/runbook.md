@@ -313,6 +313,17 @@ node apps/cli/dist/index.js doctor --workspace D:\Coding\DeepCodex --json --requ
 
 Use `--require-trusted-policy-bundle` with `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES` configured. Without a trusted key, a bundle that verifies only against an embedded public key remains untrusted and the preflight fails.
 
+Generate shell completion scripts:
+
+```powershell
+node apps/cli/dist/index.js completion powershell
+node apps/cli/dist/index.js completion bash
+node apps/cli/dist/index.js completion zsh
+node apps/cli/dist/index.js completion json
+```
+
+The shell scripts complete command names, subcommands, and options from the Commander command tree. `completion json` prints the same command spec for packaging checks or custom installer scripts.
+
 List reusable policy profiles:
 
 ```powershell

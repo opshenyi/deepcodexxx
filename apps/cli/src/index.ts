@@ -1043,12 +1043,210 @@ program
     }
   });
 
+program
+  .command("completion")
+  .argument("<shell>", "bash, zsh, powershell, or json")
+  .option("--command-name <name>", "Command name to register with the shell", "deepcodex")
+  .option("--json", "Print the completion spec as JSON", false)
+  .action((shell: string, options: { commandName: string; json: boolean }) => {
+    const spec = createCompletionSpec(program, options.commandName);
+    if (options.json || shell === "json") {
+      console.log(JSON.stringify(spec, null, 2));
+      return;
+    }
+    output.write(createCompletionScript(parseCompletionShell(shell), spec));
+  });
+
 try {
   await program.parseAsync();
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(chalk.red(message));
   process.exitCode = 1;
+}
+
+type CompletionShell = "bash" | "zsh" | "powershell";
+
+interface CompletionCommandSpec {
+  path: string[];
+  description: string;
+  options: string[];
+  subcommands: string[];
+}
+
+interface CompletionSpec {
+  commandName: string;
+  commands: CompletionCommandSpec[];
+}
+
+function parseCompletionShell(value: string): CompletionShell {
+  if (value === "bash" || value === "zsh" || value === "powershell") {
+    return value;
+  }
+  throw new Error("completion shell must be bash, zsh, powershell, or json.");
+}
+
+function createCompletionSpec(root: Command, commandName: string): CompletionSpec {
+  return {
+    commandName,
+    commands: collectCompletionCommands(root)
+  };
+}
+
+function collectCompletionCommands(command: Command, pathParts: string[] = []): CompletionCommandSpec[] {
+  const spec: CompletionCommandSpec = {
+    path: pathParts,
+    description: command.description(),
+    options: collectCompletionOptions(command, pathParts.length === 0),
+    subcommands: command.commands.map((child) => child.name())
+  };
+  return [
+    spec,
+    ...command.commands.flatMap((child) => collectCompletionCommands(child, [...pathParts, child.name()]))
+  ];
+}
+
+function collectCompletionOptions(command: Command, isRoot: boolean): string[] {
+  const flags = new Set<string>(["-h", "--help"]);
+  if (isRoot) {
+    flags.add("-V");
+    flags.add("--version");
+  }
+  for (const option of command.options) {
+    if (option.short) {
+      flags.add(option.short);
+    }
+    if (option.long) {
+      flags.add(option.long);
+    }
+  }
+  return [...flags];
+}
+
+function createCompletionScript(shell: CompletionShell, spec: CompletionSpec): string {
+  switch (shell) {
+    case "bash":
+      return createBashCompletionScript(spec);
+    case "zsh":
+      return createZshCompletionScript(spec);
+    case "powershell":
+      return createPowerShellCompletionScript(spec);
+  }
+}
+
+function createBashCompletionScript(spec: CompletionSpec): string {
+  const cases = spec.commands.map(
+    (command) => `    ${bashCasePattern(command.path)}) candidates="${bashWords([...command.subcommands, ...command.options])}" ;;`
+  );
+  return `# DeepCodex bash completion
+_deepcodex_completion() {
+  local cur key candidates
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  key=""
+  for ((i=1; i<COMP_CWORD; i++)); do
+    if [[ "\${COMP_WORDS[$i]}" != -* ]]; then
+      if [[ -z "$key" ]]; then
+        key="\${COMP_WORDS[$i]}"
+      else
+        key="$key \${COMP_WORDS[$i]}"
+      fi
+    fi
+  done
+  case "$key" in
+${cases.join("\n")}
+    *) candidates="${bashWords(spec.commands[0]?.subcommands ?? [])}" ;;
+  esac
+  COMPREPLY=( $(compgen -W "$candidates" -- "$cur") )
+}
+complete -F _deepcodex_completion ${shellWord(spec.commandName)}
+`;
+}
+
+function createZshCompletionScript(spec: CompletionSpec): string {
+  const cases = spec.commands.map(
+    (command) => `    ${bashCasePattern(command.path)}) candidates=(${zshWords([...command.subcommands, ...command.options])}) ;;`
+  );
+  return `#compdef ${spec.commandName}
+# DeepCodex zsh completion
+_deepcodex() {
+  local cur key
+  local -a candidates
+  cur="\${words[CURRENT]}"
+  key=""
+  for ((i=2; i<CURRENT; i++)); do
+    if [[ "\${words[$i]}" != -* ]]; then
+      if [[ -z "$key" ]]; then
+        key="\${words[$i]}"
+      else
+        key="$key \${words[$i]}"
+      fi
+    fi
+  done
+  case "$key" in
+${cases.join("\n")}
+    *) candidates=(${zshWords(spec.commands[0]?.subcommands ?? [])}) ;;
+  esac
+  compadd -- $candidates
+}
+compdef _deepcodex ${spec.commandName}
+`;
+}
+
+function createPowerShellCompletionScript(spec: CompletionSpec): string {
+  const json = JSON.stringify(spec, null, 2);
+  return `# DeepCodex PowerShell completion
+$deepCodexCompletionSpec = @'
+${json}
+'@ | ConvertFrom-Json
+
+Register-ArgumentCompleter -Native -CommandName '${powerShellSingleQuote(spec.commandName)}' -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  $words = @($commandAst.CommandElements | ForEach-Object { $_.Extent.Text })
+  $pathParts = @()
+  $lastIndex = $words.Count - 1
+  for ($i = 1; $i -lt $words.Count; $i++) {
+    $word = $words[$i]
+    if ($i -eq $lastIndex -and $wordToComplete.Length -gt 0) {
+      break
+    }
+    if (-not $word.StartsWith("-")) {
+      $pathParts += $word
+    }
+  }
+  $pathKey = $pathParts -join " "
+  $commandSpec = $deepCodexCompletionSpec.commands | Where-Object { ($_.path -join " ") -eq $pathKey } | Select-Object -First 1
+  if (-not $commandSpec) {
+    $commandSpec = $deepCodexCompletionSpec.commands | Where-Object { $_.path.Count -eq 0 } | Select-Object -First 1
+  }
+  @($commandSpec.subcommands + $commandSpec.options) |
+    Where-Object { $_ -like "$wordToComplete*" } |
+    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, "ParameterValue", $_) }
+}
+`;
+}
+
+function bashCasePattern(pathParts: string[]): string {
+  return pathParts.length === 0 ? '""' : shellWord(pathParts.join(" "));
+}
+
+function bashWords(words: string[]): string {
+  return words.map(bashCompletionWord).join(" ");
+}
+
+function zshWords(words: string[]): string {
+  return words.map(shellWord).join(" ");
+}
+
+function bashCompletionWord(value: string): string {
+  return value.replace(/(["\\$`])/g, "\\$1");
+}
+
+function shellWord(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function powerShellSingleQuote(value: string): string {
+  return value.replace(/'/g, "''");
 }
 
 function printEvalTask(task: EvalTask): void {

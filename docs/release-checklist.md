@@ -20,6 +20,8 @@ npm test
 npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js doctor --json
+node apps/cli/dist/index.js completion json
+node apps/cli/dist/index.js completion powershell
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
@@ -30,6 +32,7 @@ Expected result:
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
+- CLI `completion json` emits a parseable command spec, and shell-specific completion scripts include top-level commands, subcommands, and options.
 - CLI `doctor --json --require-*` exits non-zero when a requested API-key, workspace-config, or trusted-policy-bundle condition is not met; run the strict flags that match the planned demo workspace.
 - CLI `doctor` reports provider retry settings.
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.

@@ -29,6 +29,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Structured Web diff rendering for live event output, approval details, and session replay, with multi-file unified diffs split into readable blocks and a split before/after review mode for focused file changes.
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
+- CLI `completion` generation for PowerShell, bash, zsh, and JSON command specs.
 - Shared release evidence reports through core, CLI, server API, and Web/Desktop, aggregating config provenance, policy-bundle status, eval evidence, security scan metadata, provider-key status, and recent session summaries.
 - Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
 - Web/Desktop Markdown downloads for release evidence and distribution preflight reports, reusing the same server exporters as CLI/API.
@@ -92,6 +93,6 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add richer DLP classification and policy-controlled OCR.
 - Add richer generated-asset handling and file-type policies.
 - Add kernel-level shell sandboxing or remote isolated execution workers.
-- Add packaged desktop installers, signed releases, and auto-update policy.
+- Add packaged CLI binaries plus packaged desktop installers, signed releases, and auto-update policy.
 - Add semantic eval scoring, benchmark tasks, and regression suites inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.
