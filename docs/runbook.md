@@ -365,7 +365,7 @@ CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent eve
 
 `release evidence` aggregates workspace config provenance, policy-bundle verification, eval evidence, security scan metadata, provider-key status, and recent session summaries into one Markdown or JSON report. It is intended as an interview or CI evidence artifact; it does not replace the individual tests, eval runs, or security review.
 
-`release preflight` checks the product root for expected root scripts, Web/Desktop/CLI/server build scripts, Desktop bootstrap safety settings, built artifacts, required docs, and ignored local-state paths. Missing built artifacts warn so a source-only checkout can still be reviewed, while missing scripts, docs, or safety settings fail the gate.
+`release preflight` checks the product root for expected root scripts, Web/Desktop/CLI/server build scripts, CLI bin/completion readiness, Desktop bootstrap safety settings, built artifacts, required docs, and ignored local-state paths. Missing built artifacts warn so a source-only checkout can still be reviewed, while missing scripts, docs, CLI packaging metadata, or safety settings fail the gate.
 
 `security scan` is a read-only preflight for existing probable secrets. Use `--json` for CI artifacts and `--fail-on-findings` when a workspace should fail the gate if any finding metadata is reported. The command reports finding type and label only; it does not print matched values.
 

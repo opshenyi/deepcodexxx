@@ -29,6 +29,8 @@ describe("distribution preflight", () => {
     expect(report.summary.fail).toBe(0);
     expect(report.summary.warn).toBe(0);
     expect(report.summary.ready).toBe(true);
+    expect(report.checks.find((check) => check.id === "cli-bin-entry")?.status).toBe("pass");
+    expect(report.checks.find((check) => check.id === "cli-completion-command")?.status).toBe("pass");
     expect(report.checks.find((check) => check.id === "desktop-sandbox")?.status).toBe("pass");
     expect(report.checks.find((check) => check.id === "web-dist")?.status).toBe("pass");
   });
@@ -40,6 +42,20 @@ describe("distribution preflight", () => {
 
     expect(report.checks.find((check) => check.id === "script-verify")?.status).toBe("fail");
     expect(report.checks.find((check) => check.id === "web-dist")?.status).toBe("warn");
+    expect(report.summary.ready).toBe(false);
+  });
+
+  it("fails when CLI packaging polish is missing", async () => {
+    tempDir = await createProductFixture({
+      includeArtifacts: true,
+      omitCliBin: true,
+      omitCliCompletionCommand: true
+    });
+
+    const report = await createDistributionPreflightReport(tempDir);
+
+    expect(report.checks.find((check) => check.id === "cli-bin-entry")?.status).toBe("fail");
+    expect(report.checks.find((check) => check.id === "cli-completion-command")?.status).toBe("fail");
     expect(report.summary.ready).toBe(false);
   });
 
@@ -59,7 +75,12 @@ describe("distribution preflight", () => {
   });
 });
 
-async function createProductFixture(options: { includeArtifacts: boolean; omitVerifyScript?: boolean }): Promise<string> {
+async function createProductFixture(options: {
+  includeArtifacts: boolean;
+  omitVerifyScript?: boolean;
+  omitCliBin?: boolean;
+  omitCliCompletionCommand?: boolean;
+}): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
   await mkdir(path.join(root, "apps", "cli"), { recursive: true });
   await mkdir(path.join(root, "apps", "server"), { recursive: true });
@@ -78,7 +99,16 @@ async function createProductFixture(options: { includeArtifacts: boolean; omitVe
       "start:desktop": "npm run build && npm run start -w @deepcodex/desktop"
     }
   });
-  await writePackage(path.join(root, "apps", "cli", "package.json"), { build: "tsc -p tsconfig.json" });
+  await mkdir(path.join(root, "apps", "cli", "src"), { recursive: true });
+  await writeJson(path.join(root, "apps", "cli", "package.json"), {
+    ...(options.omitCliBin ? {} : { bin: { deepcodex: "dist/index.js" } }),
+    scripts: { build: "tsc -p tsconfig.json" }
+  });
+  await writeFile(
+    path.join(root, "apps", "cli", "src", "index.ts"),
+    options.omitCliCompletionCommand ? "program.command('doctor');\n" : 'program.command("completion");\n',
+    "utf8"
+  );
   await writePackage(path.join(root, "apps", "server", "package.json"), { build: "tsc -p tsconfig.json" });
   await writePackage(path.join(root, "apps", "web", "package.json"), { build: "vite build" });
   await writeJson(path.join(root, "apps", "desktop", "package.json"), {

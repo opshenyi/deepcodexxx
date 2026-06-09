@@ -31,7 +31,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
 - CLI `completion` generation for PowerShell, bash, zsh, and JSON command specs.
 - Shared release evidence reports through core, CLI, server API, and Web/Desktop, aggregating config provenance, policy-bundle status, eval evidence, security scan metadata, provider-key status, and recent session summaries.
-- Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
+- Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
 - Web/Desktop Markdown downloads for release evidence and distribution preflight reports, reusing the same server exporters as CLI/API.
 - Built-in and workspace-defined read-only smoke evals for repository mapping, safety review, release-evidence review, and team-specific checks, with exact expected-signal scoring, CI threshold flags, optional recorded local eval history, cross-run comparison reports, shared server APIs, CLI report aggregation, and a Web/Desktop Eval evidence panel.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
@@ -76,7 +76,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
 | Eval evidence | `docs/evals.md` | Repeatable built-in and workspace-defined read-only smoke tasks, scoring behavior, CI thresholds, optional local history, cross-run comparison, CLI/API report aggregation, Web/Desktop visibility, and current scoring limits. |
 | Release evidence report | `deepcodex release evidence` and Web/Desktop right rail | Single readiness artifact spanning config, policy, evals, security scan, provider-key status, and recent sessions. |
-| Distribution preflight report | `deepcodex release preflight` and Web/Desktop right rail | Delivery gate for scripts, three-client/server build coverage, Desktop bootstrap safety, docs, artifacts, and ignored local state. |
+| Distribution preflight report | `deepcodex release preflight` and Web/Desktop right rail | Delivery gate for scripts, three-client/server build coverage, CLI bin/completion readiness, Desktop bootstrap safety, docs, artifacts, and ignored local state. |
 
 ## Readiness Levels
 

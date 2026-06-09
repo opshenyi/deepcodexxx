@@ -42,6 +42,7 @@ export async function createDistributionPreflightReport(
     serverPackageRaw,
     webPackageRaw,
     desktopPackageRaw,
+    cliSource,
     desktopMain,
     gitignore
   ] = await Promise.all([
@@ -50,6 +51,7 @@ export async function createDistributionPreflightReport(
     readOptionalText(path.join(root, "apps", "server", "package.json")),
     readOptionalText(path.join(root, "apps", "web", "package.json")),
     readOptionalText(path.join(root, "apps", "desktop", "package.json")),
+    readOptionalText(path.join(root, "apps", "cli", "src", "index.ts")),
     readOptionalText(path.join(root, "apps", "desktop", "src", "main.ts")),
     readOptionalText(path.join(root, ".gitignore"))
   ]);
@@ -57,6 +59,7 @@ export async function createDistributionPreflightReport(
   const checks = [
     ...createScriptChecks(rootPackageRaw),
     ...createClientPackageChecks(cliPackageRaw, serverPackageRaw, webPackageRaw, desktopPackageRaw),
+    ...createCliChecks(cliPackageRaw, cliSource),
     ...createDesktopChecks(desktopPackageRaw, desktopMain),
     ...(await createArtifactChecks(root)),
     ...(await createDocChecks(root)),
@@ -127,6 +130,25 @@ function createClientPackageChecks(
     createPackageBuildCheck(serverPackageRaw, "server-package", "Server package", "client"),
     createPackageBuildCheck(webPackageRaw, "web-package", "Web package", "client"),
     createPackageBuildCheck(desktopPackageRaw, "desktop-package", "Desktop package", "client")
+  ];
+}
+
+function createCliChecks(cliPackageRaw: string | undefined, cliSource: string | undefined): DistributionPreflightCheck[] {
+  const cliPackage = cliPackageRaw ? parseJsonObject(cliPackageRaw, "apps/cli/package.json") : {};
+  const bin = readRecord(cliPackage.bin);
+  const deepcodexBin = bin.deepcodex;
+  return [
+    {
+      id: "cli-bin-entry",
+      area: "client",
+      label: "CLI binary entry",
+      status: deepcodexBin === "dist/index.js" ? "pass" : "fail",
+      detail:
+        deepcodexBin === "dist/index.js"
+          ? "apps/cli package exposes deepcodex -> dist/index.js."
+          : "apps/cli package should expose bin.deepcodex as dist/index.js."
+    },
+    createSourceContainsCheck(cliSource, "cli-completion-command", "CLI completion command", ".command(\"completion\")", "client")
   ];
 }
 
