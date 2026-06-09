@@ -348,17 +348,23 @@ function eventDetails(event: AgentEvent): string {
     case "assistant_message":
       return event.content;
     case "tool_approval_requested":
-      return `reason: ${event.reason}\nrequestedAt: ${event.requestedAt}\ninput:\n${formatEventValue(event.input)}`;
+      return withFileAudit(
+        `reason: ${event.reason}\nrequestedAt: ${event.requestedAt}\ninput:\n${formatEventValue(event.input)}`,
+        event.fileAudits
+      );
     case "tool_approval_resolved":
-      return `approved: ${event.approved}\nreason: ${event.reason ?? "No reason provided."}\nactor: ${
+      return withFileAudit(
+        `approved: ${event.approved}\nreason: ${event.reason ?? "No reason provided."}\nactor: ${
         event.actor ?? "unknown"
       }\nrequestedAt: ${event.requestedAt}\nresolvedAt: ${event.resolvedAt}\ndecisionLatencyMs: ${
         event.decisionLatencyMs
-      }`;
+      }`,
+        event.fileAudits
+      );
     case "tool_started":
       return formatEventValue(event.input);
     case "tool_finished":
-      return event.output;
+      return event.audit?.files ? `${event.output}\n\nFile audit\n${formatEventValue(event.audit.files)}` : event.output;
     case "final":
       return event.content;
     case "error":
@@ -381,6 +387,10 @@ function formatEventValue(value: unknown): string {
     return value;
   }
   return JSON.stringify(value, null, 2) ?? String(value);
+}
+
+function withFileAudit(value: string, fileAudits: unknown): string {
+  return fileAudits ? `${value}\n\nfileAudits:\n${formatEventValue(fileAudits)}` : value;
 }
 
 function codeFence(value: string): string {

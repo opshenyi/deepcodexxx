@@ -72,7 +72,7 @@ Recommended demo flow:
 2. Start in `suggest` mode for inspection-only prompts.
 3. Use `workspace-write` only on a disposable branch or sample workspace.
 4. Set `Tool approvals` to `Manual` when demonstrating write, shell, or memory safety gates.
-5. Watch the event stream for approvals, tool starts, tool results, errors, and final answer.
+5. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
 6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
 7. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
 8. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
@@ -166,6 +166,8 @@ Tool approval modes:
 | `deny` | Mutating tool calls are rejected after the approval event is recorded. | Dry runs that prove mutation cannot proceed. |
 
 Approval audit events record request time, decision time, decision latency, and actor in the live event stream and persisted session history.
+
+For `write_file` and `edit_file`, approval and tool result events also include file audit metadata when the path can be resolved. The approval request records the before-file SHA-256 snapshot; the tool result records before/after SHA-256 snapshots and whether the change was applied or only previewed.
 
 ## Troubleshooting
 

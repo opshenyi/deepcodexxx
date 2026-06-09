@@ -8,6 +8,7 @@ import {
   normalizeBudgetPolicy
 } from "./budget.js";
 import { DeepSeekClient } from "./deepseek.js";
+import { createApprovalFileAudits } from "./file-audit.js";
 import { readWorkspaceMemory } from "./memory.js";
 import { createDefaultTools } from "./tools.js";
 import type { AgentEvent, AgentRunOptions, AgentRunResult, ChatMessage, RuntimeTool, ToolApprovalRisk } from "./types.js";
@@ -141,13 +142,15 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
           const approvalId = randomUUID();
           const reason = approvalReason(call.function.name, risk);
           const requestedAt = new Date().toISOString();
+          const fileAudits = await createApprovalFileAudits(call.function.name, input, workspace);
           const approvalRequest = {
             approvalId,
             name: call.function.name,
             input,
             risk,
             reason,
-            requestedAt
+            requestedAt,
+            fileAudits
           };
           await emit({ type: "tool_approval_requested", ...approvalRequest });
           const decision = await options.requestToolApproval(approvalRequest);
@@ -161,7 +164,8 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
             requestedAt,
             resolvedAt,
             decisionLatencyMs: Math.max(0, Date.parse(resolvedAt) - Date.parse(requestedAt)),
-            actor: decision.actor ?? "approval-handler"
+            actor: decision.actor ?? "approval-handler",
+            fileAudits
           });
 
           if (!decision.approved) {
@@ -181,7 +185,13 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
       const result = tool
         ? await tool.run(input, { workspace })
         : { ok: false, content: `Unknown tool: ${call.function.name}` };
-      await emit({ type: "tool_finished", name: call.function.name, output: result.content, ok: result.ok });
+      await emit({
+        type: "tool_finished",
+        name: call.function.name,
+        output: result.content,
+        ok: result.ok,
+        audit: result.audit
+      });
       messages.push({
         role: "tool",
         tool_call_id: call.id,

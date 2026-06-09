@@ -7,7 +7,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Boundary | Current behavior | Commercial requirement |
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
-| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata. | Add approval file hashes and shell isolation. |
+| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, and optional token/cost budgets can stop further work after a limit is reached. | Add secrets management, provider allowlists, and managed pricing policy. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
@@ -25,7 +25,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Mode | Current enforcement | Recommended demo use |
 | --- | --- | --- |
 | `auto` | Mutating tools execute after workspace policy checks. | Fast demos in disposable workspaces. |
-| `manual` | `write_file`, `edit_file`, `run_command`, and `append_memory` emit an approval request and wait for Web or CLI approval before execution. Approval events include request time, decision time, decision latency, and actor. | Interview demos where the reviewer wants to see safety gates. |
+| `manual` | `write_file`, `edit_file`, `run_command`, and `append_memory` emit an approval request and wait for Web or CLI approval before execution. Approval events include request time, decision time, decision latency, actor, and before-file hashes for write/edit tools when available. | Interview demos where the reviewer wants to see safety gates. |
 | `deny` | Mutating tool calls are denied after the approval event is recorded with a policy actor. | Dry runs that should prove no mutation can proceed. |
 
 ## File Access Controls
@@ -38,6 +38,7 @@ Implemented controls:
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
+- File write and edit approval/tool events include SHA-256 file audit metadata. In preview mode, the proposed after-hash is recorded with `applied: false`; in write mode, before/after hashes are recorded with `applied: true`.
 - Search and list operations are bounded to reduce runaway traversal.
 - Large tool outputs are truncated before being returned to the model.
 
@@ -95,7 +96,7 @@ Current limitations:
 The next security work should prioritize:
 
 - Richer generated-asset handling and file-type policies.
-- Approval file hashes and policy profile metadata.
+- Policy profile metadata.
 - Managed provider pricing profiles for budget policy.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

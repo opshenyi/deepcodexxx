@@ -19,6 +19,7 @@ type AgentEvent =
       risk: "workspace-write" | "shell" | "memory";
       reason: string;
       requestedAt: string;
+      fileAudits?: FileAuditEntry[];
     }
   | {
       type: "tool_approval_resolved";
@@ -30,9 +31,10 @@ type AgentEvent =
       resolvedAt: string;
       decisionLatencyMs: number;
       actor?: string;
+      fileAudits?: FileAuditEntry[];
     }
   | { type: "tool_started"; name: string; input: unknown }
-  | { type: "tool_finished"; name: string; output: string; ok: boolean }
+  | { type: "tool_finished"; name: string; output: string; ok: boolean; audit?: ToolAuditMetadata }
   | { type: "step"; index: number; maxSteps: number }
   | { type: "final"; content: string }
   | { type: "error"; message: string };
@@ -77,6 +79,25 @@ type BudgetSnapshot = {
   remainingUsd?: number;
 };
 
+type FileHashSnapshot = {
+  exists: boolean;
+  sha256?: string;
+  bytes?: number;
+  error?: string;
+};
+
+type FileAuditEntry = {
+  path: string;
+  operation?: "write" | "edit";
+  before?: FileHashSnapshot;
+  after?: FileHashSnapshot;
+  applied?: boolean;
+};
+
+type ToolAuditMetadata = {
+  files?: FileAuditEntry[];
+};
+
 type SessionSummary = {
   sessionId: string;
   workspace: string;
@@ -109,6 +130,7 @@ type PendingApproval = {
   risk: "workspace-write" | "shell" | "memory";
   reason: string;
   requestedAt: string;
+  fileAudits?: FileAuditEntry[];
 };
 
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
@@ -457,7 +479,8 @@ function App() {
             input: event.input,
             risk: event.risk,
             reason: event.reason,
-            requestedAt: formatStoredTime(event.requestedAt)
+            requestedAt: formatStoredTime(event.requestedAt),
+            fileAudits: event.fileAudits
           }
         ]);
         break;
@@ -854,7 +877,7 @@ function App() {
                   </div>
                   <div className="sessionRowMeta">{approval.requestedAt}</div>
                   <p className="approvalReason">{approval.reason}</p>
-                  <pre className="approvalInput">{formatBody(approval.input)}</pre>
+                  <pre className="approvalInput">{formatApprovalDetails(approval.input, approval.fileAudits)}</pre>
                   <div className="approvalActions">
                     <button type="button" onClick={() => resolveApproval(approval.approvalId, true)}>
                       Approve
@@ -1007,6 +1030,47 @@ function formatBody(value: unknown) {
   return serialized ?? String(value);
 }
 
+function formatApprovalDetails(input: unknown, fileAudits?: FileAuditEntry[]) {
+  const audit = formatFileAudits(fileAudits);
+  return audit ? `${formatBody(input)}\n\nFile audit\n${audit}` : formatBody(input);
+}
+
+function formatToolOutput(output: string, audit?: ToolAuditMetadata) {
+  const fileAudit = formatFileAudits(audit?.files);
+  return fileAudit ? `${output}\n\nFile audit\n${fileAudit}` : output;
+}
+
+function formatFileAudits(fileAudits?: FileAuditEntry[]) {
+  if (!fileAudits || fileAudits.length === 0) {
+    return "";
+  }
+  return fileAudits
+    .map((entry) => {
+      const status = entry.applied === undefined ? "" : entry.applied ? "applied" : "preview";
+      return [
+        `${entry.path}${entry.operation ? ` (${entry.operation})` : ""}${status ? ` ${status}` : ""}`,
+        `before: ${formatFileSnapshot(entry.before)}`,
+        entry.after ? `after: ${formatFileSnapshot(entry.after)}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+}
+
+function formatFileSnapshot(snapshot?: FileHashSnapshot) {
+  if (!snapshot) {
+    return "not captured";
+  }
+  if (snapshot.error) {
+    return snapshot.error;
+  }
+  if (!snapshot.exists) {
+    return "missing";
+  }
+  return `sha256:${snapshot.sha256?.slice(0, 12) ?? "unknown"} bytes:${snapshot.bytes ?? 0}`;
+}
+
 function formatBudgetStatus(budget: BudgetSnapshot | null): string {
   if (!budget) {
     return "Optional";
@@ -1132,7 +1196,10 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         tone: "accent",
         title: event.name,
         meta: `${event.risk} / requested ${formatStoredTime(event.requestedAt)}`,
-        body: `${event.reason}\n\nRequested: ${formatStoredDateTime(event.requestedAt)}\n\n${formatBody(event.input)}`
+        body: `${event.reason}\n\nRequested: ${formatStoredDateTime(event.requestedAt)}\n\n${formatApprovalDetails(
+          event.input,
+          event.fileAudits
+        )}`
       };
     case "tool_approval_resolved":
       return {
@@ -1144,7 +1211,7 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         meta: `${event.approved ? "Approved" : "Denied"} / ${event.actor ?? "unknown"} / ${event.decisionLatencyMs}ms`,
         body: `${event.reason ?? "No reason provided."}\n\nRequested: ${formatStoredDateTime(
           event.requestedAt
-        )}\nResolved: ${formatStoredDateTime(event.resolvedAt)}`
+        )}\nResolved: ${formatStoredDateTime(event.resolvedAt)}${formatFileAudits(event.fileAudits) ? `\n\nFile audit\n${formatFileAudits(event.fileAudits)}` : ""}`
       };
     case "tool_started":
       return {
@@ -1164,7 +1231,7 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         tone: event.ok ? "good" : "bad",
         title: event.name,
         meta: event.ok ? "Tool completed" : "Tool failed",
-        body: event.output
+        body: formatToolOutput(event.output, event.audit)
       };
     case "final":
       return {

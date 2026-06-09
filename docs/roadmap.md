@@ -14,8 +14,8 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Phase | Goal | Work items | Exit criteria |
 | --- | --- | --- | --- |
-| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, tool loop, token accounting, budget controls, workspace guardrails, approval metadata, audit export, memory, Web session replay, Desktop, CLI, docs. | Checklist passes and limitations are documented. |
-| Phase 1: safer local agent | Make local write-mode use easier to trust. | Approval file hashes, shell isolation, generated-asset policies. | User can approve each write or shell command with a visible diff or command body, and review the decision later. |
+| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, tool loop, token accounting, budget controls, workspace guardrails, approval metadata, file hash auditing, audit export, memory, Web session replay, Desktop, CLI, docs. | Checklist passes and limitations are documented. |
+| Phase 1: safer local agent | Make local write-mode use easier to trust. | Shell isolation, generated-asset policies, reusable policy profiles. | User can approve each write or shell command with a visible diff or command body, and review the decision later. |
 | Phase 2: product operations | Make demos repeatable and measurable. | Structured run history, audit retention controls, managed pricing profiles, benchmark tasks, regression evals. | A release can compare behavior across model/config changes. |
 | Phase 3: desktop release | Move beyond development Electron launch. | Packaged installers, signing, update policy, crash reporting plan, OS-specific smoke tests. | A reviewer can install and run Desktop without starting dev servers manually. |
 | Phase 4: team pilot | Support controlled internal use. | Config profiles, shared policy templates, secrets redaction, team documentation, pilot feedback loop. | A small team can run DeepCodex on approved repositories with documented support boundaries. |
@@ -25,7 +25,6 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Item | Why it matters | Suggested owner area |
 | --- | --- | --- |
-| Approval file hashes | Makes approved writes easier to verify after a run. | Core, server, Web. |
 | Diff viewer UI | Lets users inspect generated diffs with better affordances. | Web, CLI. |
 | Audit retention controls | Keeps exported and local audit history manageable for pilots. | Server, storage, clients. |
 | Generated-asset policies | Prevent generated assets and specialized file types from overwhelming model context or memory. | Core, config. |

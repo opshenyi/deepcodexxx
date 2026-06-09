@@ -99,7 +99,14 @@ describe("session store", () => {
       input: { path: "README.md" },
       risk: "workspace-write",
       reason: "write_file can change files in the selected workspace.",
-      requestedAt: "2026-06-09T00:00:00.000Z"
+      requestedAt: "2026-06-09T00:00:00.000Z",
+      fileAudits: [
+        {
+          path: "README.md",
+          operation: "write",
+          before: { exists: true, sha256: "a".repeat(64), bytes: 10 }
+        }
+      ]
     });
     await recorder.record({
       type: "tool_approval_resolved",
@@ -110,7 +117,31 @@ describe("session store", () => {
       requestedAt: "2026-06-09T00:00:00.000Z",
       resolvedAt: "2026-06-09T00:00:01.250Z",
       decisionLatencyMs: 1250,
-      actor: "test-suite"
+      actor: "test-suite",
+      fileAudits: [
+        {
+          path: "README.md",
+          operation: "write",
+          before: { exists: true, sha256: "a".repeat(64), bytes: 10 }
+        }
+      ]
+    });
+    await recorder.record({
+      type: "tool_finished",
+      name: "write_file",
+      ok: true,
+      output: "Wrote README.md",
+      audit: {
+        files: [
+          {
+            path: "README.md",
+            operation: "write",
+            before: { exists: true, sha256: "a".repeat(64), bytes: 10 },
+            after: { exists: true, sha256: "b".repeat(64), bytes: 12 },
+            applied: true
+          }
+        ]
+      }
     });
     await recorder.record({ type: "final", content: "done" });
 
@@ -119,12 +150,14 @@ describe("session store", () => {
     expect(markdown).toContain("# DeepCodex Session Export");
     expect(markdown).toContain("session-export");
     expect(markdown).toContain("Approval approved for write_file by test-suite in 1250ms.");
+    expect(markdown).toContain("fileAudits");
+    expect(markdown).toContain("Wrote README.md");
     expect(markdown).toContain("- Token Budget: none");
     expect(markdown).toContain("## Final Response");
 
     const json = JSON.parse(exportSessionHistory(session, "json")) as { sessionId: string; eventCount: number };
     expect(json.sessionId).toBe("session-export");
-    expect(json.eventCount).toBe(4);
+    expect(json.eventCount).toBe(5);
   });
 
   it("parses session export formats", () => {

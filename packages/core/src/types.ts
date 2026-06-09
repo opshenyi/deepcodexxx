@@ -57,6 +57,25 @@ export interface BudgetSnapshot {
 
 export type BudgetLimitReason = "tokens" | "cost";
 
+export interface FileHashSnapshot {
+  exists: boolean;
+  sha256?: string;
+  bytes?: number;
+  error?: string;
+}
+
+export interface FileAuditEntry {
+  path: string;
+  operation?: "write" | "edit";
+  before?: FileHashSnapshot;
+  after?: FileHashSnapshot;
+  applied?: boolean;
+}
+
+export interface ToolAuditMetadata {
+  files?: FileAuditEntry[];
+}
+
 export type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
   | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
@@ -71,6 +90,7 @@ export type AgentEvent =
       risk: ToolApprovalRisk;
       reason: string;
       requestedAt: string;
+      fileAudits?: FileAuditEntry[];
     }
   | {
       type: "tool_approval_resolved";
@@ -82,9 +102,10 @@ export type AgentEvent =
       resolvedAt: string;
       decisionLatencyMs: number;
       actor?: string;
+      fileAudits?: FileAuditEntry[];
     }
   | { type: "tool_started"; name: string; input: unknown }
-  | { type: "tool_finished"; name: string; output: string; ok: boolean }
+  | { type: "tool_finished"; name: string; output: string; ok: boolean; audit?: ToolAuditMetadata }
   | { type: "step"; index: number; maxSteps: number }
   | { type: "final"; content: string }
   | { type: "error"; message: string };
@@ -101,6 +122,7 @@ export interface ToolApprovalRequest {
   risk: ToolApprovalRisk;
   reason: string;
   requestedAt: string;
+  fileAudits?: FileAuditEntry[];
 }
 
 export interface ToolApprovalDecision {
@@ -191,6 +213,7 @@ export interface ToolRuntime {
 export interface ToolResult {
   ok: boolean;
   content: string;
+  audit?: ToolAuditMetadata;
 }
 
 export interface RuntimeTool {

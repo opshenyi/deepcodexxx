@@ -2,6 +2,8 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
+Core safety features include workspace path guardrails, manual tool approvals, diff-producing write/edit tools, file hash audit metadata, session replay/export, and run-level token or estimated-cost budgets.
+
 ## Quick Start
 
 ```powershell

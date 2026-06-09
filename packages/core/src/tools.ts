@@ -1,11 +1,11 @@
 import { exec } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
 import { assertShellCommandAllowed, canWriteFiles, truncateForModel } from "./safety.js";
-import type { RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
+import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
 import { isDeniedByPatterns, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
 const execAsync = promisify(exec);
@@ -109,14 +109,23 @@ const writeFileTool: RuntimeTool = {
     if (exceedsFileLimit(Buffer.byteLength(next, "utf8"), runtime)) {
       return fail(`Content exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
-    const previous = await readFile(target, "utf8").catch(() => "");
+    const previousBuffer = await readFile(target).catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return undefined;
+      }
+      throw error;
+    });
+    const previous = previousBuffer?.toString("utf8") ?? "";
     const diff = createUnifiedDiff(rel, previous, next);
+    const nextBuffer = Buffer.from(next, "utf8");
+    const audit = fileAudit(rel, "write", previousBuffer, nextBuffer, false);
     if (!canWriteFiles(runtime.workspace.policy)) {
-      return ok(`Preview only. File writes are disabled by the current approval policy.\n\n${diff}`);
+      return ok(`Preview only. File writes are disabled by the current approval policy.\n\n${diff}`, { files: [audit] });
     }
     await writeFile(target, next, "utf8");
-    const hash = createHash("sha256").update(next).digest("hex").slice(0, 12);
-    return ok(`Wrote ${rel} sha256:${hash}\n\n${diff}`);
+    return ok(`Wrote ${rel} sha256:${audit.after?.sha256?.slice(0, 12) ?? "unknown"}\n\n${diff}`, {
+      files: [{ ...audit, applied: true }]
+    });
   }
 };
 
@@ -148,21 +157,24 @@ const editFileTool: RuntimeTool = {
     if (exceedsFileLimit(targetStat.size, runtime)) {
       return fail(`File exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
-    const current = await readUtf8TextFile(target);
-    if (current === undefined) {
+    const currentBuffer = await readFile(target);
+    if (isProbablyBinary(currentBuffer)) {
       return fail(`File appears to be binary: ${rel}`);
     }
+    const current = currentBuffer.toString("utf8");
     const search = stringValue(args.search);
     if (!current.includes(search)) {
       return fail(`Search text was not found in ${rel}`);
     }
     const next = current.replace(search, stringValue(args.replace));
     const diff = createUnifiedDiff(rel, current, next);
+    const nextBuffer = Buffer.from(next, "utf8");
+    const audit = fileAudit(rel, "edit", currentBuffer, nextBuffer, false);
     if (!canWriteFiles(runtime.workspace.policy)) {
-      return ok(`Preview only. File edits are disabled by the current approval policy.\n\n${diff}`);
+      return ok(`Preview only. File edits are disabled by the current approval policy.\n\n${diff}`, { files: [audit] });
     }
     await writeFile(target, next, "utf8");
-    return ok(`Edited ${rel}\n\n${diff}`);
+    return ok(`Edited ${rel}\n\n${diff}`, { files: [{ ...audit, applied: true }] });
   }
 };
 
@@ -366,12 +378,28 @@ function numberValue(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function ok(content: string): ToolResult {
-  return { ok: true, content };
+function ok(content: string, audit?: ToolResult["audit"]): ToolResult {
+  return audit ? { ok: true, content, audit } : { ok: true, content };
 }
 
 function fail(content: string): ToolResult {
   return { ok: false, content };
+}
+
+function fileAudit(
+  relativePath: string,
+  operation: FileAuditEntry["operation"],
+  beforeBuffer: Buffer | undefined,
+  afterBuffer: Buffer,
+  applied: boolean
+): FileAuditEntry {
+  return {
+    path: relativePath,
+    operation,
+    before: beforeBuffer ? createBufferHashSnapshot(beforeBuffer) : { exists: false },
+    after: createBufferHashSnapshot(afterBuffer),
+    applied
+  };
 }
 
 function exceedsFileLimit(size: number, runtime: ToolRuntime): boolean {
@@ -402,6 +430,10 @@ function isProbablyBinary(buffer: Buffer): boolean {
     }
   }
   return suspicious / sample.length > 0.08;
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function createUnifiedDiff(relativePath: string, before: string, after: string): string {

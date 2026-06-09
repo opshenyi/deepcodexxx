@@ -15,6 +15,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
+- File write/edit approvals and tool results include SHA-256 file audit metadata when file paths can be resolved.
 - Token usage events are recorded when the provider returns usage metadata.
 - Run-level token and estimated cost budgets can stop additional tool or model work after provider usage reaches the configured limit.
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
@@ -42,13 +43,13 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, diff-producing tools, manual approvals, and strict read-only inspection; still needs sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, diff-producing tools, file hash audit metadata, manual approvals, and strict read-only inspection; still needs sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
 ## Next Commercial Milestones
 
-- Add approval file hashes and reusable policy profiles.
+- Add reusable policy profiles.
 - Add audit retention controls and redaction policies.
 - Add richer generated-asset handling and file-type policies.
 - Add managed pricing profiles and per-workspace budget policy templates.

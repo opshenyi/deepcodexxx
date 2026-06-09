@@ -19,6 +19,9 @@ import type {
   ApprovalPolicy,
   BudgetPolicy,
   BudgetSnapshot,
+  FileAuditEntry,
+  FileHashSnapshot,
+  ToolAuditMetadata,
   SessionEventRecorder,
   ToolApprovalDecision,
   ToolApprovalRequest
@@ -258,7 +261,7 @@ function printEvent(event: AgentEvent): void {
       console.log(chalk.cyan(`tool ${event.name}`));
       break;
     case "tool_finished":
-      console.log(event.ok ? chalk.green(event.output) : chalk.red(event.output));
+      console.log(event.ok ? chalk.green(formatToolOutput(event.output, event.audit)) : chalk.red(formatToolOutput(event.output, event.audit)));
       break;
     case "final":
       console.log(chalk.bold("\nfinal"));
@@ -401,7 +404,7 @@ function createCliApprovalHandler(
     console.log(chalk.yellow("\nTool approval required"));
     console.log(`${request.name} (${request.risk})`);
     console.log(request.reason);
-    console.log(formatApprovalInput(request.input));
+    console.log(formatApprovalInput(request.input, request.fileAudits));
     const answer = (await rl.question("Approve this tool call? [y/N] ")).trim().toLowerCase();
     const approved = answer === "y" || answer === "yes";
     return {
@@ -412,12 +415,54 @@ function createCliApprovalHandler(
   };
 }
 
-function formatApprovalInput(inputValue: unknown): string {
+function formatApprovalInput(inputValue: unknown, fileAudits?: FileAuditEntry[]): string {
+  const audit = formatFileAudits(fileAudits);
+  const inputText = formatValue(inputValue);
+  return audit ? `${inputText}\n\nFile audit\n${audit}` : inputText;
+}
+
+function formatToolOutput(outputValue: string, audit?: ToolAuditMetadata): string {
+  const fileAudit = formatFileAudits(audit?.files);
+  return fileAudit ? `${outputValue}\n\nFile audit\n${fileAudit}` : outputValue;
+}
+
+function formatValue(inputValue: unknown): string {
   if (typeof inputValue === "string") {
     return inputValue;
   }
   const serialized = JSON.stringify(inputValue, null, 2);
   return serialized ?? String(inputValue);
+}
+
+function formatFileAudits(fileAudits?: FileAuditEntry[]): string {
+  if (!fileAudits || fileAudits.length === 0) {
+    return "";
+  }
+  return fileAudits
+    .map((entry) => {
+      const status = entry.applied === undefined ? "" : entry.applied ? "applied" : "preview";
+      return [
+        `${entry.path}${entry.operation ? ` (${entry.operation})` : ""}${status ? ` ${status}` : ""}`,
+        `before: ${formatFileSnapshot(entry.before)}`,
+        entry.after ? `after: ${formatFileSnapshot(entry.after)}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+}
+
+function formatFileSnapshot(snapshot?: FileHashSnapshot): string {
+  if (!snapshot) {
+    return "not captured";
+  }
+  if (snapshot.error) {
+    return snapshot.error;
+  }
+  if (!snapshot.exists) {
+    return "missing";
+  }
+  return `sha256:${snapshot.sha256?.slice(0, 12) ?? "unknown"} bytes:${snapshot.bytes ?? 0}`;
 }
 
 function createCliEventHandler(recorder?: SessionEventRecorder) {

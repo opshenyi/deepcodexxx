@@ -48,7 +48,17 @@ describe("agent approval risk", () => {
     });
 
     expect(events).toContainEqual(
-      expect.objectContaining({ type: "tool_approval_requested", requestedAt: expect.any(String) })
+      expect.objectContaining({
+        type: "tool_approval_requested",
+        requestedAt: expect.any(String),
+        fileAudits: [
+          expect.objectContaining({
+            path: "approval.txt",
+            operation: "write",
+            before: { exists: false }
+          })
+        ]
+      })
     );
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -58,7 +68,14 @@ describe("agent approval risk", () => {
         actor: "test-suite",
         requestedAt: expect.any(String),
         resolvedAt: expect.any(String),
-        decisionLatencyMs: expect.any(Number)
+        decisionLatencyMs: expect.any(Number),
+        fileAudits: [
+          expect.objectContaining({
+            path: "approval.txt",
+            operation: "write",
+            before: { exists: false }
+          })
+        ]
       })
     );
     expect(events).toContainEqual(
@@ -91,6 +108,23 @@ describe("agent approval risk", () => {
       })
     );
     expect(events).toContainEqual(expect.objectContaining({ type: "tool_started", name: "write_file" }));
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "tool_finished",
+        name: "write_file",
+        audit: {
+          files: [
+            expect.objectContaining({
+              path: "approval.txt",
+              operation: "write",
+              applied: true,
+              before: { exists: false },
+              after: expect.objectContaining({ exists: true, bytes: 9, sha256: expect.any(String) })
+            })
+          ]
+        }
+      })
+    );
     await expect(readFile(path.join(tempDir, "approval.txt"), "utf8")).resolves.toBe("approved\n");
   });
 

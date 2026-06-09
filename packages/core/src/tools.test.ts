@@ -30,6 +30,14 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain("Preview only");
     expect(result.content).toContain("+hello");
+    expect(result.audit?.files?.[0]).toMatchObject({
+      path: "preview.txt",
+      operation: "write",
+      applied: false,
+      before: { exists: false },
+      after: { exists: true, bytes: 6 }
+    });
+    expect(result.audit?.files?.[0]?.after?.sha256).toHaveLength(64);
     await expect(readFile(path.join(tempDir, "preview.txt"), "utf8")).rejects.toThrow();
   });
 
@@ -44,6 +52,13 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain("Wrote created.txt");
     expect(result.content).toContain("+created");
+    expect(result.audit?.files?.[0]).toMatchObject({
+      path: "created.txt",
+      operation: "write",
+      applied: true,
+      before: { exists: false },
+      after: { exists: true, bytes: 8 }
+    });
     await expect(readFile(path.join(tempDir, "created.txt"), "utf8")).resolves.toBe("created\n");
   });
 
@@ -63,6 +78,13 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain("-beta");
     expect(result.content).toContain("+gamma");
+    expect(result.audit?.files?.[0]).toMatchObject({
+      path: path.join("src", "app.txt"),
+      operation: "edit",
+      applied: true,
+      before: { exists: true, bytes: 11 },
+      after: { exists: true, bytes: 12 }
+    });
     await expect(readFile(path.join(tempDir, "src", "app.txt"), "utf8")).resolves.toBe("alpha\ngamma\n");
   });
 

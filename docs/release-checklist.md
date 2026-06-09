@@ -44,6 +44,7 @@ Checklist:
 - `suggest` mode can run a repository inspection prompt.
 - Event stream shows session start, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
+- Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
@@ -99,6 +100,7 @@ Checklist:
 - The task scope is narrow and reversible.
 - The presenter can explain which files changed.
 - Tests or typecheck are run after any product-code change.
+- Session replay/export includes before/after file hash audit metadata for write/edit tools.
 - Generated memory is reviewed before sharing the workspace.
 
 ## Go/No-Go Criteria
