@@ -47,7 +47,7 @@ const pendingApprovals = new Map<
   }
 >();
 
-app.use(cors());
+app.use(createCorsMiddleware());
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -321,6 +321,33 @@ function readWorkspace(value: unknown): string {
       ? value
       : process.env.DEEPCODEX_WORKSPACE || process.env.INIT_CWD || process.cwd();
   return input && input.trim() ? input : process.cwd();
+}
+
+function createCorsMiddleware() {
+  const allowedOrigins = readCorsOriginsFromEnv();
+  if (allowedOrigins.length === 0) {
+    return cors();
+  }
+  return cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    }
+  });
+}
+
+function readCorsOriginsFromEnv(): string[] {
+  const raw = process.env.DEEPCODEX_CORS_ORIGINS;
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(",")
+    .map((entry) => entry.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
 }
 
 type RunApprovalMode = "auto" | "manual" | "deny";

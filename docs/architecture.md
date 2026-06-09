@@ -28,6 +28,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
 - `.deepcodex/policy-bundle.json` can bind the active config SHA-256 to an Ed25519 signature that CLI/API verification checks against a trusted public key.
 - `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` makes CLI/server agent runs require a trusted policy bundle before model or tool execution starts.
+- Server CORS is permissive by default for local development and can be restricted with `DEEPCODEX_CORS_ORIGINS`.
 - Desktop production-like launches start the built server automatically when `DEEPCODEX_WEB_URL` is not set, wait for local health, then load the built Web client.
 - Dangerous shell commands are blocked unless `full-access` is selected.
 - Common shell network commands are blocked unless network access is explicitly enabled.

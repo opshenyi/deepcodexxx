@@ -103,7 +103,7 @@ Provider usage controls:
 Current limitations:
 
 - Shell network policy is pattern-based; OS-level network isolation is still future work.
-- CORS is open for local development and should be restricted before hosted use.
+- CORS is open by default for local development. Set `DEEPCODEX_CORS_ORIGINS` for controlled browser origins, and still add authentication before any non-local deployment.
 
 ## Redaction Controls
 

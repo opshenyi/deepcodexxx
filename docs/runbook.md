@@ -28,6 +28,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
 | `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
 | `DEEPCODEX_PORT` | Optional for server. | `17361` | Port used by the local server. |
+| `DEEPCODEX_CORS_ORIGINS` | Optional for server. | Empty. | Comma-separated browser origins allowed by CORS. Empty keeps permissive local-development CORS. |
 | `VITE_DEEPCODEX_SERVER_URL` | Optional for Web build/dev. | `http://127.0.0.1:17361` | Default API base shown in the Web Server field; users can override it at runtime in the sidebar. |
 | `DEEPCODEX_WORKSPACE` | Optional. | Current working directory. | Used by the server and CLI when a request does not pass a workspace path. |
 | `DEEPCODEX_DENIED_PATHS` | Optional. | Built-in defaults. | Comma-separated deny patterns such as `secrets,private/*.json,**/*.map`. Extends the default list. |
@@ -177,6 +178,8 @@ Runtime endpoints:
 - Health check: `http://127.0.0.1:17361/api/health`
 
 The Web sidebar includes a Server field. It defaults to `VITE_DEEPCODEX_SERVER_URL` or `http://127.0.0.1:17361`, normalizes host-only values such as `127.0.0.1:17361`, and saves the selected API base in browser local storage.
+
+For controlled demos, set `DEEPCODEX_CORS_ORIGINS=http://127.0.0.1:5173` or a comma-separated allowlist matching the Web origins you expect. Requests without an `Origin` header, such as local scripts and health checks, still work.
 
 Recommended demo flow:
 
@@ -378,6 +381,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
 | Web UI cannot run the agent. | Server is not listening or the Web Server field points at the wrong API base. | Open `/api/health`, then save the matching Server URL in the sidebar. |
+| Browser reports a CORS failure. | `DEEPCODEX_CORS_ORIGINS` does not include the Web origin. | Add the Web origin to `DEEPCODEX_CORS_ORIGINS` or leave it empty for local development. |
 | Desktop production-like launch opens but cannot run tasks. | Managed server did not start or the Web Server field points at another API base. | Use `npm run start:desktop`, check `/api/health`, and save the matching Server URL. |
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |

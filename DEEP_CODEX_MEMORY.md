@@ -63,6 +63,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Verified the Web server URL control with `npm run build -w @deepcodex/web`, `npm run typecheck`, and an in-app browser smoke: Server input rendered, Save server normalized/saved `http://127.0.0.1:17361`, status stayed `Default`, and console errors were zero.
 - Added CLI machine-readable output for automation: `deepcodex ask --json` emits newline-delimited JSON event records plus a final result record, and `deepcodex doctor --json` emits a structured diagnostics object. Prompt/manual approvals are rejected in `ask --json` to keep stdout machine-readable.
 - Verified CLI JSON output with `npm run build -w @deepcodex/cli`, `node apps/cli/dist/index.js doctor --json | ConvertFrom-Json`, and `node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "..."` parsed line-by-line as JSON.
+- Added optional server CORS origin allowlist through `DEEPCODEX_CORS_ORIGINS`. When unset the local development server keeps permissive CORS; when set, matching browser origins receive `Access-Control-Allow-Origin`, non-matching origins receive no CORS allow header, and no-origin local clients still work.
+- Verified CORS allowlisting by launching a temporary built server on port 17461 with `DEEPCODEX_CORS_ORIGINS=http://allowed.test`; allowed origin returned the CORS header, blocked origin did not, both health checks returned 200, and the temporary process was stopped.
 
 ## Architecture Decisions
 
