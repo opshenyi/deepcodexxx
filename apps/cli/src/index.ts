@@ -3,7 +3,7 @@ import "dotenv/config";
 import chalk from "chalk";
 import { Command } from "commander";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -46,6 +46,7 @@ import type {
   SessionEventRecorder,
   ToolApprovalDecision,
   ToolApprovalRequest,
+  WorkspaceContext,
   WorkspaceConfig
 } from "@deepcodex/core";
 
@@ -68,6 +69,22 @@ type EvalScore = {
   totalSignals: number;
   score: number;
   passed: boolean;
+};
+
+type EvalRunRecord = {
+  id: string;
+  evalId: string;
+  label: string;
+  workspace: string;
+  model: string;
+  sessionId: string;
+  createdAt: string;
+  prompt: string;
+  expectedSignals: string[];
+  score: EvalScore;
+  scoreThreshold?: number;
+  thresholdPassed: boolean;
+  finalText: string;
 };
 
 const builtInEvalTasks: BuiltInEvalTask[] = [
@@ -326,6 +343,7 @@ evals
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--min-score <number>", "Exit non-zero unless the eval score is at least this value from 0 to 1")
   .option("--require-pass", "Exit non-zero unless every expected signal is matched", false)
+  .option("--record", "Persist the eval result under .deepcodex/state/evals", false)
   .action(
     async (
       evalId: string,
@@ -340,6 +358,7 @@ evals
         pricingProfile?: string;
         minScore?: string;
         requirePass: boolean;
+        record: boolean;
       }
     ) => {
       const task = resolveEvalTask(evalId);
@@ -387,6 +406,21 @@ evals
         onEvent: options.json ? createCliJsonEventHandler() : createCliEventHandler()
       });
       const score = scoreEvalResult(task, result.finalText);
+      const thresholdFailed = evalScoreFailed(score, scoreThreshold);
+      const evalRecord =
+        options.record
+          ? await writeEvalRunRecord(
+              workspace,
+              createEvalRunRecord(task, {
+                workspaceRoot: workspace.root,
+                model: provider.model,
+                sessionId: result.sessionId,
+                finalText: result.finalText,
+                score,
+                scoreThreshold
+              })
+            )
+          : undefined;
 
       if (options.json) {
         console.log(
@@ -398,10 +432,11 @@ evals
             finalText: result.finalText,
             expectedSignals: task.expectedSignals,
             score,
-            scoreThreshold
+            scoreThreshold,
+            record: evalRecord
           })
         );
-        if (evalScoreFailed(score, scoreThreshold)) {
+        if (thresholdFailed) {
           process.exitCode = 1;
         }
         return;
@@ -413,12 +448,52 @@ evals
       if (score.missingSignals.length > 0) {
         console.log(`missing signals ${score.missingSignals.join(", ")}`);
       }
-      if (evalScoreFailed(score, scoreThreshold)) {
+      if (evalRecord) {
+        console.log(`record ${evalRecord.path}`);
+      }
+      if (thresholdFailed) {
         console.log(chalk.red("eval score threshold failed"));
         process.exitCode = 1;
       }
     }
   );
+
+evals
+  .command("history")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; json: boolean }) => {
+    const workspace = await createWorkspaceContext(options.workspace, { mode: "suggest" });
+    const records = await listEvalRunRecords(workspace);
+    if (options.json) {
+      console.log(JSON.stringify(records, null, 2));
+      return;
+    }
+    if (records.length === 0) {
+      console.log("No eval runs recorded.");
+      return;
+    }
+    for (const record of records) {
+      console.log(
+        `${record.id}  ${record.evalId}  score ${formatEvalScore(record.score)}  ${record.createdAt}  ${record.thresholdPassed ? "threshold passed" : "threshold failed"}`
+      );
+    }
+  });
+
+evals
+  .command("show-run")
+  .argument("<runId>", "Recorded eval run id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (runId: string, options: { workspace: string; json: boolean }) => {
+    const workspace = await createWorkspaceContext(options.workspace, { mode: "suggest" });
+    const record = await readEvalRunRecord(workspace, runId);
+    if (options.json) {
+      console.log(JSON.stringify(record, null, 2));
+      return;
+    }
+    printEvalRunRecord(record);
+  });
 
 config
   .command("show")
@@ -862,6 +937,130 @@ function formatEvalScore(score: EvalScore): string {
   return `${score.matchedSignals.length}/${score.totalSignals} (${score.score.toFixed(2)}) ${
     score.passed ? "passed" : "not passed"
   }`;
+}
+
+function createEvalRunRecord(
+  task: BuiltInEvalTask,
+  input: {
+    workspaceRoot: string;
+    model: string;
+    sessionId: string;
+    finalText: string;
+    score: EvalScore;
+    scoreThreshold?: number;
+  }
+): EvalRunRecord {
+  const createdAt = new Date().toISOString();
+  return {
+    id: createEvalRunId(task.id, input.sessionId, createdAt),
+    evalId: task.id,
+    label: task.label,
+    workspace: input.workspaceRoot,
+    model: input.model,
+    sessionId: input.sessionId,
+    createdAt,
+    prompt: task.prompt,
+    expectedSignals: task.expectedSignals,
+    score: input.score,
+    scoreThreshold: input.scoreThreshold,
+    thresholdPassed: !evalScoreFailed(input.score, input.scoreThreshold),
+    finalText: input.finalText
+  };
+}
+
+async function writeEvalRunRecord(
+  workspace: WorkspaceContext,
+  record: EvalRunRecord
+): Promise<{ path: string; record: EvalRunRecord }> {
+  const filePath = evalRunFilePath(workspace, record.id);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  return { path: filePath, record };
+}
+
+async function listEvalRunRecords(workspace: WorkspaceContext): Promise<EvalRunRecord[]> {
+  const directory = evalRunDirectory(workspace);
+  const entries = await readdir(directory, { withFileTypes: true }).catch((error: unknown) => {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  });
+  const records = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map(async (entry): Promise<EvalRunRecord | undefined> => {
+        try {
+          return await readEvalRunRecord(workspace, entry.name.slice(0, -".json".length));
+        } catch {
+          return undefined;
+        }
+      })
+  );
+  return records
+    .filter((record): record is EvalRunRecord => Boolean(record))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+async function readEvalRunRecord(workspace: WorkspaceContext, runId: string): Promise<EvalRunRecord> {
+  const filePath = evalRunFilePath(workspace, runId);
+  const raw = await readFile(filePath, "utf8").catch((error: unknown) => {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      throw new Error(`Eval run not found: ${runId}`);
+    }
+    throw error;
+  });
+  return parseEvalRunRecord(raw, filePath);
+}
+
+function parseEvalRunRecord(raw: string, filePath: string): EvalRunRecord {
+  const parsed = JSON.parse(raw) as Partial<EvalRunRecord>;
+  if (
+    !parsed.id ||
+    !parsed.evalId ||
+    !parsed.sessionId ||
+    !parsed.createdAt ||
+    !Array.isArray(parsed.expectedSignals) ||
+    !parsed.score
+  ) {
+    throw new Error(`Invalid eval run record: ${filePath}`);
+  }
+  return parsed as EvalRunRecord;
+}
+
+function printEvalRunRecord(record: EvalRunRecord): void {
+  console.log(`${record.id}  ${record.evalId}  ${record.label}`);
+  console.log(`Workspace: ${record.workspace}`);
+  console.log(`Model: ${record.model}`);
+  console.log(`Session: ${record.sessionId}`);
+  console.log(`Created: ${record.createdAt}`);
+  console.log(`Score: ${formatEvalScore(record.score)}`);
+  console.log(`Threshold: ${record.scoreThreshold ?? "not set"} (${record.thresholdPassed ? "passed" : "failed"})`);
+  if (record.score.missingSignals.length > 0) {
+    console.log(`Missing signals: ${record.score.missingSignals.join(", ")}`);
+  }
+  console.log("\nFinal");
+  console.log(record.finalText);
+}
+
+function evalRunDirectory(workspace: WorkspaceContext): string {
+  return path.join(workspace.root, ".deepcodex", "state", "evals");
+}
+
+function evalRunFilePath(workspace: WorkspaceContext, runId: string): string {
+  assertValidEvalRunId(runId);
+  return path.join(evalRunDirectory(workspace), `${runId}.json`);
+}
+
+function createEvalRunId(evalId: string, sessionId: string, createdAt: string): string {
+  const timestamp = createdAt.replace(/[^0-9A-Za-z]/g, "");
+  return `${timestamp}-${evalId}-${sessionId.slice(0, 8)}`;
+}
+
+function assertValidEvalRunId(runId: string): void {
+  if (!/^[A-Za-z0-9._-]+$/.test(runId)) {
+    throw new Error(`Invalid eval run id: ${runId}`);
+  }
 }
 
 function printEvent(event: AgentEvent): void {
