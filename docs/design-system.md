@@ -20,6 +20,7 @@ DeepCodex uses `D:\design-md` as the local design reference library. The current
 - Radius: 4px to 8px for functional controls and panels.
 - Typography: system sans for UI, system mono for event bodies, no icon dependency.
 - Layout: three-pane agent console with controls, event stream, and memory/output rail.
+- Review surfaces: unified and split diff modes use the same restrained borders, mono text, and wrapping rules as the event timeline.
 
 ## Rules
 
@@ -28,4 +29,3 @@ DeepCodex uses `D:\design-md` as the local design reference library. The current
 - Avoid decorative gradients and floating visual effects.
 - Prefer product data, event traces, and terminal-like content over marketing copy.
 - Preserve mobile usability with single-column stacking and long-text wrapping.
-

@@ -5,6 +5,7 @@ import "./styles.css";
 type ApprovalMode = "suggest" | "workspace-write" | "full-access";
 type ToolApprovalMode = "auto" | "manual" | "deny";
 type ShellExecutionMode = "direct" | "workspace-copy";
+type DiffViewMode = "unified" | "split";
 
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
@@ -59,6 +60,16 @@ type LogItem = {
 type RichTextBlock =
   | { type: "text"; value: string }
   | { type: "diff"; header: string; lines: string[] };
+
+type SplitDiffLine = {
+  kind: "add" | "remove" | "context" | "empty";
+  marker: string;
+  text: string;
+};
+
+type SplitDiffRow =
+  | { type: "meta"; text: string }
+  | { type: "pair"; left: SplitDiffLine; right: SplitDiffLine };
 
 type TokenUsageSummary = {
   promptTokens: number;
@@ -270,6 +281,7 @@ const defaultPolicyProfile =
 const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
 const defaultShellExecutionMode =
   (localStorage.getItem("deepcodex.shellExecutionMode") as ShellExecutionMode | null) ?? "direct";
+const defaultDiffViewMode = localStorage.getItem("deepcodex.diffViewMode") === "split" ? "split" : "unified";
 const configuredServerUrl = normalizeServerUrl(import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361");
 const defaultServerUrl = localStorage.getItem("deepcodex.serverUrl") ?? configuredServerUrl;
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -388,6 +400,7 @@ function App() {
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
   const [policyBundle, setPolicyBundle] = useState<PolicyBundleVerificationResult | null>(null);
   const [policyBundleMessage, setPolicyBundleMessage] = useState("");
+  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>(defaultDiffViewMode);
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -927,6 +940,11 @@ function App() {
     }
   }
 
+  function updateDiffViewMode(nextMode: DiffViewMode) {
+    setDiffViewMode(nextMode);
+    localStorage.setItem("deepcodex.diffViewMode", nextMode);
+  }
+
   function toPolicyProfileOptionId(value?: string, options = policyProfileOptions): string | undefined {
     if (!value) {
       return undefined;
@@ -1217,6 +1235,24 @@ function App() {
                 <span>{counts.tools} tools</span>
                 <span>{counts.tokens} tokens</span>
                 <span>{counts.errors} errors</span>
+                <div className="reviewSwitch" role="group" aria-label="Diff review mode">
+                  <button
+                    type="button"
+                    className={diffViewMode === "unified" ? "active" : ""}
+                    aria-pressed={diffViewMode === "unified"}
+                    onClick={() => updateDiffViewMode("unified")}
+                  >
+                    Unified
+                  </button>
+                  <button
+                    type="button"
+                    className={diffViewMode === "split" ? "active" : ""}
+                    aria-pressed={diffViewMode === "split"}
+                    onClick={() => updateDiffViewMode("split")}
+                  >
+                    Split
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1256,7 +1292,9 @@ function App() {
                           <time>{item.timestamp}</time>
                         </div>
                       </div>
-                      {item.body ? <RichTextBlockView className="eventBody" value={item.body} /> : null}
+                      {item.body ? (
+                        <RichTextBlockView className="eventBody" value={item.body} diffViewMode={diffViewMode} />
+                      ) : null}
                     </article>
                   ))}
                 </div>
@@ -1344,7 +1382,9 @@ function App() {
                           <time>{item.timestamp}</time>
                         </div>
                       </div>
-                      {item.body ? <RichTextBlockView className="eventBody" value={item.body} /> : null}
+                      {item.body ? (
+                        <RichTextBlockView className="eventBody" value={item.body} diffViewMode={diffViewMode} />
+                      ) : null}
                     </article>
                   ))}
                 </div>
@@ -1401,6 +1441,7 @@ function App() {
                   <RichTextBlockView
                     className="approvalInput"
                     value={formatApprovalDetails(approval.input, approval.fileAudits)}
+                    diffViewMode={diffViewMode}
                   />
                   <div className="approvalActions">
                     <button type="button" onClick={() => resolveApproval(approval.approvalId, true)}>
@@ -1754,13 +1795,21 @@ function formatBody(value: unknown) {
   return serialized ?? String(value);
 }
 
-function RichTextBlockView({ className, value }: { className: string; value: string }) {
+function RichTextBlockView({
+  className,
+  value,
+  diffViewMode
+}: {
+  className: string;
+  value: string;
+  diffViewMode: DiffViewMode;
+}) {
   const blocks = parseRichTextBlocks(value);
   return (
     <div className={`${className} richTextBlock`}>
       {blocks.map((block, index) =>
         block.type === "diff" ? (
-          <DiffBlockView key={`${block.header}-${index}`} block={block} />
+          <DiffBlockView key={`${block.header}-${index}`} block={block} viewMode={diffViewMode} />
         ) : (
           <pre key={`text-${index}`} className="richTextPlain">
             {block.value}
@@ -1771,21 +1820,59 @@ function RichTextBlockView({ className, value }: { className: string; value: str
   );
 }
 
-function DiffBlockView({ block }: { block: Extract<RichTextBlock, { type: "diff" }> }) {
+function DiffBlockView({ block, viewMode }: { block: Extract<RichTextBlock, { type: "diff" }>; viewMode: DiffViewMode }) {
   return (
     <div className="diffBlock">
       <div className="diffHeader">{block.header}</div>
-      <div className="diffRows">
-        {block.lines.map((line, index) => {
-          const kind = diffLineKind(line);
-          return (
-            <div key={`${index}-${line}`} className={`diffRow ${kind}`}>
-              <span className="diffMarker">{diffLineMarker(line)}</span>
-              <code>{diffLineText(line)}</code>
-            </div>
-          );
-        })}
+      {viewMode === "split" ? <SplitDiffRows lines={block.lines} /> : <UnifiedDiffRows lines={block.lines} />}
+    </div>
+  );
+}
+
+function UnifiedDiffRows({ lines }: { lines: string[] }) {
+  return (
+    <div className="diffRows">
+      {lines.map((line, index) => {
+        const kind = diffLineKind(line);
+        return (
+          <div key={`${index}-${line}`} className={`diffRow ${kind}`}>
+            <span className="diffMarker">{diffLineMarker(line)}</span>
+            <code>{diffLineText(line)}</code>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SplitDiffRows({ lines }: { lines: string[] }) {
+  return (
+    <div className="diffSplitRows">
+      <div className="diffSplitHead">
+        <span>Before</span>
+        <span>After</span>
       </div>
+      {createSplitDiffRows(lines).map((row, index) =>
+        row.type === "meta" ? (
+          <div key={`meta-${index}-${row.text}`} className="diffSplitMeta">
+            <code>{row.text}</code>
+          </div>
+        ) : (
+          <div key={`pair-${index}-${row.left.text}-${row.right.text}`} className="diffSplitRow">
+            <DiffSplitCell line={row.left} side="left" />
+            <DiffSplitCell line={row.right} side="right" />
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function DiffSplitCell({ line, side }: { line: SplitDiffLine; side: "left" | "right" }) {
+  return (
+    <div className={`diffSplitCell ${line.kind} ${side}`}>
+      <span className="diffMarker">{line.marker}</span>
+      <code>{line.text}</code>
     </div>
   );
 }
@@ -1859,6 +1946,70 @@ function isDiffLine(value: string): boolean {
     value.startsWith(" ") ||
     value.startsWith("[diff ")
   );
+}
+
+function createSplitDiffRows(lines: string[]): SplitDiffRow[] {
+  const rows: SplitDiffRow[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    const kind = diffLineKind(line);
+    if (kind === "header" || kind === "meta") {
+      rows.push({ type: "meta", text: line });
+      index += 1;
+      continue;
+    }
+    if (kind === "remove") {
+      const removed: string[] = [];
+      const added: string[] = [];
+      while (index < lines.length && diffLineKind(lines[index] ?? "") === "remove") {
+        removed.push(lines[index] ?? "");
+        index += 1;
+      }
+      while (index < lines.length && diffLineKind(lines[index] ?? "") === "add") {
+        added.push(lines[index] ?? "");
+        index += 1;
+      }
+      const count = Math.max(removed.length, added.length);
+      for (let pairIndex = 0; pairIndex < count; pairIndex += 1) {
+        const removedLine = removed[pairIndex];
+        const addedLine = added[pairIndex];
+        rows.push({
+          type: "pair",
+          left: removedLine ? createSplitDiffLine(removedLine, "remove") : createEmptySplitDiffLine(),
+          right: addedLine ? createSplitDiffLine(addedLine, "add") : createEmptySplitDiffLine()
+        });
+      }
+      continue;
+    }
+    if (kind === "add") {
+      rows.push({
+        type: "pair",
+        left: createEmptySplitDiffLine(),
+        right: createSplitDiffLine(line, "add")
+      });
+      index += 1;
+      continue;
+    }
+    const context = createSplitDiffLine(line, "context");
+    rows.push({ type: "pair", left: context, right: context });
+    index += 1;
+  }
+
+  return rows;
+}
+
+function createSplitDiffLine(value: string, kind: SplitDiffLine["kind"]): SplitDiffLine {
+  return {
+    kind,
+    marker: diffLineMarker(value),
+    text: diffLineText(value)
+  };
+}
+
+function createEmptySplitDiffLine(): SplitDiffLine {
+  return { kind: "empty", marker: " ", text: "" };
 }
 
 function diffLineKind(value: string): "header" | "add" | "remove" | "context" | "meta" {

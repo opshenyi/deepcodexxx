@@ -82,6 +82,39 @@ describe("session store", () => {
     });
   });
 
+  it("reads session history files with a UTF-8 BOM", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+    await mkdir(sessionDirectory(workspace), { recursive: true });
+    await writeFile(
+      path.join(sessionDirectory(workspace), "bom-session.json"),
+      `\uFEFF${JSON.stringify({
+        sessionId: "bom-session",
+        workspace: workspace.root,
+        status: "completed",
+        createdAt: "2026-06-09T00:00:00.000Z",
+        updatedAt: "2026-06-09T00:00:01.000Z",
+        eventCount: 1,
+        events: [
+          {
+            sequence: 1,
+            timestamp: "2026-06-09T00:00:01.000Z",
+            event: { type: "final", content: "done" }
+          }
+        ],
+        finalContent: "done"
+      })}`,
+      "utf8"
+    );
+
+    const session = await readSessionHistory(workspace, "bom-session");
+    const summaries = await listSessionHistories(workspace);
+
+    expect(session.finalContent).toBe("done");
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]?.sessionId).toBe("bom-session");
+  });
+
   it("exports session history as markdown and json", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir);

@@ -329,7 +329,7 @@ function summarizeSession(session: SessionHistory): SessionSummary {
 }
 
 function parseSessionHistory(raw: string, source: string): SessionHistory {
-  const parsed = JSON.parse(raw) as Partial<SessionHistory>;
+  const parsed = JSON.parse(stripJsonBom(raw)) as Partial<SessionHistory>;
   if (!parsed.sessionId || !Array.isArray(parsed.events)) {
     throw new Error(`Invalid session history file: ${source}`);
   }
@@ -352,6 +352,10 @@ function parseSessionHistory(raw: string, source: string): SessionHistory {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function stripJsonBom(value: string): string {
+  return value.charCodeAt(0) === 0xfeff ? value.slice(1) : value;
 }
 
 function renderSessionMarkdown(session: SessionHistory): string {

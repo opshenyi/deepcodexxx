@@ -478,6 +478,46 @@ h2 {
   min-width: 0;
 }
 
+.reviewSwitch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(68px, 1fr));
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.reviewSwitch button {
+  min-height: 30px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.reviewSwitch button:last-child {
+  border-right: 0;
+}
+
+.reviewSwitch button:hover:not(:disabled) {
+  background: var(--surface-subtle);
+  border-color: var(--line);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.reviewSwitch button.active {
+  background: var(--ink);
+  color: #fdfcfc;
+}
+
 .conversation {
   min-width: 0;
 }
@@ -691,6 +731,104 @@ pre {
 }
 
 .diffRow code {
+  display: block;
+  min-width: 0;
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diffSplitRows {
+  display: grid;
+  min-width: 0;
+}
+
+.diffSplitHead,
+.diffSplitRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.diffSplitHead {
+  border-bottom: 1px solid var(--line);
+  background: #fbfbf8;
+}
+
+.diffSplitHead span {
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  color: var(--quiet);
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.diffSplitHead span:last-child {
+  border-right: 0;
+}
+
+.diffSplitMeta {
+  min-width: 0;
+  border-bottom: 1px solid rgba(31, 35, 40, 0.06);
+  background: #f7f8f9;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diffSplitMeta code {
+  display: block;
+  min-width: 0;
+  padding: 3px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diffSplitCell {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-width: 0;
+  border-bottom: 1px solid rgba(31, 35, 40, 0.06);
+  color: #302c2c;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diffSplitCell.left {
+  border-right: 1px solid rgba(31, 35, 40, 0.08);
+}
+
+.diffSplitCell.add {
+  background: #edf8f1;
+}
+
+.diffSplitCell.remove {
+  background: #fff1f0;
+}
+
+.diffSplitCell.context {
+  background: #ffffff;
+}
+
+.diffSplitCell.empty {
+  background: #fbfbf8;
+}
+
+.diffSplitCell.add .diffMarker {
+  color: #17623b;
+}
+
+.diffSplitCell.remove .diffMarker {
+  color: #9f2d2d;
+}
+
+.diffSplitCell code {
   display: block;
   min-width: 0;
   padding: 2px 8px;
@@ -1197,6 +1335,23 @@ pre {
   .rightRail {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+}
+
+@media (max-width: 620px) {
+  .diffSplitHead,
+  .diffSplitRow {
+    grid-template-columns: 1fr;
+  }
+
+  .diffSplitHead span,
+  .diffSplitCell.left {
+    border-right: 0;
+  }
+
+  .diffSplitHead span + span,
+  .diffSplitCell.right {
+    border-top: 1px solid rgba(31, 35, 40, 0.08);
   }
 }
 
