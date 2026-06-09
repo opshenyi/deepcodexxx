@@ -7,6 +7,7 @@ type ToolApprovalMode = "auto" | "manual" | "deny";
 
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
+  | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "assistant_message"; content: string }
   | {
       type: "tool_approval_requested";
@@ -34,7 +35,7 @@ type AgentEvent =
   | { type: "final"; content: string }
   | { type: "error"; message: string };
 
-type LogKind = "Session" | "Step" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
+type LogKind = "Session" | "Step" | "Usage" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
 type LogTone = "plain" | "muted" | "good" | "bad" | "accent";
 type MemoryState = "idle" | "loading" | "ready" | "error";
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -47,6 +48,13 @@ type LogItem = {
   meta?: string;
   body?: string;
   timestamp: string;
+  tokens?: number;
+};
+
+type TokenUsageSummary = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
 };
 
 type SessionSummary = {
@@ -58,6 +66,7 @@ type SessionSummary = {
   updatedAt: string;
   eventCount: number;
   lastEventType?: AgentEvent["type"];
+  tokenUsage?: TokenUsageSummary;
   finalContent?: string;
   errorMessage?: string;
 };
@@ -167,7 +176,8 @@ function App() {
     () => ({
       errors: items.filter((item) => item.kind === "Error" || item.tone === "bad").length,
       finals: items.filter((item) => item.kind === "Final").length,
-      tools: items.filter((item) => item.kind === "Tool").length
+      tools: items.filter((item) => item.kind === "Tool").length,
+      tokens: items.reduce((sum, item) => sum + (item.tokens ?? 0), 0)
     }),
     [items]
   );
@@ -508,6 +518,10 @@ function App() {
             <strong>{counts.tools}</strong>
           </div>
           <div className="metric">
+            <span>Tokens</span>
+            <strong>{counts.tokens}</strong>
+          </div>
+          <div className="metric">
             <span>Errors</span>
             <strong>{counts.errors}</strong>
           </div>
@@ -544,6 +558,7 @@ function App() {
               <div className="streamMeta" aria-label="Event summary">
                 <span>{items.length} events</span>
                 <span>{counts.tools} tools</span>
+                <span>{counts.tokens} tokens</span>
                 <span>{counts.errors} errors</span>
               </div>
             </div>
@@ -625,6 +640,10 @@ function App() {
                     <div>
                       <span>Events</span>
                       <strong>{selectedSession.eventCount}</strong>
+                    </div>
+                    <div>
+                      <span>Tokens</span>
+                      <strong>{selectedSession.tokenUsage?.totalTokens ?? 0}</strong>
                     </div>
                     <div>
                       <span>Created</span>
@@ -783,7 +802,8 @@ function App() {
                     <span>{session.status}</span>
                   </div>
                   <div className="sessionRowMeta">
-                    {session.eventCount} events / {session.lastEventType ?? "none"}
+                    {session.eventCount} events / {session.tokenUsage?.totalTokens ?? 0} tokens /{" "}
+                    {session.lastEventType ?? "none"}
                   </div>
                   <div className="sessionRowText">{session.errorMessage ?? session.finalContent ?? session.workspace}</div>
                   <div className="sessionRowActions">
@@ -844,6 +864,17 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         title: "Session started",
         meta: `${event.sessionId.slice(0, 8)} / ${event.model}`,
         body: event.workspace
+      };
+    case "model_usage":
+      return {
+        id,
+        timestamp,
+        kind: "Usage",
+        tone: "muted",
+        title: "Model usage",
+        meta: `${event.totalTokens} tokens`,
+        body: `Model: ${event.model}\nPrompt tokens: ${event.promptTokens}\nCompletion tokens: ${event.completionTokens}\nTotal tokens: ${event.totalTokens}`,
+        tokens: event.totalTokens
       };
     case "step":
       return {

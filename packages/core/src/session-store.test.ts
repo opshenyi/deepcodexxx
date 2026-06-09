@@ -35,6 +35,13 @@ describe("session store", () => {
       model: "deepseek-chat"
     });
     await recorder.record({ type: "step", index: 1, maxSteps: 1 });
+    await recorder.record({
+      type: "model_usage",
+      model: "deepseek-chat",
+      promptTokens: 12,
+      completionTokens: 8,
+      totalTokens: 20
+    });
     await recorder.record({ type: "final", content: "done" });
 
     const filePath = path.join(sessionDirectory(workspace), "session-1.json");
@@ -42,20 +49,22 @@ describe("session store", () => {
       eventCount: number;
       events: Array<{ sequence: number; timestamp: string }>;
     };
-    expect(raw.eventCount).toBe(3);
+    expect(raw.eventCount).toBe(4);
     expect(raw.events[0]?.sequence).toBe(1);
     expect(raw.events[0]?.timestamp).toEqual(expect.any(String));
 
     const session = await readSessionHistory(workspace, "session-1");
     expect(session.status).toBe("completed");
     expect(session.finalContent).toBe("done");
+    expect(session.tokenUsage).toEqual({ promptTokens: 12, completionTokens: 8, totalTokens: 20 });
 
     const summaries = await listSessionHistories(workspace);
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
       sessionId: "session-1",
       status: "completed",
-      eventCount: 3,
+      eventCount: 4,
+      tokenUsage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
       lastEventType: "final"
     });
   });

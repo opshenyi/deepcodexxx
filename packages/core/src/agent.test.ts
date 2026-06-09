@@ -111,6 +111,30 @@ describe("agent approval risk", () => {
 
     expect(existsSync(path.join(tempDir, ".deepcodex"))).toBe(false);
   });
+
+  it("emits model usage when the chat response includes token accounting", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const events: AgentEvent[] = [];
+
+    await runDeepCodexAgent({
+      prompt: "inspect only",
+      workspace: tempDir,
+      chatClient: finalOnlyClient(),
+      onEvent: (event) => {
+        events.push(event);
+      }
+    });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "model_usage",
+        model: "test-model",
+        promptTokens: 10,
+        completionTokens: 5,
+        totalTokens: 15
+      })
+    );
+  });
 });
 
 function scriptedWriteClient(): AgentChatClient {
@@ -174,7 +198,12 @@ function finalOnlyClient(): AgentChatClient {
               content: "inspection complete"
             }
           }
-        ]
+        ],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15
+        }
       };
     }
   };

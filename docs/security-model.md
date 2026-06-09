@@ -9,7 +9,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata. | Add approval file hashes and shell isolation. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
-| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. | Add secrets management, provider allowlists, and token accounting. |
+| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata. | Add secrets management, provider allowlists, pricing policy, and budget enforcement. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
 
 ## Approval Modes

@@ -39,6 +39,7 @@ export interface JsonSchema {
 
 export type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
+  | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "assistant_message"; content: string }
   | {
       type: "tool_approval_requested";

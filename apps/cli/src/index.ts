@@ -112,7 +112,9 @@ sessions
     }
     for (const session of histories) {
       console.log(
-        `${session.sessionId}  ${session.status}  ${session.eventCount} events  ${session.updatedAt}  ${session.lastEventType ?? "none"}`
+        `${session.sessionId}  ${session.status}  ${session.eventCount} events  ${
+          session.tokenUsage?.totalTokens ?? 0
+        } tokens  ${session.updatedAt}  ${session.lastEventType ?? "none"}`
       );
     }
   });
@@ -132,6 +134,7 @@ sessions
     console.log(`${history.sessionId}  ${history.status}  ${history.eventCount} events`);
     console.log(`workspace ${history.workspace}`);
     console.log(`updated ${history.updatedAt}`);
+    console.log(`tokens ${history.tokenUsage?.totalTokens ?? 0}`);
     if (history.finalContent) {
       console.log("\nfinal");
       console.log(history.finalContent);
@@ -170,6 +173,13 @@ function printEvent(event: AgentEvent): void {
       console.log(chalk.gray(`session ${event.sessionId}`));
       console.log(chalk.gray(`workspace ${event.workspace}`));
       console.log(chalk.gray(`model ${event.model}`));
+      break;
+    case "model_usage":
+      console.log(
+        chalk.gray(
+          `usage ${event.totalTokens} tokens (${event.promptTokens} prompt / ${event.completionTokens} completion)`
+        )
+      );
       break;
     case "step":
       console.log(chalk.gray(`step ${event.index}/${event.maxSteps}`));

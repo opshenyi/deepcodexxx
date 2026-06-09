@@ -11,6 +11,12 @@ export interface SessionEventRecord {
   event: AgentEvent;
 }
 
+export interface TokenUsageSummary {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface SessionHistory {
   sessionId: string;
   workspace: string;
@@ -20,6 +26,7 @@ export interface SessionHistory {
   updatedAt: string;
   eventCount: number;
   events: SessionEventRecord[];
+  tokenUsage?: TokenUsageSummary;
   finalContent?: string;
   errorMessage?: string;
 }
@@ -33,6 +40,7 @@ export interface SessionSummary {
   updatedAt: string;
   eventCount: number;
   lastEventType?: AgentEvent["type"];
+  tokenUsage?: TokenUsageSummary;
   finalContent?: string;
   errorMessage?: string;
 }
@@ -194,6 +202,9 @@ function applyEventMetadata(history: SessionHistory, event: AgentEvent): void {
       history.model = event.model;
       history.status = "running";
       break;
+    case "model_usage":
+      history.tokenUsage = addTokenUsage(history.tokenUsage, event);
+      break;
     case "final":
       history.status = "completed";
       history.finalContent = event.content;
@@ -216,6 +227,7 @@ function summarizeSession(session: SessionHistory): SessionSummary {
     updatedAt: session.updatedAt,
     eventCount: session.eventCount,
     lastEventType: lastEvent?.type,
+    tokenUsage: session.tokenUsage,
     finalContent: session.finalContent,
     errorMessage: session.errorMessage
   };
@@ -236,6 +248,7 @@ function parseSessionHistory(raw: string, source: string): SessionHistory {
     updatedAt: parsed.updatedAt ?? "",
     eventCount: parsed.events.length,
     events: parsed.events,
+    tokenUsage: parsed.tokenUsage,
     finalContent: parsed.finalContent,
     errorMessage: parsed.errorMessage
   };
@@ -256,6 +269,7 @@ function renderSessionMarkdown(session: SessionHistory): string {
     `- Created: ${session.createdAt || "unknown"}`,
     `- Updated: ${session.updatedAt || "unknown"}`,
     `- Events: ${session.eventCount}`,
+    `- Tokens: ${session.tokenUsage?.totalTokens ?? 0}`,
     ""
   ];
 
@@ -283,6 +297,8 @@ function eventSummary(event: AgentEvent): string {
   switch (event.type) {
     case "session_started":
       return `Session started with ${event.model}.`;
+    case "model_usage":
+      return `Model usage for ${event.model}: ${event.totalTokens} tokens.`;
     case "step":
       return `Step ${event.index} of ${event.maxSteps}.`;
     case "assistant_message":
@@ -308,6 +324,8 @@ function eventDetails(event: AgentEvent): string {
   switch (event.type) {
     case "session_started":
       return `workspace: ${event.workspace}\nmodel: ${event.model}`;
+    case "model_usage":
+      return `model: ${event.model}\npromptTokens: ${event.promptTokens}\ncompletionTokens: ${event.completionTokens}\ntotalTokens: ${event.totalTokens}`;
     case "assistant_message":
       return event.content;
     case "tool_approval_requested":
@@ -329,6 +347,14 @@ function eventDetails(event: AgentEvent): string {
     case "step":
       return "";
   }
+}
+
+function addTokenUsage(current: TokenUsageSummary | undefined, event: Extract<AgentEvent, { type: "model_usage" }>) {
+  return {
+    promptTokens: (current?.promptTokens ?? 0) + event.promptTokens,
+    completionTokens: (current?.completionTokens ?? 0) + event.completionTokens,
+    totalTokens: (current?.totalTokens ?? 0) + event.totalTokens
+  };
 }
 
 function formatEventValue(value: unknown): string {

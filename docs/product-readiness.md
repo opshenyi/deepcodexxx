@@ -15,6 +15,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
+- Token usage events are recorded when the provider returns usage metadata.
 - Strict read-only `suggest` runs that avoid creating `.deepcodex` memory or session state.
 - Demo mode when `DEEPSEEK_API_KEY` is missing.
 - Basic workspace guardrails for path traversal and denied folders.
@@ -49,7 +50,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add approval file hashes and reusable policy profiles.
 - Add audit retention controls and redaction policies.
 - Add richer generated-asset handling and file-type policies.
-- Add model pricing controls, token accounting, and budget limits.
+- Add model pricing controls, cost estimates, and budget limits.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.

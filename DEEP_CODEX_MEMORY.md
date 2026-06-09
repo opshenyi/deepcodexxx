@@ -33,6 +33,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added approval audit metadata across core/server/Web/CLI: request time, decision time, decision latency, and actor.
 - Added Markdown/JSON session export through core formatter, server endpoint, Web export button, and CLI `sessions export`.
 - Added binary-aware file handling so read/edit reject binary-looking files and search skips them.
+- Added token usage accounting events and session totals when the provider returns usage metadata; surfaced in Web, CLI, replay, and export.
 
 ## Architecture Decisions
 
@@ -45,10 +46,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 ## Next Steps
 
-1. Run `npm install`.
-2. Fix any TypeScript or dependency issues from install/build.
-3. Run `npm run build` and `npm test`.
-4. Start `npm run dev`, inspect the Web client in the browser, and polish layout if needed.
-5. Add approval file hashes, audit retention controls, and release packaging.
-6. Add generated-asset policies and shell isolation.
-7. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.
+1. Commit and push the token usage accounting work if it has not already been committed.
+2. Add cost/budget controls that can stop sessions before runaway provider spend.
+3. Add approval file hashes, audit retention controls, generated-asset policies, and shell isolation.
+4. Continue browser and CLI smoke checks after meaningful product changes.
+5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

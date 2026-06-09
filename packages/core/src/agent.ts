@@ -48,6 +48,17 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   for (let index = 1; index <= maxSteps; index += 1) {
     await emit({ type: "step", index, maxSteps });
     const response = await client.chat(messages, tools.map((tool) => tool.definition));
+    if (response.usage) {
+      const promptTokens = response.usage.prompt_tokens ?? 0;
+      const completionTokens = response.usage.completion_tokens ?? 0;
+      await emit({
+        type: "model_usage",
+        model: client.model,
+        promptTokens,
+        completionTokens,
+        totalTokens: response.usage.total_tokens ?? promptTokens + completionTokens
+      });
+    }
     const assistant = response.choices[0]?.message;
     if (!assistant) {
       throw new Error("DeepSeek returned no assistant message.");
