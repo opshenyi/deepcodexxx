@@ -28,6 +28,7 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
+- CLI `doctor` reports provider retry settings.
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.

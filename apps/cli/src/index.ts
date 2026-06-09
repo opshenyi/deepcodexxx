@@ -391,6 +391,8 @@ program
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
     console.log(`DeepSeek base URL: ${provider.baseUrl}`);
     console.log(`DeepSeek model: ${provider.model}`);
+    console.log(`Provider max retries: ${process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2"}`);
+    console.log(`Provider retry base delay ms: ${process.env.DEEPCODEX_PROVIDER_RETRY_BASE_MS ?? "500"}`);
     console.log(`Allowed provider base URLs: ${workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0}`);
     console.log(`Allowed provider models: ${workspaceConfig.config.provider?.allowedModels?.length ?? 0}`);
     console.log(`Max session tokens: ${process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set"}`);

@@ -6,6 +6,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 - Clean TypeScript monorepo structure.
 - DeepSeek-compatible agent loop with function tools.
+- DeepSeek-compatible provider retry/backoff for retryable status codes and network failures.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
 - Desktop production-like startup can bootstrap the built local server and load the built Web client.

@@ -14,7 +14,7 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Phase | Goal | Work items | Exit criteria |
 | --- | --- | --- | --- |
-| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client, provider/model allowlists, tool loop, workspace config defaults, SHA-256 provenance, signed policy-bundle verification, signed-only policy enforcement, custom team policy profiles, token accounting, budget controls, managed pricing profiles, reusable policy profiles, workspace guardrails, generated/build output deny patterns, media/artifact extension policy, metadata-only artifact inspection, approval metadata, file hash auditing, built-in and workspace-specific event redaction, write-time DLP blocking, audit export/retention, minimal shell environment, network-aware shell command policy, memory, Web session replay, Desktop production-like server bootstrap, CLI, docs. | Checklist passes and limitations are documented. |
+| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client with retry/backoff, provider/model allowlists, tool loop, workspace config defaults, SHA-256 provenance, signed policy-bundle verification, signed-only policy enforcement, custom team policy profiles, token accounting, budget controls, managed pricing profiles, reusable policy profiles, workspace guardrails, generated/build output deny patterns, media/artifact extension policy, metadata-only artifact inspection, approval metadata, file hash auditing, built-in and workspace-specific event redaction, write-time DLP blocking, audit export/retention, minimal shell environment, network-aware shell command policy, memory, Web session replay, Desktop production-like server bootstrap, CLI, docs. | Checklist passes and limitations are documented. |
 | Phase 1: safer local agent | Make local write-mode use easier to trust. | OS-level shell sandboxing, policy bundle rotation/revocation workflow, policy-controlled OCR/PDF/archive extraction. | User can approve each write or shell command with a visible diff or command body, review the decision later, and understand when shell network access was intentionally enabled. |
 | Phase 2: product operations | Make demos repeatable and measurable. | Structured run history, managed pricing profiles, benchmark tasks, regression evals. | A release can compare behavior across model/config changes. |
 | Phase 3: desktop release | Move beyond production-like Electron launch. | Packaged installers, signing, update policy, crash reporting plan, OS-specific smoke tests. | A reviewer can install and run Desktop without starting dev servers manually. |
@@ -38,6 +38,7 @@ Before claiming broader commercial readiness, decide:
 - Whether shell execution will be sandboxed locally, remotely, or both.
 - Whether hosted workspaces are managed by DeepCodex or connected to customer machines.
 - Which DeepSeek models are supported and how fallback models are selected.
+- Whether retry exhaustion should trigger fallback model selection or fail closed.
 - How long prompts, tool outputs, and memory should be retained.
 - Which approval events must be auditable for team pilots.
 

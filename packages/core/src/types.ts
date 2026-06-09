@@ -199,6 +199,8 @@ export interface DeepSeekConfig {
   baseUrl?: string;
   model?: string;
   timeoutMs?: number;
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
 }
 
 export interface DeepSeekChatRequest {

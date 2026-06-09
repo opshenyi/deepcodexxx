@@ -11,7 +11,8 @@ export class DeepSeekError extends Error {
   constructor(
     message: string,
     readonly status?: number,
-    readonly body?: string
+    readonly body?: string,
+    readonly retryable = false
   ) {
     super(message);
     this.name = "DeepSeekError";
@@ -22,6 +23,8 @@ export class DeepSeekClient {
   readonly baseUrl: string;
   readonly model: string;
   readonly timeoutMs: number;
+  readonly maxRetries: number;
+  readonly retryBaseDelayMs: number;
   private readonly apiKey?: string;
 
   constructor(config: DeepSeekConfig = {}) {
@@ -29,6 +32,8 @@ export class DeepSeekClient {
     this.baseUrl = normalizeBaseUrl(config.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_DEEPSEEK_BASE_URL);
     this.model = config.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL;
     this.timeoutMs = config.timeoutMs ?? 120_000;
+    this.maxRetries = config.maxRetries ?? readNonNegativeIntegerEnv("DEEPCODEX_PROVIDER_MAX_RETRIES", 2);
+    this.retryBaseDelayMs = config.retryBaseDelayMs ?? readNonNegativeNumberEnv("DEEPCODEX_PROVIDER_RETRY_BASE_MS", 500);
   }
 
   get configured(): boolean {
@@ -50,6 +55,31 @@ export class DeepSeekClient {
       stream: false
     };
 
+    let lastError: DeepSeekError | undefined;
+    const maxAttempts = this.maxRetries + 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.sendChatRequest(payload);
+      } catch (error) {
+        const deepSeekError = toDeepSeekError(error);
+        lastError = deepSeekError;
+        if (!deepSeekError.retryable || attempt >= maxAttempts) {
+          throw attempt > 1 && deepSeekError.retryable
+            ? new DeepSeekError(
+                `DeepSeek request failed after ${attempt} attempts: ${deepSeekError.message}`,
+                deepSeekError.status,
+                deepSeekError.body,
+                deepSeekError.retryable
+              )
+            : deepSeekError;
+        }
+        await delay(retryDelayMs(this.retryBaseDelayMs, attempt));
+      }
+    }
+    throw lastError ?? new DeepSeekError("DeepSeek request failed.");
+  }
+
+  private async sendChatRequest(payload: DeepSeekChatRequest): Promise<DeepSeekChatResponse> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -66,16 +96,26 @@ export class DeepSeekClient {
 
       const body = await response.text();
       if (!response.ok) {
-        throw new DeepSeekError(`DeepSeek request failed with ${response.status}`, response.status, body);
+        throw new DeepSeekError(
+          `DeepSeek request failed with ${response.status}`,
+          response.status,
+          body,
+          isRetryableStatus(response.status)
+        );
       }
 
-      return JSON.parse(body) as DeepSeekChatResponse;
+      try {
+        return JSON.parse(body) as DeepSeekChatResponse;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new DeepSeekError(`DeepSeek returned invalid JSON: ${message}`, response.status, body);
+      }
     } catch (error) {
       if (error instanceof DeepSeekError) {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      throw new DeepSeekError(`DeepSeek request failed: ${message}`);
+      throw new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true);
     } finally {
       clearTimeout(timer);
     }
@@ -108,3 +148,47 @@ export class DeepSeekClient {
   }
 }
 
+function toDeepSeekError(error: unknown): DeepSeekError {
+  if (error instanceof DeepSeekError) {
+    return error;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return new DeepSeekError(`DeepSeek request failed: ${message}`, undefined, undefined, true);
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function retryDelayMs(baseDelayMs: number, failedAttempt: number): number {
+  return baseDelayMs * 2 ** Math.max(0, failedAttempt - 1);
+}
+
+function delay(ms: number): Promise<void> {
+  if (ms <= 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function readNonNegativeIntegerEnv(name: string, fallback: number): number {
+  const value = readNonNegativeNumberEnv(name, fallback);
+  if (!Number.isInteger(value)) {
+    throw new Error(`${name} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function readNonNegativeNumberEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative number.`);
+  }
+  return parsed;
+}

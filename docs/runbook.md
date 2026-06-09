@@ -25,6 +25,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPSEEK_API_KEY` | Required for live model runs. | Empty. | If missing, DeepCodex runs in local demo mode and does not call DeepSeek. |
 | `DEEPSEEK_BASE_URL` | Optional. | `https://api.deepseek.com` | The client calls `${DEEPSEEK_BASE_URL}/chat/completions`; trailing slash is stripped. |
 | `DEEPSEEK_MODEL` | Optional. | `deepseek-chat` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
+| `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
+| `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
 | `DEEPCODEX_PORT` | Optional for server. | `17361` | Keep `17361` for the current Web client because it connects to `http://127.0.0.1:17361`. |
 | `DEEPCODEX_WORKSPACE` | Optional. | Current working directory. | Used by the server and CLI when a request does not pass a workspace path. |
 | `DEEPCODEX_DENIED_PATHS` | Optional. | Built-in defaults. | Comma-separated deny patterns such as `secrets,private/*.json,**/*.map`. Extends the default list. |
@@ -119,7 +121,7 @@ Example:
 
 Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. Do not put provider keys or secrets in workspace config.
 
-The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
+The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; 400-class request errors and invalid JSON are surfaced without retry.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
@@ -149,6 +151,7 @@ Expected checks:
 
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
+- Provider retry settings print with their effective environment/default values.
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
 - Workspace config SHA-256 prints when a config file exists.
@@ -372,6 +375,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
 | Provider is rejected. | `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, or workspace defaults do not match `provider.allowedBaseUrls` or `provider.allowedModels`. | Run `deepcodex doctor --workspace <path>` and update the workspace provider policy or selected model. |
+| Provider call fails after several attempts. | DeepSeek-compatible provider returned retryable failures or the network remained unavailable through the retry budget. | Run `doctor`, verify network/API status, and tune `DEEPCODEX_PROVIDER_MAX_RETRIES` or `DEEPCODEX_PROVIDER_RETRY_BASE_MS` only for trusted demos. |
 | Run fails before the model call with signed policy required. | `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` and the policy bundle is missing, untrusted, expired, or does not match the active config SHA-256. | Run `deepcodex config verify-bundle --workspace <path> --public-key <pem>` and fix the bundle or trusted public key. |
 | Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON, unsupported values, or an invalid redaction regex. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |

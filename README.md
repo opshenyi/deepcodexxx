@@ -50,6 +50,8 @@ node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
 - `DEEPSEEK_BASE_URL`: Defaults to `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: Defaults to `deepseek-chat`.
+- `DEEPCODEX_PROVIDER_MAX_RETRIES`: Defaults to `2`; retries retryable provider failures before surfacing an error.
+- `DEEPCODEX_PROVIDER_RETRY_BASE_MS`: Defaults to `500`; exponential backoff base delay for provider retries.
 - `DEEPCODEX_PORT`: Defaults to `17361`.
 - `DEEPCODEX_WORKSPACE`: Optional default workspace path.
 - `DEEPCODEX_DENIED_EXTENSIONS`: Optional extension deny-list additions for media/artifact files.
