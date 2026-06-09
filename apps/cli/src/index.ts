@@ -34,6 +34,7 @@ import {
   scoreEvalResult,
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
+  createPolicyTrustPackage,
   createWorkspacePolicyBundle,
   resolveProviderSelection,
   runDeepCodexAgent,
@@ -50,6 +51,7 @@ import type {
   PolicyBundleVerificationResult,
   PolicyBundleVerificationOptions,
   PolicyProfile,
+  PolicyTrustPackage,
   SessionRetentionPolicy,
   ShellEnvironmentMode,
   ShellExecutionMode,
@@ -660,6 +662,58 @@ config
       process.exitCode = 1;
     }
   });
+
+config
+  .command("export-trust-package")
+  .description("Export a policy-bundle trust package without private keys.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .requiredOption("--public-key <path...>", "Trusted Ed25519 public key PEM path(s)")
+  .option("--trusted-issuer <name...>", "Trusted policy-bundle issuer name(s)")
+  .option("--revoked-bundle <sha256...>", "Revoked policy bundle SHA-256 digest(s)")
+  .option("--revoked-key <sha256...>", "Revoked signing public key SHA-256 digest(s)")
+  .option("--require-signed-policy", "Recommend signed-only enforcement in generated environment values", false)
+  .option("--output <path>", "Write trust package JSON to this path")
+  .option("--env-output <path>", "Write a .env fragment for local/CI trust policy")
+  .option("--force", "Overwrite output files", false)
+  .option("--json", "Print JSON output", false)
+  .action(
+    async (options: {
+      workspace: string;
+      publicKey: string[];
+      trustedIssuer?: string[];
+      revokedBundle?: string[];
+      revokedKey?: string[];
+      requireSignedPolicy: boolean;
+      output?: string;
+      envOutput?: string;
+      force: boolean;
+      json: boolean;
+    }) => {
+      const publicKeyPaths = options.publicKey.map((entry) => path.resolve(entry));
+      const publicKeys = await Promise.all(publicKeyPaths.map((entry) => readFile(entry, "utf8")));
+      const trustPackage = await createPolicyTrustPackage(options.workspace, {
+        publicKeys,
+        publicKeySources: publicKeyPaths,
+        trustedIssuers: options.trustedIssuer,
+        revokedBundleSha256: options.revokedBundle,
+        revokedPublicKeySha256: options.revokedKey,
+        requireSignedPolicy: options.requireSignedPolicy
+      });
+      const outputPath = options.output ? path.resolve(options.output) : undefined;
+      const envOutputPath = options.envOutput ? path.resolve(options.envOutput) : undefined;
+      if (outputPath) {
+        await writeTextOutputFile(outputPath, `${JSON.stringify(trustPackage, null, 2)}\n`, options.force);
+      }
+      if (envOutputPath) {
+        await writeTextOutputFile(envOutputPath, createPolicyTrustEnvFragment(trustPackage, publicKeyPaths), options.force);
+      }
+      if (options.json) {
+        console.log(JSON.stringify({ trustPackage, outputPath, envOutputPath }, null, 2));
+        return;
+      }
+      printPolicyTrustPackageSummary(trustPackage, outputPath, envOutputPath);
+    }
+  );
 
 profiles
   .command("list")
@@ -1296,6 +1350,46 @@ function printPolicyBundleVerification(result: PolicyBundleVerificationResult): 
   }
 }
 
+function createPolicyTrustEnvFragment(trustPackage: PolicyTrustPackage, publicKeyPaths: string[]): string {
+  const values = {
+    DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES: publicKeyPaths.join(","),
+    ...trustPackage.recommendedEnv
+  };
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+    .join("\n")}\n`;
+}
+
+function printPolicyTrustPackageSummary(
+  trustPackage: PolicyTrustPackage,
+  outputPath: string | undefined,
+  envOutputPath: string | undefined
+): void {
+  console.log(chalk.bold("policy trust package"));
+  console.log(`Workspace: ${trustPackage.workspace}`);
+  console.log(`Generated: ${trustPackage.generatedAt}`);
+  console.log(`Verification: ${trustPackage.verification.ok ? "trusted" : "not trusted"}`);
+  console.log(`Reason: ${trustPackage.verification.reason}`);
+  console.log(`Config SHA-256: ${trustPackage.configSha256 ?? "not available"}`);
+  console.log(`Bundle SHA-256: ${trustPackage.policyBundleSha256 ?? "not available"}`);
+  console.log(`Require signed policy: ${trustPackage.requireSignedPolicy ? "yes" : "no"}`);
+  for (const key of trustPackage.trustedPublicKeys) {
+    console.log(`Trusted public key: ${key.sha256}${key.source ? ` (${key.source})` : ""}`);
+  }
+  if (trustPackage.trustedIssuers.length > 0) {
+    console.log(`Trusted issuers: ${trustPackage.trustedIssuers.join(", ")}`);
+  }
+  if (outputPath) {
+    console.log(`Package JSON: ${outputPath}`);
+  }
+  if (envOutputPath) {
+    console.log(`Environment fragment: ${envOutputPath}`);
+  }
+  for (const warning of trustPackage.warnings) {
+    console.log(chalk.yellow(`Warning: ${warning}`));
+  }
+}
+
 function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {
   if (value === "minimal" || value === "inherit") {
     return value;
@@ -1327,6 +1421,14 @@ async function assertOutputFileAvailable(filePath: string): Promise<void> {
 async function writePemFile(filePath: string, content: string, mode: number): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, content, { encoding: "utf8", mode });
+}
+
+async function writeTextOutputFile(filePath: string, content: string, overwrite: boolean): Promise<void> {
+  if (!overwrite) {
+    await assertOutputFileAvailable(filePath);
+  }
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, content, "utf8");
 }
 
 function createSha256(value: string): string {

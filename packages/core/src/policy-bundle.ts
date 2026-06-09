@@ -69,6 +69,40 @@ export interface CreatePolicyBundleResult {
   publicKeySha256?: string;
 }
 
+export interface PolicyTrustPackagePublicKey {
+  sha256: string;
+  publicKey: string;
+  source?: string;
+}
+
+export interface PolicyTrustPackage {
+  version: number;
+  generatedAt: string;
+  workspace: string;
+  configSha256?: string;
+  policyBundlePath: string;
+  policyBundleSha256?: string;
+  verification: PolicyBundleVerificationResult;
+  trustedPublicKeys: PolicyTrustPackagePublicKey[];
+  trustedIssuers: string[];
+  revokedPolicyBundles: string[];
+  revokedSigningKeys: string[];
+  requireSignedPolicy: boolean;
+  recommendedEnv: Record<string, string>;
+  warnings: string[];
+}
+
+export interface CreatePolicyTrustPackageOptions {
+  publicKeys: string[];
+  publicKeySources?: string[];
+  trustedIssuers?: string[];
+  revokedBundleSha256?: string[];
+  revokedPublicKeySha256?: string[];
+  requireSignedPolicy?: boolean;
+  generatedAt?: Date | string;
+  now?: Date;
+}
+
 export async function createWorkspacePolicyBundle(
   workspaceInput: string,
   options: CreatePolicyBundleOptions
@@ -129,6 +163,58 @@ export async function createWorkspacePolicyBundle(
     configSha256: workspaceConfig.sha256,
     bundleSha256: createSha256(raw),
     publicKeySha256: embeddedPublicKey ? createSha256(embeddedPublicKey) : undefined
+  };
+}
+
+export async function createPolicyTrustPackage(
+  workspaceInput: string,
+  options: CreatePolicyTrustPackageOptions
+): Promise<PolicyTrustPackage> {
+  const root = await resolveWorkspaceRoot(workspaceInput);
+  const trustedPublicKeys = normalizePublicKeyEntries(options.publicKeys, options.publicKeySources);
+  if (trustedPublicKeys.length === 0) {
+    throw new Error("At least one trusted public key is required to export a policy trust package.");
+  }
+  const trustedIssuers = uniqueStrings(options.trustedIssuers);
+  const revokedPolicyBundles = normalizeSha256List(options.revokedBundleSha256);
+  const revokedSigningKeys = normalizeSha256List(options.revokedPublicKeySha256);
+  const verification = await verifyWorkspacePolicyBundle(root, {
+    publicKeys: trustedPublicKeys.map((entry) => entry.publicKey),
+    revokedBundleSha256: revokedPolicyBundles,
+    revokedPublicKeySha256: revokedSigningKeys,
+    trustedIssuers,
+    now: options.now
+  });
+  const workspaceConfig = await readWorkspaceConfig(root);
+  const generatedAt = normalizeBundleDate(options.generatedAt ?? new Date(), "generatedAt");
+  const recommendedEnv = removeEmptyEnvValues({
+    DEEPCODEX_REQUIRE_SIGNED_POLICY: options.requireSignedPolicy ? "true" : undefined,
+    DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS: trustedIssuers.join(","),
+    DEEPCODEX_REVOKED_POLICY_BUNDLES: revokedPolicyBundles.join(","),
+    DEEPCODEX_REVOKED_POLICY_KEYS: revokedSigningKeys.join(",")
+  });
+  const warnings = [
+    verification.ok ? "" : `Policy bundle is not trusted by this package: ${verification.reason}`,
+    options.requireSignedPolicy
+      ? ""
+      : "Signed-only enforcement is not enabled in the recommended environment values."
+  ].filter(Boolean);
+
+  return {
+    version: 1,
+    generatedAt,
+    workspace: root,
+    configSha256: workspaceConfig.sha256,
+    policyBundlePath: verification.path,
+    policyBundleSha256: verification.bundleSha256,
+    verification,
+    trustedPublicKeys,
+    trustedIssuers,
+    revokedPolicyBundles,
+    revokedSigningKeys,
+    requireSignedPolicy: options.requireSignedPolicy ?? false,
+    recommendedEnv,
+    warnings
   };
 }
 
@@ -447,6 +533,28 @@ function uniqueStrings(values: Array<string | undefined> | undefined): string[] 
 
 function normalizeSha256List(values: string[] | undefined): string[] {
   return uniqueStrings(values).map((value) => value.toLowerCase());
+}
+
+function normalizePublicKeyEntries(publicKeys: string[], sources: string[] | undefined): PolicyTrustPackagePublicKey[] {
+  const entries = new Map<string, PolicyTrustPackagePublicKey>();
+  publicKeys.forEach((publicKey, index) => {
+    const trimmed = publicKey.trim();
+    if (!trimmed || entries.has(trimmed)) {
+      return;
+    }
+    entries.set(trimmed, {
+      sha256: createSha256(trimmed),
+      publicKey: trimmed,
+      source: sources?.[index]
+    });
+  });
+  return [...entries.values()];
+}
+
+function removeEmptyEnvValues(values: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined && value !== "")
+  ) as Record<string, string>;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

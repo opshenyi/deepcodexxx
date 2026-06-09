@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createPolicyBundleSigningPayload,
+  createPolicyTrustPackage,
   createWorkspacePolicyBundle,
   POLICY_BUNDLE_RELATIVE_PATH,
   type PolicyBundlePayload,
@@ -214,6 +215,54 @@ describe("policy bundle verification", () => {
     expect(result.exists).toBe(false);
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("missing");
+  });
+
+  it("exports a policy trust package without private key material", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspaceConfig = await writeWorkspaceConfigTemplate(tempDir);
+    const keys = createSigningKeys();
+    await createWorkspacePolicyBundle(tempDir, {
+      privateKey: keys.privateKeyPem,
+      issuer: "Security Team",
+      issuedAt: "2026-06-09T01:00:00.000Z"
+    });
+
+    const result = await createPolicyTrustPackage(tempDir, {
+      publicKeys: [keys.publicKeyPem],
+      publicKeySources: ["policy-public.pem"],
+      trustedIssuers: ["Security Team"],
+      requireSignedPolicy: true,
+      generatedAt: "2026-06-09T02:00:00.000Z"
+    });
+
+    expect(result).toMatchObject({
+      version: 1,
+      generatedAt: "2026-06-09T02:00:00.000Z",
+      workspace: tempDir,
+      configSha256: workspaceConfig.sha256,
+      requireSignedPolicy: true,
+      trustedIssuers: ["Security Team"],
+      recommendedEnv: {
+        DEEPCODEX_REQUIRE_SIGNED_POLICY: "true",
+        DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS: "Security Team"
+      }
+    });
+    expect(result.verification.ok).toBe(true);
+    expect(result.trustedPublicKeys).toEqual([
+      {
+        sha256: createSha256(keys.publicKeyPem.trim()),
+        publicKey: keys.publicKeyPem.trim(),
+        source: "policy-public.pem"
+      }
+    ]);
+    expect(JSON.stringify(result)).not.toContain(keys.privateKeyPem.trim());
+  });
+
+  it("requires at least one trusted public key for trust package export", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeWorkspaceConfigTemplate(tempDir);
+
+    await expect(createPolicyTrustPackage(tempDir, { publicKeys: [] })).rejects.toThrow(/trusted public key/);
   });
 });
 

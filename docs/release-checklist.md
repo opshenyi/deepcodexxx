@@ -47,6 +47,7 @@ Expected result:
 - CLI `config generate-keypair --private-key <pem> --public-key <pem>` creates Ed25519 key files, prints the public key SHA-256, and refuses accidental overwrite unless `--force` is used.
 - CLI `config sign-bundle --workspace <path> --private-key <pem> --issuer <name>` creates `.deepcodex/policy-bundle.json` for the active config and refuses accidental overwrite unless `--force` is used.
 - CLI `config verify-bundle --workspace <path> --public-key <pem> [<pem>...]` verifies a signed policy bundle when one is present.
+- CLI `config export-trust-package --workspace <path> --public-key <pem> --output <json> --env-output <env>` exports public-key trust metadata and local/CI env values without private key material.
 - Policy-bundle trust policy can be tested with multiple trusted keys, revoked bundle hashes, revoked key hashes, and trusted issuer filters.
 - With `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`, CLI/server runs fail before model execution when the signed bundle is missing or untrusted.
 - CLI `profiles list --workspace <path>` includes any workspace-defined team profiles.

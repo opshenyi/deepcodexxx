@@ -174,6 +174,14 @@ node apps/cli/dist/index.js config sign-bundle --workspace D:\Coding\DeepCodex -
 node apps/cli/dist/index.js config verify-bundle --workspace D:\Coding\DeepCodex --public-key D:\keys\old-policy.pub.pem D:\keys\new-policy.pub.pem
 ```
 
+Export a trust package for local/CI rollout without private keys:
+
+```powershell
+node apps/cli/dist/index.js config export-trust-package --workspace D:\Coding\DeepCodex --public-key D:\keys\policy-public.pem --trusted-issuer "Security Team" --require-signed-policy --output D:\keys\deepcodex-policy-trust.json --env-output D:\keys\deepcodex-policy-trust.env
+```
+
+The trust package contains public key PEM data, public key SHA-256 fingerprints, bundle/config fingerprints, issuer and revocation policy, signed-only recommendation, and the current verification result. The env fragment contains local/CI variables such as `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`, `DEEPCODEX_REQUIRE_SIGNED_POLICY`, and trusted issuer or revocation lists. It never includes signing private keys.
+
 The server exposes the same verification result at `/api/policy-bundle?workspace=<path>` using `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`. Use `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS` to narrow the trust policy during rotation or incident response. Set `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` to require a trusted signed bundle before CLI/server agent runs start. This enforcement switch is environment-only so an unsigned workspace config cannot disable it. Do not put signing private keys in `.deepcodex/config.json`, `.env`, repository files, session memory, or session history.
 
 The Web and Desktop clients include a Policy bundle panel in the right rail. `Load config` refreshes that panel for the selected workspace, and `Check bundle` can refresh it independently. The panel displays the server verification result only; key generation and signing stay in the CLI so private signing keys do not enter the browser runtime.

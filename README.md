@@ -47,6 +47,7 @@ Workspace defaults can be stored in `.deepcodex/config.json` so a repository can
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js config export-trust-package --workspace D:\Coding\DeepCodex --public-key D:\keys\policy-public.pem --trusted-issuer "Security Team" --require-signed-policy --output D:\keys\deepcodex-policy-trust.json --env-output D:\keys\deepcodex-policy-trust.env
 ```
 
 ## Environment
