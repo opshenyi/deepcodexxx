@@ -55,6 +55,7 @@ Checklist:
 - `http://127.0.0.1:17361/api/health` returns `ok: true`.
 - `http://127.0.0.1:5173` loads the Web client.
 - Workspace path can be entered and saved in the browser.
+- Server URL can be reviewed in the sidebar, saved, and used for memory/session/config calls without console errors.
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.

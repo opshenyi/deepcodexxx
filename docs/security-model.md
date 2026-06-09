@@ -103,7 +103,6 @@ Provider usage controls:
 Current limitations:
 
 - Shell network policy is pattern-based; OS-level network isolation is still future work.
-- The Web client currently assumes the local server runs on `127.0.0.1:17361`.
 - CORS is open for local development and should be restricted before hosted use.
 
 ## Redaction Controls

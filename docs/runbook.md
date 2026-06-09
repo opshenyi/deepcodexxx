@@ -27,7 +27,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPSEEK_MODEL` | Optional. | `deepseek-chat` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
 | `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
 | `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
-| `DEEPCODEX_PORT` | Optional for server. | `17361` | Keep `17361` for the current Web client because it connects to `http://127.0.0.1:17361`. |
+| `DEEPCODEX_PORT` | Optional for server. | `17361` | Port used by the local server. |
+| `VITE_DEEPCODEX_SERVER_URL` | Optional for Web build/dev. | `http://127.0.0.1:17361` | Default API base shown in the Web Server field; users can override it at runtime in the sidebar. |
 | `DEEPCODEX_WORKSPACE` | Optional. | Current working directory. | Used by the server and CLI when a request does not pass a workspace path. |
 | `DEEPCODEX_DENIED_PATHS` | Optional. | Built-in defaults. | Comma-separated deny patterns such as `secrets,private/*.json,**/*.map`. Extends the default list. |
 | `DEEPCODEX_DENIED_EXTENSIONS` | Optional. | Built-in defaults. | Comma-separated extensions such as `.pem,.sqlite`. Extends the default media/artifact extension deny list. |
@@ -174,6 +175,8 @@ Runtime endpoints:
 - Web client: `http://127.0.0.1:5173`
 - Local server: `http://127.0.0.1:17361`
 - Health check: `http://127.0.0.1:17361/api/health`
+
+The Web sidebar includes a Server field. It defaults to `VITE_DEEPCODEX_SERVER_URL` or `http://127.0.0.1:17361`, normalizes host-only values such as `127.0.0.1:17361`, and saves the selected API base in browser local storage.
 
 Recommended demo flow:
 
@@ -360,8 +363,8 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
-| Web UI cannot run the agent. | Server is not listening on `17361`. | Open `/api/health` and keep `DEEPCODEX_PORT=17361`. |
-| Desktop production-like launch opens but cannot run tasks. | Managed server did not start or a different port was configured without rebuilding the Web client. | Use `npm run start:desktop`, keep `DEEPCODEX_PORT=17361`, and check `/api/health`. |
+| Web UI cannot run the agent. | Server is not listening or the Web Server field points at the wrong API base. | Open `/api/health`, then save the matching Server URL in the sidebar. |
+| Desktop production-like launch opens but cannot run tasks. | Managed server did not start or the Web Server field points at another API base. | Use `npm run start:desktop`, check `/api/health`, and save the matching Server URL. |
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |

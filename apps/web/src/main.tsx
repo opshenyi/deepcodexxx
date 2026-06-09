@@ -237,7 +237,8 @@ const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxA
 const defaultPolicyProfile =
   localStorage.getItem("deepcodex.policyProfile") ?? "custom";
 const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
-const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
+const configuredServerUrl = normalizeServerUrl(import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361");
+const defaultServerUrl = localStorage.getItem("deepcodex.serverUrl") ?? configuredServerUrl;
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
@@ -322,6 +323,9 @@ const memoryStateLabels: Record<MemoryState, string> = {
 
 function App() {
   const [workspace, setWorkspace] = useState(defaultWorkspace);
+  const [serverUrl, setServerUrl] = useState(normalizeServerUrl(defaultServerUrl) || configuredServerUrl);
+  const [serverUrlDraft, setServerUrlDraft] = useState(defaultServerUrl);
+  const [serverMessage, setServerMessage] = useState("");
   const [prompt, setPrompt] = useState("Inspect this repository and propose the safest next implementation step.");
   const [policyProfileId, setPolicyProfileId] = useState<PolicyProfileOption["id"]>(defaultPolicyProfile);
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
@@ -377,6 +381,8 @@ function App() {
 
   const latestItem = items.length > 0 ? items[items.length - 1] : undefined;
   const canRun = prompt.trim().length > 0 && !isRunning;
+  const serverStatus = serverUrl === configuredServerUrl ? "Default" : "Custom";
+  const serverDraftChanged = normalizeServerUrl(serverUrlDraft) !== serverUrl;
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
@@ -394,7 +400,7 @@ function App() {
   useEffect(() => {
     void loadPricingProfiles();
     void loadPolicyProfiles();
-  }, []);
+  }, [serverUrl]);
 
   async function runAgent() {
     if (!prompt.trim()) {
@@ -496,9 +502,21 @@ function App() {
     }
   }
 
-  async function loadPricingProfiles() {
+  function saveServerUrl() {
+    const normalized = normalizeServerUrl(serverUrlDraft) || configuredServerUrl;
+    setServerUrlDraft(normalized);
+    setServerUrl(normalized);
+    localStorage.setItem("deepcodex.serverUrl", normalized);
+    setServerMessage(`Using ${normalized}`);
+    if (normalized === serverUrl) {
+      void loadPricingProfiles(normalized);
+      void loadPolicyProfiles(workspace, normalized);
+    }
+  }
+
+  async function loadPricingProfiles(baseUrl = serverUrl) {
     try {
-      const response = await fetch(`${serverUrl}/api/pricing-profiles`);
+      const response = await fetch(`${baseUrl}/api/pricing-profiles`);
       if (!response.ok) {
         throw new Error(await readResponseError(response));
       }
@@ -513,13 +531,13 @@ function App() {
     }
   }
 
-  async function loadPolicyProfiles(workspaceOverride = workspace) {
+  async function loadPolicyProfiles(workspaceOverride = workspace, baseUrl = serverUrl) {
     const params = new URLSearchParams();
     if (workspaceOverride) {
       params.set("workspace", workspaceOverride);
     }
     try {
-      const response = await fetch(`${serverUrl}/api/policy-profiles?${params.toString()}`);
+      const response = await fetch(`${baseUrl}/api/policy-profiles?${params.toString()}`);
       if (!response.ok) {
         throw new Error(await readResponseError(response));
       }
@@ -863,6 +881,30 @@ function App() {
             <span className={`fieldStatus ${configState}`}>{configState === "idle" ? "Optional" : configState}</span>
           </div>
           {configMessage ? <p className="fieldHelp">{configMessage}</p> : null}
+        </section>
+
+        <section className="panel">
+          <div className="panelHeading">
+            <label htmlFor="server-url">Server</label>
+            <span className="fieldStatus">{serverStatus}</span>
+          </div>
+          <input
+            id="server-url"
+            value={serverUrlDraft}
+            onChange={(event) => {
+              setServerUrlDraft(event.target.value);
+              setServerMessage("");
+            }}
+            placeholder={configuredServerUrl}
+            spellCheck={false}
+          />
+          <div className="panelActions">
+            <button type="button" className="secondary" onClick={saveServerUrl}>
+              Save server
+            </button>
+            <span className="fieldStatus">{serverDraftChanged ? "Unsaved" : "Active"}</span>
+          </div>
+          {serverMessage ? <p className="fieldHelp">{serverMessage}</p> : null}
         </section>
 
         <section className="panel">
@@ -1515,6 +1557,19 @@ async function readResponseError(response: Response) {
   }
   const text = await response.text();
   return text || fallback;
+}
+
+function normalizeServerUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    return new URL(withProtocol).toString().replace(/\/+$/, "");
+  } catch {
+    return withProtocol.replace(/\/+$/, "");
+  }
 }
 
 function formatBody(value: unknown) {

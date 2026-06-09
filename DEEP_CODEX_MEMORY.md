@@ -59,6 +59,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added structured Web diff rendering for live timelines, session replay, and approval inputs. Unified diffs now render as bordered diff blocks with add/remove/header rows, multiple `diff --` files split into separate blocks, and following `File audit` text preserved as plain audit detail.
 - Verified the Web diff viewer with `npm run build -w @deepcodex/web`, `npm run typecheck`, `npm run verify` (13 files / 93 tests), and an in-app browser replay smoke using a temporary ignored session. Browser DOM checks confirmed two diff blocks, intact `+++` headers, preserved `File audit`, and zero console errors. Browser screenshot capture timed out in the automation channel, so visual verification used DOM/CSS assertions rather than an image artifact.
 - Verified shell failure handling with `npx vitest run packages/core/src/tools.test.ts` (25 tests), `npm run typecheck`, and final `npm run verify` (13 files / 95 tests).
+- Added runtime-configurable Web server URL. `VITE_DEEPCODEX_SERVER_URL` sets the build/default API base, the Web sidebar exposes a Server field, values are normalized and saved to `localStorage`, and the setting is shared by agent runs, memory, config, sessions, exports, retention, approvals, profiles, and pricing calls.
+- Verified the Web server URL control with `npm run build -w @deepcodex/web`, `npm run typecheck`, and an in-app browser smoke: Server input rendered, Save server normalized/saved `http://127.0.0.1:17361`, status stayed `Default`, and console errors were zero.
 
 ## Architecture Decisions
 
