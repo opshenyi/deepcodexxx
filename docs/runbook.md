@@ -182,6 +182,8 @@ Agent events are redacted for common secret patterns before they are streamed to
 
 Write and edit tools also apply sensitive-text checks before producing diffs or writing files. Probable secrets and workspace `dlpPatterns` matches are blocked by default and reported by finding type without returning raw secret values. Set `policy.allowSecretWrites: true` only in a trusted workspace policy when a fixture or migration intentionally needs secret-like text.
 
+The same sensitive-text detector can run as a read-only workspace security scan from CLI or Web/Desktop. The scan respects denied paths, denied extensions, binary detection, `maxFileBytes`, and workspace `dlpPatterns`, and reports only file path, line number, finding type, and label. It does not return the matched secret value or line text.
+
 ZIP-compatible archive listing is disabled by default. When `policy.allowArchiveListing: true`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or CLI `--allow-archive-listing` is set, the agent can call `list_archive_entries` to read the ZIP central directory and return bounded entry metadata. It does not extract files, decompress data, return entry contents, return archive comments, or bypass denied workspace paths. Entries matching denied path policy are omitted from the manifest.
 
 PDF text extraction is disabled by default. When `policy.allowPdfTextExtraction: true`, `DEEPCODEX_ALLOW_PDF_TEXT_EXTRACTION=true`, Web `PDF text extraction`, or CLI `--allow-pdf-text-extraction` is set, the agent can call `extract_pdf_text` to read bounded text from a local PDF. It respects denied paths and `maxFileBytes`, requires a PDF header, caps pages and returned characters, and does not return raw bytes, base64 data, images, attachments, or embedded files.
@@ -240,9 +242,10 @@ Recommended demo flow:
 5. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
 6. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
 7. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-8. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-9. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-10. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+8. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+9. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+10. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+11. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -322,9 +325,13 @@ node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex -
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --record
 node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json --fail-on-findings
 ```
 
 CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs.
+
+`security scan` is a read-only preflight for existing probable secrets. Use `--json` for CI artifacts and `--fail-on-findings` when a workspace should fail the gate if any finding metadata is reported. The command reports finding type and label only; it does not print matched values.
 
 Inspect workspace defaults:
 
@@ -463,6 +470,8 @@ The `list_archive_entries` tool can list ZIP-compatible archive entry metadata o
 
 The `extract_pdf_text` tool can extract local PDF text only when PDF text extraction policy is explicitly enabled. It reads the PDF through the shared file policy, reports page and character bounds, and does not expose raw PDF bytes, base64 content, images, attachments, or embedded files.
 
+The Security scan panel and CLI `security scan` command use the same detector as write-time DLP blocking to scan existing allowed text files for probable secrets. The output is intentionally metadata-only: path, line, type, and label.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check |
@@ -478,6 +487,7 @@ The `extract_pdf_text` tool can extract local PDF text only when PDF text extrac
 | Shell command changes are missing from the workspace. | Shell execution mode is `workspace-copy`, so relative-path writes happened in the temporary snapshot. | Use direct mode only when the command is intentionally allowed to update the selected workspace, or keep workspace-copy for verification commands. |
 | Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
 | Write or edit is blocked by DLP policy. | The proposed content looks like a secret assignment, bearer token, token literal, or workspace custom DLP match. | Move the value to an environment variable or set `policy.allowSecretWrites: true` only for a trusted fixture/migration workspace. |
+| Security scan reports findings. | Existing allowed text files match built-in sensitive patterns or workspace `dlpPatterns`. | Review the reported path and line locally, move real secrets out of the workspace, or tune project-specific patterns for false positives. |
 | A project-specific secret still appears in output. | Redaction is pattern-based. | Add the pattern to a future project DLP policy and rotate the exposed secret if necessary. |
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |

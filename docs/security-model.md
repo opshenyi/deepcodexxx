@@ -119,11 +119,13 @@ Implemented controls:
 - Tool output sent back into the model loop is redacted, reducing the chance that a later assistant message repeats a secret.
 - `.deepcodex/config.json` can add workspace-specific regex redaction patterns through `policy.redactionPatterns`; matches are replaced with `[redacted-custom]` before streaming, persistence, and model-loop reuse.
 - `.deepcodex/config.json` can add workspace-specific write-time DLP regex patterns through `policy.dlpPatterns`; matches block `write_file` and `edit_file` unless `allowSecretWrites` is enabled.
+- CLI `security scan` and the Web/Desktop Security scan panel can scan existing allowed text files for probable secrets using the built-in sensitive patterns and workspace `dlpPatterns`. Results include path, line, finding type, and label only; matched values and line text are not returned.
 
 Current limitations:
 
 - Redaction is pattern-based and should be expanded with richer DLP classification before team or hosted use.
 - Write-time DLP is pattern-based and may miss transformed or indirect secrets; it should be expanded with richer classification before team or hosted use.
+- Workspace security scans are bounded, pattern-based, and limited to allowed text files; they are a preflight aid, not a full secret-management or data-loss-prevention system.
 - Existing session files created before this control was added are not rewritten retroactively.
 
 ## Data Handling

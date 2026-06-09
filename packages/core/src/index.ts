@@ -9,6 +9,7 @@ export * from "./provider-policy.js";
 export * from "./pricing.js";
 export * from "./redaction.js";
 export * from "./safety.js";
+export * from "./sensitive-scan.js";
 export * from "./session-store.js";
 export * from "./tools.js";
 export * from "./types.js";

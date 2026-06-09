@@ -35,6 +35,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Shell commands can run in `workspace-copy` mode, which snapshots allowed workspace files into a temporary directory, runs the command there, records shell audit metadata, and removes the snapshot afterward.
 - Shell command failures, timeouts, signals, and output overflows are reported as failed tool results so verification failures remain visible to the agent and user.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.
+- Existing probable secrets can be scanned from CLI or Web/Desktop as metadata-only findings without returning matched values.
 - ZIP archive entry listing is blocked unless `allowArchiveListing` is explicitly enabled, and even then returns only bounded central-directory metadata without extraction.
 - PDF text extraction is blocked unless `allowPdfTextExtraction` is explicitly enabled, and even then returns only bounded text without raw bytes, images, attachments, embedded files, or base64 content.
 - Missing API keys trigger demo mode instead of crashing the product.

@@ -22,6 +22,7 @@ import {
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
+  scanWorkspaceSensitiveText,
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
   createWorkspacePolicyBundle,
@@ -48,7 +49,8 @@ import type {
   ToolApprovalRequest,
   WorkspaceContext,
   WorkspaceConfig,
-  WorkspaceEvalTask
+  WorkspaceEvalTask,
+  SensitiveTextScanResult
 } from "@deepcodex/core";
 
 const program = new Command();
@@ -327,6 +329,42 @@ const evals = program.command("evals").description("Run DeepCodex smoke evaluati
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
 const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
+const security = program.command("security").description("Run local workspace security checks.");
+
+security
+  .command("scan")
+  .description("Scan allowed workspace text files for probable secrets without returning secret values.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .option("--max-files <number>", "Maximum text files to scan", "500")
+  .option("--max-findings <number>", "Maximum findings to report", "200")
+  .option("--fail-on-findings", "Exit non-zero when findings are present", false)
+  .action(
+    async (options: {
+      workspace: string;
+      json: boolean;
+      maxFiles?: string;
+      maxFindings?: string;
+      failOnFindings: boolean;
+    }) => {
+      const workspaceConfig = await readWorkspaceConfig(options.workspace);
+      const profile = resolveCliProfile(undefined, workspaceConfig.config);
+      const policy = createPolicy("suggest", undefined, undefined, false, false, false, profile, workspaceConfig.config);
+      const workspace = await createWorkspaceContext(options.workspace, policy);
+      const result = await scanWorkspaceSensitiveText(workspace, {
+        maxFiles: readOptionalInteger(options.maxFiles),
+        maxFindings: readOptionalInteger(options.maxFindings)
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        printSensitiveScanResult(result);
+      }
+      if (options.failOnFindings && result.findings.length > 0) {
+        process.exitCode = 1;
+      }
+    }
+  );
 
 evals
   .command("list")
@@ -976,6 +1014,26 @@ function printEvalTask(task: EvalTask): void {
   console.log(task.prompt);
 }
 
+function printSensitiveScanResult(result: SensitiveTextScanResult): void {
+  console.log(chalk.bold("security scan"));
+  console.log(`scanned files: ${result.scannedFiles}`);
+  console.log(`files with findings: ${result.filesWithFindings}`);
+  console.log(`findings: ${result.findings.length}`);
+  console.log(`skipped denied: ${result.skipped.denied}`);
+  console.log(`skipped oversized: ${result.skipped.oversized}`);
+  console.log(`skipped binary: ${result.skipped.binary}`);
+  console.log(`skipped unreadable: ${result.skipped.unreadable}`);
+  console.log(`truncated: ${result.truncated ? "yes" : "no"}`);
+  if (result.findings.length === 0) {
+    console.log("No probable secrets found in scanned text files.");
+    return;
+  }
+  console.log("");
+  for (const finding of result.findings) {
+    console.log(`${finding.path}:${finding.line}  ${finding.type}:${finding.label}`);
+  }
+}
+
 function scoreEvalResult(task: EvalTask, finalText: string): EvalScore {
   const normalizedFinalText = normalizeEvalText(finalText);
   const matchedSignals = task.expectedSignals.filter((signal) => normalizedFinalText.includes(normalizeEvalText(signal)));
@@ -1564,7 +1622,7 @@ function readOptionalInteger(value: unknown): number | undefined {
     return undefined;
   }
   if (!Number.isInteger(parsed)) {
-    throw new Error("Retention integer values must be whole numbers.");
+    throw new Error("Integer values must be whole numbers.");
   }
   return parsed;
 }

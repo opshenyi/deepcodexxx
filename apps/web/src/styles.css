@@ -1098,6 +1098,46 @@ pre {
   padding: 8px 10px;
 }
 
+.securityScanBody {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.securityFindingList {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.securityFinding {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 10px;
+}
+
+.securityFinding strong,
+.securityFinding span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.securityFinding strong {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.securityFinding span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .railFoot {
   border-top: 1px solid var(--line);
   color: var(--muted);

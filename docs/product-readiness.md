@@ -32,6 +32,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
 - Workspace-specific custom redaction regex patterns for project identifiers or secret formats not covered by built-ins.
 - Write-time DLP blocking for probable secrets and workspace-defined DLP patterns before file diffs or writes are returned.
+- Read-only workspace security scan from CLI and Web/Desktop for existing probable secrets, reporting only path, line, finding type, and label.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
@@ -73,7 +74,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, Web unified/split diff review, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, Web unified/split diff review, existing-secret preflight scan, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
 | Desktop release | Closer, but not installer-ready. | Has production-like local server bootstrap; still needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 

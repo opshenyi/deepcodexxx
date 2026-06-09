@@ -251,6 +251,28 @@ type SessionRetentionResult = {
   dryRun: boolean;
 };
 
+type SecurityScanFinding = {
+  path: string;
+  line: number;
+  type: string;
+  label: string;
+};
+
+type SecurityScanResult = {
+  scannedFiles: number;
+  filesWithFindings: number;
+  findings: SecurityScanFinding[];
+  maxFiles: number;
+  maxFindings: number;
+  truncated: boolean;
+  skipped: {
+    denied: number;
+    oversized: number;
+    binary: number;
+    unreadable: number;
+  };
+};
+
 type PolicyProfileOption = {
   id: string;
   label: string;
@@ -412,6 +434,9 @@ function App() {
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
   const [retentionState, setRetentionState] = useState<LoadState>("idle");
+  const [securityScanState, setSecurityScanState] = useState<LoadState>("idle");
+  const [securityScan, setSecurityScan] = useState<SecurityScanResult | null>(null);
+  const [securityScanMessage, setSecurityScanMessage] = useState("");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [configMessage, setConfigMessage] = useState("");
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
@@ -464,6 +489,8 @@ function App() {
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const policyBundleStatus = formatPolicyBundleStatus(policyBundle, policyBundleState);
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
+  const securityScanStatus = formatSecurityScanStatus(securityScan, securityScanState);
+  const securityScanTone = formatSecurityScanTone(securityScan, securityScanState);
   const selectedWorkspaceProfile = workspaceProfiles.find((profile) => profile.id === selectedWorkspaceProfileId);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
@@ -487,6 +514,9 @@ function App() {
     setPolicyBundle(null);
     setPolicyBundleState("idle");
     setPolicyBundleMessage("");
+    setSecurityScan(null);
+    setSecurityScanState("idle");
+    setSecurityScanMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -694,6 +724,35 @@ function App() {
       setPolicyBundle(null);
       setPolicyBundleMessage(message);
       setPolicyBundleState("error");
+    }
+  }
+
+  async function loadSecurityScan() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    if (policyProfileId !== "custom") {
+      params.set("profileId", policyProfileId);
+    }
+    params.set("maxFiles", "500");
+    params.set("maxFindings", "200");
+    setSecurityScanState("loading");
+    setSecurityScanMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/security/scan?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { result: SecurityScanResult };
+      setSecurityScan(body.result);
+      setSecurityScanMessage(formatSecurityScanMessage(body.result));
+      setSecurityScanState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSecurityScan(null);
+      setSecurityScanMessage(message);
+      setSecurityScanState("error");
     }
   }
 
@@ -1699,6 +1758,58 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Security scan</span>
+              <h2>DLP findings</h2>
+            </div>
+            <span className={`outputStatus ${securityScanTone}`}>{securityScanStatus}</span>
+          </div>
+          <div className="securityScanBody">
+            <p className={securityScanState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {securityScanMessage || "No scan loaded."}
+            </p>
+            {securityScan ? (
+              <dl className="policyBundleFacts">
+                <div>
+                  <dt>Scanned</dt>
+                  <dd>{securityScan.scannedFiles}</dd>
+                </div>
+                <div>
+                  <dt>Skipped</dt>
+                  <dd>
+                    {securityScan.skipped.denied + securityScan.skipped.oversized + securityScan.skipped.binary + securityScan.skipped.unreadable}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Truncated</dt>
+                  <dd>{securityScan.truncated ? "Yes" : "No"}</dd>
+                </div>
+              </dl>
+            ) : null}
+            {securityScan?.findings.length ? (
+              <div className="securityFindingList">
+                {securityScan.findings.slice(0, 12).map((finding, index) => (
+                  <article key={`${finding.path}-${finding.line}-${finding.type}-${index}`} className="securityFinding">
+                    <strong>{finding.path}</strong>
+                    <span>
+                      line {finding.line} / {finding.type}:{finding.label}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={loadSecurityScan}
+              disabled={securityScanState === "loading"}
+            >
+              {securityScanState === "loading" ? "Scanning" : "Run scan"}
+            </button>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Workspace memory</span>
               <h2>Memory</h2>
             </div>
@@ -2360,6 +2471,40 @@ function formatPolicyBundleStatus(
     return policyBundle.trusted ? "Failed" : "Untrusted";
   }
   return "Failed";
+}
+
+function formatSecurityScanStatus(scan: SecurityScanResult | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Scanning";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!scan) {
+    return "Not run";
+  }
+  return scan.findings.length > 0 ? `${scan.findings.length} findings` : "Clear";
+}
+
+function formatSecurityScanTone(scan: SecurityScanResult | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error" || (scan && scan.findings.length > 0)) {
+    return "error";
+  }
+  if (scan) {
+    return "ready";
+  }
+  return "idle";
+}
+
+function formatSecurityScanMessage(scan: SecurityScanResult): string {
+  if (scan.findings.length === 0) {
+    return `Scanned ${scan.scannedFiles} files. No probable secrets found.`;
+  }
+  const suffix = scan.truncated ? " Results are truncated." : "";
+  return `Found ${scan.findings.length} probable secret signals in ${scan.filesWithFindings} files.${suffix}`;
 }
 
 function formatPolicyBundleTone(policyBundle: PolicyBundleVerificationResult | null, state: LoadState): string {

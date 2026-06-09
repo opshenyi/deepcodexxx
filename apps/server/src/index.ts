@@ -20,6 +20,7 @@ import {
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
+  scanWorkspaceSensitiveText,
   assertProviderAllowed,
   resolveProviderSelection,
   runDeepCodexAgent,
@@ -101,6 +102,27 @@ app.get("/api/workspace-config", async (req, res, next) => {
 app.get("/api/policy-bundle", async (req, res, next) => {
   try {
     res.json(await verifyWorkspacePolicyBundle(readWorkspace(req.query.workspace), await readPolicyBundleVerificationOptions()));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/security/scan", async (req, res, next) => {
+  try {
+    const workspacePath = readWorkspace(req.query.workspace);
+    const workspaceConfig = await readWorkspaceConfig(workspacePath);
+    const profile = readPolicyProfile(
+      typeof req.query.profileId === "string" ? req.query.profileId : undefined,
+      workspaceConfig.config
+    );
+    const policy = createRunPolicy("suggest", false, false, false, undefined, profile, workspaceConfig.config);
+    const workspace = await createWorkspaceContext(workspacePath, policy);
+    res.json({
+      result: await scanWorkspaceSensitiveText(workspace, {
+        maxFiles: readOptionalInteger(req.query.maxFiles),
+        maxFindings: readOptionalInteger(req.query.maxFindings)
+      })
+    });
   } catch (error) {
     next(error);
   }
@@ -550,7 +572,7 @@ function readOptionalInteger(value: unknown): number | undefined {
     return undefined;
   }
   if (!Number.isInteger(parsed)) {
-    throw new Error("Retention integer values must be whole numbers.");
+    throw new Error("Integer values must be whole numbers.");
   }
   return parsed;
 }
