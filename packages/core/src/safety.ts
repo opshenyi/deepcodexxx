@@ -28,6 +28,37 @@ export function assertShellCommandAllowed(command: string, policy: ApprovalPolic
   }
 }
 
+export function createShellEnvironment(policy: ApprovalPolicy): NodeJS.ProcessEnv {
+  if (policy.shellEnvironment === "inherit") {
+    return { ...process.env };
+  }
+
+  const allowed = new Set([
+    "ALLUSERSPROFILE",
+    "APPDATA",
+    "COMSPEC",
+    "ComSpec",
+    "HOME",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "LOCALAPPDATA",
+    "PATH",
+    "PATHEXT",
+    "Path",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "SystemDrive",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "WINDIR",
+    "windir"
+  ]);
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => allowed.has(key)));
+}
+
 export function truncateForModel(value: string, maxLength = 20_000): string {
   if (value.length <= maxLength) {
     return value;
@@ -36,4 +67,3 @@ export function truncateForModel(value: string, maxLength = 20_000): string {
   const tail = value.slice(-Math.floor(maxLength * 0.25));
   return `${head}\n\n[output truncated]\n\n${tail}`;
 }
-

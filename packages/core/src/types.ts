@@ -114,6 +114,7 @@ export type AgentEventHandler = (event: AgentEvent) => void | Promise<void>;
 
 export type ApprovalMode = "suggest" | "workspace-write" | "full-access";
 export type ToolApprovalRisk = "workspace-write" | "shell" | "memory";
+export type ShellEnvironmentMode = "minimal" | "inherit";
 
 export interface ToolApprovalRequest {
   approvalId: string;
@@ -141,6 +142,7 @@ export interface ApprovalPolicy {
   allowStateWrite?: boolean;
   deniedPaths?: string[];
   maxFileBytes?: number;
+  shellEnvironment?: ShellEnvironmentMode;
 }
 
 export interface AgentRunOptions {

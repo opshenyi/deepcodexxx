@@ -28,6 +28,7 @@ Expected result:
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor` reports configured budget environment values when present.
+- CLI `doctor` reports shell environment mode, defaulting to `minimal`.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
 
 ## Web Demo Verification
@@ -87,6 +88,7 @@ Checklist:
 - `ask` prints session, step, tool, and final output events.
 - Budgeted `ask` prints budget status when the provider returns usage metadata.
 - `--mode suggest` does not allow shell or file write/edit tools.
+- Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.
 
 ## Write-Mode Demo Verification
 

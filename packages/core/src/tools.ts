@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
-import { assertShellCommandAllowed, canWriteFiles, truncateForModel } from "./safety.js";
+import { assertShellCommandAllowed, canWriteFiles, createShellEnvironment, truncateForModel } from "./safety.js";
 import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
 import { isDeniedByPatterns, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
@@ -251,6 +251,7 @@ const runCommandTool: RuntimeTool = {
     const timeout = Math.min(numberValue(args.timeoutMs, 60_000), 180_000);
     const result = await execAsync(command, {
       cwd: runtime.workspace.root,
+      env: createShellEnvironment(runtime.workspace.policy),
       timeout,
       windowsHide: true,
       maxBuffer: 1024 * 1024 * 4

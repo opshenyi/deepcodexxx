@@ -15,7 +15,7 @@ import {
   readWorkspaceMemory,
   runDeepCodexAgent
 } from "@deepcodex/core";
-import type { AgentEvent, ApprovalMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
+import type { AgentEvent, ApprovalMode, ShellEnvironmentMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
 import type { BudgetPolicy, SessionRetentionPolicy } from "@deepcodex/core";
 
 const app = express();
@@ -264,8 +264,17 @@ function createRunPolicy(mode: ApprovalMode | undefined) {
     allowNetwork: false,
     allowStateWrite: selected !== "suggest",
     deniedPaths: readDeniedPathsFromEnv(),
-    maxFileBytes: readMaxFileBytesFromEnv()
+    maxFileBytes: readMaxFileBytesFromEnv(),
+    shellEnvironment: readShellEnvironmentModeFromEnv()
   };
+}
+
+function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode {
+  const value = process.env.DEEPCODEX_SHELL_ENV ?? "minimal";
+  if (value === "minimal" || value === "inherit") {
+    return value;
+  }
+  throw new Error("DEEPCODEX_SHELL_ENV must be minimal or inherit.");
 }
 
 function createRetentionPolicy(input?: {

@@ -23,6 +23,7 @@ import type {
   FileAuditEntry,
   FileHashSnapshot,
   SessionRetentionPolicy,
+  ShellEnvironmentMode,
   ToolAuditMetadata,
   SessionEventRecorder,
   ToolApprovalDecision,
@@ -47,6 +48,7 @@ program
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
   .action(
     async (
       promptParts: string[],
@@ -59,12 +61,13 @@ program
         maxSessionUsd?: string;
         inputUsdPerMillionTokens?: string;
         outputUsdPerMillionTokens?: string;
+        shellEnv: string;
       }
     ) => {
       const approvalMode = parseCliApprovalMode(options.approval);
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
-        const policy = createPolicy(options.mode);
+        const policy = createPolicy(options.mode, options.shellEnv);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
@@ -92,6 +95,7 @@ program
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
   .action(async (options: {
     workspace: string;
     mode: string;
@@ -100,6 +104,7 @@ program
     maxSessionUsd?: string;
     inputUsdPerMillionTokens?: string;
     outputUsdPerMillionTokens?: string;
+    shellEnv: string;
   }) => {
     const rl = createInterface({ input, output });
     const approvalMode = parseCliApprovalMode(options.approval);
@@ -110,7 +115,7 @@ program
         if (!prompt) {
           break;
         }
-        const policy = createPolicy(options.mode);
+        const policy = createPolicy(options.mode, options.shellEnv);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
@@ -235,6 +240,7 @@ program
     console.log(
       `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
     );
+    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? "minimal"}`);
     console.log(`Node: ${process.version}`);
   });
 
@@ -304,7 +310,7 @@ function parseMode(value: string): "suggest" | "workspace-write" | "full-access"
   throw new Error("mode must be suggest, workspace-write, or full-access");
 }
 
-function createPolicy(mode: string): ApprovalPolicy {
+function createPolicy(mode: string, shellEnv = process.env.DEEPCODEX_SHELL_ENV ?? "minimal"): ApprovalPolicy {
   return {
     mode: parseMode(mode),
     allowFileWrite: mode !== "suggest",
@@ -312,8 +318,16 @@ function createPolicy(mode: string): ApprovalPolicy {
     allowNetwork: false,
     allowStateWrite: mode !== "suggest",
     deniedPaths: readDeniedPathsFromEnv(),
-    maxFileBytes: readMaxFileBytesFromEnv()
+    maxFileBytes: readMaxFileBytesFromEnv(),
+    shellEnvironment: parseShellEnvironmentMode(shellEnv)
   };
+}
+
+function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {
+  if (value === "minimal" || value === "inherit") {
+    return value;
+  }
+  throw new Error("shell-env must be minimal or inherit");
 }
 
 function createRetentionPolicy(options: {

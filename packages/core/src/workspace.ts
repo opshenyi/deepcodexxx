@@ -9,7 +9,8 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowNetwork: false,
   allowStateWrite: true,
   deniedPaths: [".git", "node_modules", "references/agents", ".env", ".env.*", ".deepcodex/state"],
-  maxFileBytes: 512 * 1024
+  maxFileBytes: 512 * 1024,
+  shellEnvironment: "minimal"
 };
 
 export async function createWorkspaceContext(
@@ -32,7 +33,8 @@ export async function createWorkspaceContext(
         ? false
         : (policy.allowStateWrite ?? DEFAULT_POLICY.allowStateWrite),
     deniedPaths: uniqueDeniedPaths([...(DEFAULT_POLICY.deniedPaths ?? []), ...(policy.deniedPaths ?? [])]),
-    maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes
+    maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
+    shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment
   };
 
   const memoryDir = path.join(root, ".deepcodex");

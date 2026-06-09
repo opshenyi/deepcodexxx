@@ -35,6 +35,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS` | Optional. | Empty. | Output token price used for local cost estimates. Prices are external configuration, not hard-coded. |
 | `DEEPCODEX_MAX_SESSIONS` | Optional. | Empty. | Default maximum retained session history files for retention pruning. |
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
+| `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -151,6 +152,12 @@ Run a bounded write-mode task on a disposable workspace:
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --max-steps 12 "Make a small documentation improvement and summarize the change."
 ```
 
+Run a shell-capable task while keeping the shell environment minimal:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --shell-env minimal "Run the relevant verification command and summarize the result."
+```
+
 Run with a token budget:
 
 ```powershell
@@ -191,6 +198,7 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
+| Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |

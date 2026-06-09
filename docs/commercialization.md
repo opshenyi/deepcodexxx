@@ -25,7 +25,7 @@ Primary audiences:
 | Web client | Browser console for workspace path, execution mode, prompt, event stream, session replay, audit export, memory, and final output. | `apps/web`. | Demo-ready. | Add saved workspace profiles, diff viewer, and configurable server URL. |
 | Desktop client | Electron shell that hosts the Web experience after server and Web are available. | `apps/desktop`, `npm run dev:desktop`. | Demo-ready for local development. | Add packaged installers, signing, auto-update policy, and OS-specific QA. |
 | CLI client | `doctor`, `ask`, `memory`, and `sessions list/show/export` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, and broader non-interactive CI mode. |
-| Workspace safety | Path resolution prevents file tools from escaping the workspace; denied path patterns protect `.git`, `node_modules`, `references/agents`, env files, and session audit state by default; file-size limits reduce runaway context and memory usage. | `workspace.ts`, safety tests. | MVP-ready. | Add OS-level sandboxing for shell and broader security regression tests. |
+| Workspace safety | Path resolution prevents file tools from escaping the workspace; denied path patterns protect `.git`, `node_modules`, `references/agents`, env files, and session audit state by default; file-size limits reduce runaway context and memory usage; shell tools default to a minimal child-process environment. | `workspace.ts`, safety tests. | MVP-ready. | Add OS-level sandboxing for shell and broader security regression tests. |
 | Approval modes | `suggest`, `workspace-write`, and `full-access` control file and shell behavior. Tool approval mode can be `auto`, `manual`, or `deny`; manual pauses write, shell, and memory tools, and approval events record actor, request time, decision time, latency, and before-file hashes for file edits when available. | CLI options, server request policy, Web approval queue and replay view. | Demo-ready with documented limits. | Add reusable team policy profiles. |
 | Memory | Workspace memory persists under `.deepcodex/memory.md` and can be read from Web, CLI, and server API. `suggest` agent runs do not create workspace memory or session state. | `memory` tool, `/api/memory`, strict read-only tests. | Demo-ready. | Add memory review, redaction, and retention policy. |
 | Reference research | Reference agent survey documents studied projects and clean-room constraints. | `docs/reference-agents.md`. | Ready for interview review. | Add a formal license review before external distribution. |
@@ -35,7 +35,7 @@ Primary audiences:
 | Package | Purpose | Current state | Release requirement |
 | --- | --- | --- | --- |
 | Interview artifact | Demonstrate architecture, product surface, safety model, and roadmap. | Ready after checklist passes. | Keep docs current, run tests, and prepare a short demo path. |
-| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible for controlled local trials. | Add shell isolation, redaction policy, and documented data handling. |
+| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible for controlled local trials. | Add OS-level shell sandboxing, redaction policy, and documented data handling. |
 | Hosted product | Multi-user service with managed workspaces and auth. | Future work. | Add tenancy, RBAC, audit logs, secrets management, and infrastructure isolation. |
 
 ## Demo Narrative

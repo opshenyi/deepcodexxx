@@ -198,4 +198,66 @@ describe("workspace tools", () => {
     expect(result.content).toContain("small.txt:1");
     expect(result.content).not.toContain("asset.bin");
   });
+
+  it("runs shell commands with a minimal environment by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const previousSecret = process.env.DEEPCODEX_TEST_SECRET;
+    process.env.DEEPCODEX_TEST_SECRET = "should-not-leak";
+    try {
+      const workspace = await createWorkspaceContext(tempDir, {
+        mode: "workspace-write",
+        allowShell: true,
+        shellEnvironment: "minimal"
+      });
+      const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+      expect(runTool).toBeDefined();
+
+      const result = await runTool!.run(
+        { command: `${quoteCommandPath(process.execPath)} -e "console.log(process.env.DEEPCODEX_TEST_SECRET || 'missing')"` },
+        { workspace }
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.content.trim()).toBe("missing");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env.DEEPCODEX_TEST_SECRET;
+      } else {
+        process.env.DEEPCODEX_TEST_SECRET = previousSecret;
+      }
+    }
+  });
+
+  it("can explicitly inherit the shell environment", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const previousSecret = process.env.DEEPCODEX_TEST_SECRET;
+    process.env.DEEPCODEX_TEST_SECRET = "allowed-secret";
+    try {
+      const workspace = await createWorkspaceContext(tempDir, {
+        mode: "workspace-write",
+        allowShell: true,
+        shellEnvironment: "inherit"
+      });
+      const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+      expect(runTool).toBeDefined();
+
+      const result = await runTool!.run(
+        { command: `${quoteCommandPath(process.execPath)} -e "console.log(process.env.DEEPCODEX_TEST_SECRET || 'missing')"` },
+        { workspace }
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.content.trim()).toBe("allowed-secret");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env.DEEPCODEX_TEST_SECRET;
+      } else {
+        process.env.DEEPCODEX_TEST_SECRET = previousSecret;
+      }
+    }
+  });
 });
+
+function quoteCommandPath(value: string): string {
+  return `"${value.replaceAll('"', '\\"')}"`;
+}
