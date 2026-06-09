@@ -43,6 +43,7 @@ Implemented controls:
 - Workspace paths are resolved with `path.resolve` and rejected if they escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, `.env`, `.env.*`, `.deepcodex/state`, and common generated/build output folders such as `dist`, `build`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.vite`, and `.parcel-cache` are denied by default for file listing, reading, writing, editing, and search. Nested matches are covered with `**` patterns.
 - `DEEPCODEX_DENIED_PATHS` can extend the default denied path patterns for controlled environments, including `**` patterns such as `**/*.map`.
+- Common media, archive, Office/PDF, executable, library, and WebAssembly extensions are denied by default for file listing, reading, writing, editing, and search. `DEEPCODEX_DENIED_EXTENSIONS` can extend the default list.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
@@ -55,7 +56,7 @@ Current limitations:
 - The shell tool is not constrained by the same path resolver after a command starts.
 - A shell command can invoke external programs with the user's local permissions.
 - The denial list is intentionally small and should become configurable for real pilots.
-- Specialized generated-asset handling is path-based; future work should add richer media and artifact-type policies.
+- Specialized media/artifact handling is deny-list based; future work should add purpose-built tools for safe extraction or preview.
 
 ## Shell Controls
 

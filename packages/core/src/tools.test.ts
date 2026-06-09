@@ -154,6 +154,32 @@ describe("workspace tools", () => {
     expect(result.content).toContain("File appears to be binary");
   });
 
+  it("rejects common media and artifact extensions before reading", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "image.png"), "not really an image", "utf8");
+    const workspace = await createWorkspaceContext(tempDir);
+    const readTool = createDefaultTools().find((tool) => tool.definition.function.name === "read_file");
+    expect(readTool).toBeDefined();
+
+    const result = await readTool!.run({ path: "image.png" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied file extension");
+  });
+
+  it("rejects writes to common media and artifact extensions", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+    const writeTool = createDefaultTools().find((tool) => tool.definition.function.name === "write_file");
+    expect(writeTool).toBeDefined();
+
+    const result = await writeTool!.run({ path: "bundle.zip", content: "zip" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied file extension");
+    await expect(readFile(path.join(tempDir, "bundle.zip"), "utf8")).rejects.toThrow();
+  });
+
   it("rejects editing binary files", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const binary = Buffer.from([0, 65, 66, 67]);
@@ -197,6 +223,25 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain("small.txt:1");
     expect(result.content).not.toContain("asset.bin");
+  });
+
+  it("skips denied media and artifact extensions when listing and searching", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "small.txt"), "needle\n", "utf8");
+    await writeFile(path.join(tempDir, "image.png"), "needle\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir);
+    const listTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_files");
+    const searchTool = createDefaultTools().find((tool) => tool.definition.function.name === "search_files");
+    expect(listTool).toBeDefined();
+    expect(searchTool).toBeDefined();
+
+    const listResult = await listTool!.run({ path: "." }, { workspace });
+    const searchResult = await searchTool!.run({ query: "needle" }, { workspace });
+
+    expect(listResult.content).toContain("small.txt");
+    expect(listResult.content).not.toContain("image.png");
+    expect(searchResult.content).toContain("small.txt:1");
+    expect(searchResult.content).not.toContain("image.png");
   });
 
   it("runs shell commands with a minimal environment by default", async () => {

@@ -6,7 +6,7 @@ import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
 import { assertShellCommandAllowed, canWriteFiles, createShellEnvironment, truncateForModel } from "./safety.js";
 import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
-import { isDeniedByPatterns, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
+import { isDeniedByPatterns, isDeniedFileExtension, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
 const execAsync = promisify(exec);
 
@@ -43,7 +43,14 @@ const listFilesTool: RuntimeTool = {
     const start = resolveWorkspacePath(runtime.workspace, stringValue(args.path, "."));
     const maxDepth = Math.min(numberValue(args.maxDepth, 2), 4);
     const entries: string[] = [];
-    await walk(start, runtime.workspace.root, maxDepth, entries, runtime.workspace.policy.deniedPaths ?? []);
+    await walk(
+      start,
+      runtime.workspace.root,
+      maxDepth,
+      entries,
+      runtime.workspace.policy.deniedPaths ?? [],
+      runtime.workspace.policy.deniedFileExtensions ?? []
+    );
     return ok(entries.join("\n") || ".");
   }
 };
@@ -67,8 +74,9 @@ const readFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
-      return fail(`Denied path: ${rel}`);
+    const denial = filePolicyDenial(rel, runtime);
+    if (denial) {
+      return fail(denial);
     }
     const targetStat = await stat(target);
     if (exceedsFileLimit(targetStat.size, runtime)) {
@@ -102,8 +110,9 @@ const writeFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
-      return fail(`Denied path: ${rel}`);
+    const denial = filePolicyDenial(rel, runtime);
+    if (denial) {
+      return fail(denial);
     }
     const next = stringValue(args.content);
     if (exceedsFileLimit(Buffer.byteLength(next, "utf8"), runtime)) {
@@ -150,8 +159,9 @@ const editFileTool: RuntimeTool = {
     const args = objectInput(input);
     const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
     const rel = workspaceRelative(runtime.workspace, target);
-    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
-      return fail(`Denied path: ${rel}`);
+    const denial = filePolicyDenial(rel, runtime);
+    if (denial) {
+      return fail(denial);
     }
     const targetStat = await stat(target);
     if (exceedsFileLimit(targetStat.size, runtime)) {
@@ -199,11 +209,21 @@ const searchFilesTool: RuntimeTool = {
     const query = stringValue(args.query);
     const start = resolveWorkspacePath(runtime.workspace, stringValue(args.path, "."));
     const files: string[] = [];
-    await collectFiles(start, runtime.workspace.root, files, 350, runtime.workspace.policy.deniedPaths ?? []);
+    await collectFiles(
+      start,
+      runtime.workspace.root,
+      files,
+      350,
+      runtime.workspace.policy.deniedPaths ?? [],
+      runtime.workspace.policy.deniedFileExtensions ?? []
+    );
     const matches: string[] = [];
     for (const file of files) {
       const rel = workspaceRelative(runtime.workspace, file);
-      if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+      if (
+        isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? []) ||
+        isDeniedFileExtension(rel, runtime.workspace.policy.deniedFileExtensions ?? [])
+      ) {
         continue;
       }
       const fileStat = await stat(file).catch(() => null);
@@ -313,20 +333,24 @@ async function walk(
   root: string,
   depth: number,
   entries: string[],
-  deniedPaths: string[]
+  deniedPaths: string[],
+  deniedFileExtensions: string[]
 ): Promise<void> {
   const rel = path.relative(root, current) || ".";
   if (isDeniedByPatterns(rel, deniedPaths)) {
     return;
   }
   const currentStat = await stat(current);
+  if (!currentStat.isDirectory() && isDeniedFileExtension(rel, deniedFileExtensions)) {
+    return;
+  }
   entries.push(currentStat.isDirectory() ? `${rel}/` : rel);
   if (!currentStat.isDirectory() || depth <= 0) {
     return;
   }
   const children = await readdir(current, { withFileTypes: true });
   for (const child of children.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 80)) {
-    await walk(path.join(current, child.name), root, depth - 1, entries, deniedPaths);
+    await walk(path.join(current, child.name), root, depth - 1, entries, deniedPaths, deniedFileExtensions);
   }
 }
 
@@ -335,7 +359,8 @@ async function collectFiles(
   root: string,
   files: string[],
   limit: number,
-  deniedPaths: string[]
+  deniedPaths: string[],
+  deniedFileExtensions: string[]
 ): Promise<void> {
   if (files.length >= limit) {
     return;
@@ -346,6 +371,9 @@ async function collectFiles(
   }
   const currentStat = await stat(current);
   if (currentStat.isFile()) {
+    if (isDeniedFileExtension(rel, deniedFileExtensions)) {
+      return;
+    }
     files.push(current);
     return;
   }
@@ -357,7 +385,7 @@ async function collectFiles(
     if (files.length >= limit) {
       break;
     }
-    await collectFiles(path.join(current, child.name), root, files, limit, deniedPaths);
+    await collectFiles(path.join(current, child.name), root, files, limit, deniedPaths, deniedFileExtensions);
   }
 }
 
@@ -385,6 +413,16 @@ function ok(content: string, audit?: ToolResult["audit"]): ToolResult {
 
 function fail(content: string): ToolResult {
   return { ok: false, content };
+}
+
+function filePolicyDenial(relativePath: string, runtime: ToolRuntime): string | undefined {
+  if (isDeniedByPatterns(relativePath, runtime.workspace.policy.deniedPaths ?? [])) {
+    return `Denied path: ${relativePath}`;
+  }
+  if (isDeniedFileExtension(relativePath, runtime.workspace.policy.deniedFileExtensions ?? [])) {
+    return `Denied file extension: ${relativePath}`;
+  }
+  return undefined;
 }
 
 function fileAudit(

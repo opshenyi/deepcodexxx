@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include reusable policy profiles, workspace path guardrails, generated/build output deny patterns, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
+Core safety features include reusable policy profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
 
 ## Quick Start
 
@@ -42,6 +42,7 @@ node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 - `DEEPSEEK_MODEL`: Defaults to `deepseek-chat`.
 - `DEEPCODEX_PORT`: Defaults to `17361`.
 - `DEEPCODEX_WORKSPACE`: Optional default workspace path.
+- `DEEPCODEX_DENIED_EXTENSIONS`: Optional extension deny-list additions for media/artifact files.
 - `DEEPCODEX_MAX_SESSION_TOKENS`: Optional token budget per agent run.
 - `DEEPCODEX_MAX_SESSION_USD`: Optional estimated USD budget per agent run.
 - `DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.

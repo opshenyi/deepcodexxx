@@ -399,6 +399,7 @@ function createPolicy(mode: string | undefined, shellEnv: string | undefined, pr
     allowNetwork: false,
     allowStateWrite: selectedMode !== "suggest" && (profile?.policy.allowStateWrite ?? true),
     deniedPaths: readDeniedPathsFromEnv(),
+    deniedFileExtensions: readDeniedFileExtensionsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv() ?? profile?.policy.maxFileBytes,
     shellEnvironment: parseShellEnvironmentMode(selectedShellEnv)
   };
@@ -516,6 +517,17 @@ function formatUsd(value: number): string {
 
 function readDeniedPathsFromEnv(): string[] | undefined {
   const raw = process.env.DEEPCODEX_DENIED_PATHS;
+  if (!raw) {
+    return undefined;
+  }
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function readDeniedFileExtensionsFromEnv(): string[] | undefined {
+  const raw = process.env.DEEPCODEX_DENIED_EXTENSIONS;
   if (!raw) {
     return undefined;
   }

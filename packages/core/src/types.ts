@@ -150,6 +150,7 @@ export interface ApprovalPolicy {
   allowFileWrite?: boolean;
   allowStateWrite?: boolean;
   deniedPaths?: string[];
+  deniedFileExtensions?: string[];
   maxFileBytes?: number;
   shellEnvironment?: ShellEnvironmentMode;
 }

@@ -38,6 +38,42 @@ const DEFAULT_POLICY: ApprovalPolicy = {
     ".parcel-cache",
     "**/.parcel-cache"
   ],
+  deniedFileExtensions: [
+    ".7z",
+    ".avi",
+    ".bmp",
+    ".dll",
+    ".doc",
+    ".docx",
+    ".dylib",
+    ".exe",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".jar",
+    ".jpeg",
+    ".jpg",
+    ".m4a",
+    ".mkv",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".pdf",
+    ".png",
+    ".ppt",
+    ".pptx",
+    ".rar",
+    ".so",
+    ".tar",
+    ".tgz",
+    ".wasm",
+    ".wav",
+    ".webm",
+    ".webp",
+    ".xls",
+    ".xlsx",
+    ".zip"
+  ],
   maxFileBytes: 512 * 1024,
   shellEnvironment: "minimal"
 };
@@ -62,6 +98,10 @@ export async function createWorkspaceContext(
         ? false
         : (policy.allowStateWrite ?? DEFAULT_POLICY.allowStateWrite),
     deniedPaths: uniqueDeniedPaths([...(DEFAULT_POLICY.deniedPaths ?? []), ...(policy.deniedPaths ?? [])]),
+    deniedFileExtensions: uniqueExtensions([
+      ...(DEFAULT_POLICY.deniedFileExtensions ?? []),
+      ...(policy.deniedFileExtensions ?? [])
+    ]),
     maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
     shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment
   };
@@ -101,6 +141,11 @@ export function isDeniedByPatterns(relativePath: string, deniedPaths: string[]):
   return deniedPaths.some((pattern) => matchesDeniedPattern(normalized, pattern));
 }
 
+export function isDeniedFileExtension(relativePath: string, deniedFileExtensions: string[] = []): boolean {
+  const extension = path.extname(relativePath).toLowerCase();
+  return Boolean(extension && deniedFileExtensions.map(normalizeExtension).includes(extension));
+}
+
 function matchesDeniedPattern(relativePath: string, pattern: string): boolean {
   const normalizedPattern = pattern.trim().replaceAll("\\", "/").replace(/^\/+/, "").replace(/\/+$/, "");
   if (!normalizedPattern) {
@@ -126,4 +171,16 @@ function globPatternToRegexSource(pattern: string): string {
 
 function uniqueDeniedPaths(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function uniqueExtensions(values: string[]): string[] {
+  return [...new Set(values.map(normalizeExtension).filter(Boolean))];
+}
+
+function normalizeExtension(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.startsWith(".") ? trimmed : `.${trimmed}`;
 }

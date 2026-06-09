@@ -2,7 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createWorkspaceContext, isDeniedByPatterns, isDeniedWorkspacePath, resolveWorkspacePath } from "./workspace.js";
+import {
+  createWorkspaceContext,
+  isDeniedByPatterns,
+  isDeniedFileExtension,
+  isDeniedWorkspacePath,
+  resolveWorkspacePath
+} from "./workspace.js";
 
 let tempDir: string | undefined;
 
@@ -47,6 +53,18 @@ describe("workspace boundaries", () => {
     expect(isDeniedByPatterns("app.log", ["*.log"])).toBe(true);
     expect(isDeniedByPatterns("apps/web/app.map", ["**/*.map"])).toBe(true);
     expect(isDeniedByPatterns("src/index.ts", ["secrets", "*.local"])).toBe(false);
+  });
+
+  it("denies common media and artifact extensions", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      deniedFileExtensions: ["foo"]
+    });
+
+    expect(isDeniedFileExtension("assets/logo.png", workspace.policy.deniedFileExtensions)).toBe(true);
+    expect(isDeniedFileExtension("archive/file.foo", workspace.policy.deniedFileExtensions)).toBe(true);
+    expect(isDeniedFileExtension("src/index.ts", workspace.policy.deniedFileExtensions)).toBe(false);
   });
 
   it("extends defaults when custom denied paths are configured", async () => {

@@ -296,6 +296,7 @@ function createRunPolicy(mode: ApprovalMode | undefined, profile: ReturnType<typ
     allowNetwork: false,
     allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: readDeniedPathsFromEnv(),
+    deniedFileExtensions: readDeniedFileExtensionsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv(),
     shellEnvironment: readShellEnvironmentModeFromEnv() ?? base.shellEnvironment
   };
@@ -406,6 +407,17 @@ function removeUndefinedBudgetValues(policy: BudgetPolicy): BudgetPolicy {
 
 function readDeniedPathsFromEnv(): string[] | undefined {
   const raw = process.env.DEEPCODEX_DENIED_PATHS;
+  if (!raw) {
+    return undefined;
+  }
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function readDeniedFileExtensionsFromEnv(): string[] | undefined {
+  const raw = process.env.DEEPCODEX_DENIED_EXTENSIONS;
   if (!raw) {
     return undefined;
   }
