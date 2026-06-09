@@ -29,7 +29,8 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
-- CLI `doctor --json` emits parseable diagnostics.
+- CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
+- CLI `doctor --json --require-*` exits non-zero when a requested API-key, workspace-config, or trusted-policy-bundle condition is not met; run the strict flags that match the planned demo workspace.
 - CLI `doctor` reports provider retry settings.
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.

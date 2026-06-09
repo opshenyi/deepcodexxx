@@ -513,14 +513,35 @@ program
   .command("doctor")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--json", "Print JSON output", false)
-  .action(async (options: { workspace: string; json: boolean }) => {
+  .option("--require-api-key", "Exit non-zero when DEEPSEEK_API_KEY is missing", false)
+  .option("--require-workspace-config", "Exit non-zero when .deepcodex/config.json is missing", false)
+  .option("--require-trusted-policy-bundle", "Exit non-zero unless the policy bundle verifies with a trusted key", false)
+  .action(async (options: {
+    workspace: string;
+    json: boolean;
+    requireApiKey: boolean;
+    requireWorkspaceConfig: boolean;
+    requireTrustedPolicyBundle: boolean;
+  }) => {
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
     const profile = resolveCliProfile(undefined, workspaceConfig.config);
     const basePolicy: Partial<ApprovalPolicy> = { ...profile?.policy, ...(workspaceConfig.config.policy ?? {}) };
     const provider = readProviderSelection(workspaceConfig.config);
-    const policyBundleStatus = await readPolicyBundleStatus(options.workspace);
+    const policyBundleVerification = await readPolicyBundleVerificationForDoctor(options.workspace);
+    const policyBundleStatus = formatPolicyBundleStatusForDoctor(policyBundleVerification);
+    const deepSeekApiKey = process.env.DEEPSEEK_API_KEY ? "configured" : "missing";
+    const requirementFailures = createDoctorRequirementFailures({
+      deepSeekApiKey,
+      workspaceConfigPresent: workspaceConfig.exists,
+      policyBundleVerification,
+      requireApiKey: options.requireApiKey,
+      requireWorkspaceConfig: options.requireWorkspaceConfig,
+      requireTrustedPolicyBundle: options.requireTrustedPolicyBundle
+    });
     const diagnostics = {
-      deepSeekApiKey: process.env.DEEPSEEK_API_KEY ? "configured" : "missing",
+      ok: requirementFailures.length === 0,
+      requirementFailures,
+      deepSeekApiKey,
       deepSeekBaseUrl: provider.baseUrl,
       deepSeekModel: provider.model,
       providerMaxRetries: process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2",
@@ -548,12 +569,16 @@ program
         sha256: workspaceConfig.sha256
       },
       policyBundle: policyBundleStatus,
+      policyBundleVerification,
       signedPolicyRequired: readRequireSignedPolicyFromEnv(),
       workspaceMaxSteps: workspaceConfig.config.maxSteps ?? "profile/default",
       node: process.version
     };
     if (options.json) {
       console.log(JSON.stringify(diagnostics, null, 2));
+      if (requirementFailures.length > 0) {
+        process.exitCode = 1;
+      }
       return;
     }
     console.log(`DeepSeek API key: ${diagnostics.deepSeekApiKey}`);
@@ -584,6 +609,13 @@ program
     console.log(`Signed policy required: ${diagnostics.signedPolicyRequired ? "yes" : "no"}`);
     console.log(`Workspace max steps: ${diagnostics.workspaceMaxSteps}`);
     console.log(`Node: ${diagnostics.node}`);
+    if (requirementFailures.length > 0) {
+      console.log(chalk.red("Doctor requirements failed:"));
+      for (const failure of requirementFailures) {
+        console.log(chalk.red(`- ${failure}`));
+      }
+      process.exitCode = 1;
+    }
   });
 
 try {
@@ -749,23 +781,54 @@ async function readPolicyBundleVerificationOptions(publicKeyPaths: string[] = []
   };
 }
 
-async function readPolicyBundleStatus(workspace: string): Promise<string> {
+async function readPolicyBundleVerificationForDoctor(workspace: string): Promise<PolicyBundleVerificationResult> {
   try {
-    const result = await verifyWorkspacePolicyBundle(workspace, await readPolicyBundleVerificationOptions());
-    if (!result.exists) {
-      return "missing";
-    }
-    if (result.ok) {
-      return `trusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
-    }
-    if (result.signatureVerified) {
-      return `untrusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
-    }
-    return `failed ${result.reason}`;
+    return await verifyWorkspacePolicyBundle(workspace, await readPolicyBundleVerificationOptions());
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return `failed ${message}`;
+    return {
+      path: path.join(path.resolve(workspace), ".deepcodex/policy-bundle.json"),
+      exists: false,
+      ok: false,
+      signatureVerified: false,
+      trusted: false,
+      reason: message
+    };
   }
+}
+
+function formatPolicyBundleStatusForDoctor(result: PolicyBundleVerificationResult): string {
+  if (!result.exists && result.reason === "Policy bundle is missing.") {
+    return "missing";
+  }
+  if (result.ok) {
+    return `trusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
+  }
+  if (result.signatureVerified) {
+    return `untrusted ${result.bundleSha256?.slice(0, 12) ?? "unknown"}`;
+  }
+  return `failed ${result.reason}`;
+}
+
+function createDoctorRequirementFailures(input: {
+  deepSeekApiKey: "configured" | "missing";
+  workspaceConfigPresent: boolean;
+  policyBundleVerification: PolicyBundleVerificationResult;
+  requireApiKey: boolean;
+  requireWorkspaceConfig: boolean;
+  requireTrustedPolicyBundle: boolean;
+}): string[] {
+  const failures: string[] = [];
+  if (input.requireApiKey && input.deepSeekApiKey !== "configured") {
+    failures.push("DEEPSEEK_API_KEY is missing.");
+  }
+  if (input.requireWorkspaceConfig && !input.workspaceConfigPresent) {
+    failures.push(".deepcodex/config.json is missing.");
+  }
+  if (input.requireTrustedPolicyBundle && !input.policyBundleVerification.ok) {
+    failures.push(`Policy bundle is not trusted: ${input.policyBundleVerification.reason}`);
+  }
+  return failures;
 }
 
 async function assertSignedPolicyIfRequired(workspace: string): Promise<void> {

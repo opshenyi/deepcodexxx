@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, and run-level token or estimated-cost budgets.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, run-level token or estimated-cost budgets, and CLI CI preflight diagnostics.
 
 ## Quick Start
 
@@ -27,6 +27,7 @@ CLI client:
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list

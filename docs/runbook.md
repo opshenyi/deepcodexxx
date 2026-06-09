@@ -264,6 +264,16 @@ Machine-readable diagnostics:
 node apps/cli/dist/index.js doctor --json
 ```
 
+CI-oriented preflight checks can make `doctor` fail with a non-zero exit code when required conditions are not met. The JSON output includes `ok`, `requirementFailures`, and `policyBundleVerification`:
+
+```powershell
+node apps/cli/dist/index.js doctor --json --require-api-key
+node apps/cli/dist/index.js doctor --workspace D:\Coding\DeepCodex --json --require-workspace-config
+node apps/cli/dist/index.js doctor --workspace D:\Coding\DeepCodex --json --require-trusted-policy-bundle
+```
+
+Use `--require-trusted-policy-bundle` with `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY`, `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILE`, or `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES` configured. Without a trusted key, a bundle that verifies only against an embedded public key remains untrusted and the preflight fails.
+
 List reusable policy profiles:
 
 ```powershell
