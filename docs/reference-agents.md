@@ -22,6 +22,13 @@ This directory uses shallow clones under `references/agents` for architecture st
 | Void | https://github.com/voideditor/void | Apache-2.0 | AI-native editor surface. |
 | Devika | https://github.com/stitionai/devika | MIT | Agentic software engineer reference implementation. |
 | smol developer | https://github.com/smol-ai/developer | MIT | Embeddable developer agent library pattern. |
+| Antinomy Forge | https://github.com/antinomyhq/forge | Apache-2.0 | Rust-based terminal coding agent with command/plugin structure and benchmark material. |
+| Forge ACP CLI | https://github.com/forge-agents/forge | MIT | Agent Client Protocol-oriented CLI and multi-client coordination reference. |
+| OpenDev | https://github.com/opendev-to/opendev | MIT | Open-source AI coding agent with Rust workspace and Web UI/control surface. |
+| Live-SWE-agent | https://github.com/OpenAutoCoder/live-swe-agent | MIT | SWE-bench-oriented scaffold and high-score autonomous repair reference. |
+| Agentrove | https://github.com/Mng-dev-ai/agentrove | Apache-2.0 | Desktop/Web control plane for coordinating multiple AI coding agents. |
+| Agent Verifier | https://github.com/aurite-ai/agent-verifier | MIT | Security and policy verification reference for coding assistant behavior. |
+| AIctx | https://github.com/oldskultxo/aictx | MIT | Context continuity and memory workflow reference for long-running coding agents. |
 
 ## Design Takeaways
 
@@ -30,5 +37,6 @@ This directory uses shallow clones under `references/agents` for architecture st
 - Persist memory in the target workspace, and keep product-level memory in this repository.
 - Surface every tool call as an event stream. This makes the product inspectable and interview-friendly.
 - Prefer a provider abstraction around the OpenAI-compatible DeepSeek API so model upgrades require configuration, not code rewrites.
+- Keep policy/trust distribution explicit: public-key trust material, issuer allowlists, and revocation lists should be exportable without ever moving signing private keys into app clients.
+- Treat protocol/control-plane references as product input for multi-client coordination, not as source material to copy.
 - Use shallow reference clones only for research. Avoid license bleed by writing clean-room implementation notes and original code.
-
