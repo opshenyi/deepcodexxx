@@ -352,6 +352,8 @@ Approval audit events record request time, decision time, decision latency, and 
 
 For `write_file` and `edit_file`, approval and tool result events also include file audit metadata when the path can be resolved. The approval request records the before-file SHA-256 snapshot; the tool result records before/after SHA-256 snapshots and whether the change was applied or only previewed.
 
+For `run_command`, a zero exit code is required for a successful tool result. Non-zero exits, timeout termination, signals, and output overflow are reported as failed tool results. Shell output collection is bounded, and timeouts attempt to terminate the spawned process tree so a failed verification command is not treated as proof that checks passed.
+
 The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, PDF text, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
 
 ## Troubleshooting
@@ -363,6 +365,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
+| Shell command failed. | The command exited non-zero, timed out, was terminated, or exceeded the output cap. | Treat it as failed verification; inspect stdout/stderr and rerun only after changing the command or fixing the underlying issue. |
 | Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
 | Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
 | Write or edit is blocked by DLP policy. | The proposed content looks like a secret assignment, bearer token, token literal, or workspace custom DLP match. | Move the value to an environment variable or set `policy.allowSecretWrites: true` only for a trusted fixture/migration workspace. |

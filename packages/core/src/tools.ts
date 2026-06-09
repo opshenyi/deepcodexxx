@@ -1,7 +1,6 @@
-import { exec } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { open, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
 import { findSensitiveText, type SensitiveTextFinding } from "./redaction.js";
@@ -9,7 +8,7 @@ import { assertShellCommandAllowed, canWriteFiles, createShellEnvironment, trunc
 import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
 import { isDeniedByPatterns, isDeniedFileExtension, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
-const execAsync = promisify(exec);
+const SHELL_MAX_BUFFER_BYTES = 1024 * 1024 * 4;
 
 export function createDefaultTools(): RuntimeTool[] {
   return [
@@ -326,20 +325,15 @@ const runCommandTool: RuntimeTool = {
     const args = objectInput(input);
     const command = stringValue(args.command);
     assertShellCommandAllowed(command, runtime.workspace.policy);
-    const timeout = Math.min(numberValue(args.timeoutMs, 60_000), 180_000);
-    const result = await execAsync(command, {
+    const timeout = normalizeShellTimeout(args.timeoutMs);
+    const result = await runShellCommand(command, {
       cwd: runtime.workspace.root,
       env: createShellEnvironment(runtime.workspace.policy),
-      timeout,
-      windowsHide: true,
-      maxBuffer: 1024 * 1024 * 4
-    }).catch((error: unknown) => {
-      const err = error as { stdout?: string; stderr?: string; message?: string };
-      return {
-        stdout: err.stdout ?? "",
-        stderr: err.stderr ?? err.message ?? ""
-      };
+      timeout
     });
+    if (result.timedOut || result.outputOverflow || result.code !== 0 || result.signal) {
+      return fail(truncateForModel(formatShellFailure(result, timeout)));
+    }
     return ok(truncateForModel([result.stdout, result.stderr].filter(Boolean).join("\n")));
   }
 };
@@ -463,6 +457,140 @@ function stringValue(value: unknown, fallback = ""): string {
 
 function numberValue(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeShellTimeout(value: unknown): number {
+  const requested = Math.floor(numberValue(value, 60_000));
+  if (requested <= 0) {
+    return 60_000;
+  }
+  return Math.min(Math.max(requested, 100), 180_000);
+}
+
+interface ShellCommandResult {
+  stdout: string;
+  stderr: string;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  outputOverflow: boolean;
+}
+
+function runShellCommand(
+  command: string,
+  options: { cwd: string; env: NodeJS.ProcessEnv; timeout: number }
+): Promise<ShellCommandResult> {
+  return new Promise((resolve) => {
+    const child = spawn(command, {
+      cwd: options.cwd,
+      env: options.env,
+      shell: true,
+      windowsHide: true,
+      detached: process.platform !== "win32"
+    });
+    let stdout = "";
+    let stderr = "";
+    let outputBytes = 0;
+    let timedOut = false;
+    let outputOverflow = false;
+    let finished = false;
+    let timeoutTimer: NodeJS.Timeout;
+    let hardStopTimer: NodeJS.Timeout | undefined;
+
+    const finish = (result: Omit<ShellCommandResult, "stdout" | "stderr" | "timedOut" | "outputOverflow">) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timeoutTimer);
+      if (hardStopTimer) {
+        clearTimeout(hardStopTimer);
+      }
+      resolve({ stdout, stderr, timedOut, outputOverflow, ...result });
+    };
+
+    const stop = () => {
+      terminateProcessTree(child);
+      hardStopTimer = setTimeout(() => finish({ code: null, signal: "SIGTERM" }), 2_000);
+      hardStopTimer.unref?.();
+    };
+
+    const appendOutput = (stream: "stdout" | "stderr", chunk: Buffer) => {
+      if (outputOverflow) {
+        return;
+      }
+      const remaining = SHELL_MAX_BUFFER_BYTES - outputBytes;
+      if (remaining <= 0) {
+        outputOverflow = true;
+        stop();
+        return;
+      }
+      const next = chunk.subarray(0, Math.max(0, remaining)).toString("utf8");
+      if (stream === "stdout") {
+        stdout += next;
+      } else {
+        stderr += next;
+      }
+      outputBytes += chunk.length;
+      if (chunk.length > remaining) {
+        outputOverflow = true;
+        stop();
+      }
+    };
+
+    timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      stop();
+    }, options.timeout);
+
+    child.stdout.on("data", (chunk: Buffer) => appendOutput("stdout", chunk));
+    child.stderr.on("data", (chunk: Buffer) => appendOutput("stderr", chunk));
+    child.on("error", (error) => {
+      stderr ||= error.message;
+      finish({ code: null, signal: null });
+    });
+    child.on("close", (code, signal) => finish({ code, signal }));
+  });
+}
+
+function terminateProcessTree(child: ChildProcessWithoutNullStreams): void {
+  if (!child.pid) {
+    child.kill("SIGTERM");
+    return;
+  }
+  if (process.platform === "win32") {
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+      windowsHide: true,
+      stdio: "ignore"
+    });
+    killer.on("error", () => child.kill("SIGTERM"));
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
+  const forceKill = setTimeout(() => {
+    try {
+      process.kill(-child.pid!, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+  }, 500);
+  forceKill.unref?.();
+}
+
+function formatShellFailure(result: ShellCommandResult, timeout: number): string {
+  const status = result.outputOverflow
+    ? `Command output exceeded ${SHELL_MAX_BUFFER_BYTES} bytes and was stopped.`
+    : result.timedOut
+      ? `Command timed out or was terminated after ${timeout}ms.`
+      : result.signal
+        ? `Command was terminated by signal ${result.signal}.`
+        : `Command failed${result.code === null ? "." : ` with exit code ${result.code}.`}`;
+  const output = [result.stdout, result.stderr].filter(Boolean).join("\n");
+  return output ? `${status}\n${output}` : `${status}\nNo output captured.`;
 }
 
 function ok(content: string, audit?: ToolResult["audit"]): ToolResult {

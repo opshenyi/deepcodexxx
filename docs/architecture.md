@@ -31,6 +31,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Desktop production-like launches start the built server automatically when `DEEPCODEX_WEB_URL` is not set, wait for local health, then load the built Web client.
 - Dangerous shell commands are blocked unless `full-access` is selected.
 - Common shell network commands are blocked unless network access is explicitly enabled.
+- Shell command failures, timeouts, signals, and output overflows are reported as failed tool results so verification failures remain visible to the agent and user.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.
 - Missing API keys trigger demo mode instead of crashing the product.
 

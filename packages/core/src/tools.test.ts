@@ -397,6 +397,43 @@ describe("workspace tools", () => {
     await expect(runTool!.run({ command: "npm install" }, { workspace })).rejects.toThrow(/network-enabled/);
   });
 
+  it("marks non-zero shell exits as failed tool results", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowShell: true
+    });
+    const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+    expect(runTool).toBeDefined();
+
+    const result = await runTool!.run(
+      { command: `${quoteCommandPath(process.execPath)} -e "console.error('failed check'); process.exit(7)"` },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("exit code 7");
+    expect(result.content).toContain("failed check");
+  });
+
+  it("marks timed-out shell commands as failed tool results", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowShell: true
+    });
+    const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+    expect(runTool).toBeDefined();
+
+    const result = await runTool!.run(
+      { command: `${quoteCommandPath(process.execPath)} -e "setTimeout(() => {}, 10000)"`, timeoutMs: 100 },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("timed out or was terminated");
+  });
+
   it("can explicitly inherit the shell environment", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const previousSecret = process.env.DEEPCODEX_TEST_SECRET;

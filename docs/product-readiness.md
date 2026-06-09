@@ -42,6 +42,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Binary-aware read, edit, and search handling for non-text files.
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
 - Network-aware shell command policy blocks common package install, git network, and network utility commands by default unless network access is explicitly enabled.
+- Shell command non-zero exits, timeouts, termination signals, and output overflows are surfaced as failed tool results instead of successful output text.
 - Reference repositories documented for architecture study.
 - Commercialization, runbook, security model, release checklist, and roadmap docs.
 

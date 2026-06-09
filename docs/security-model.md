@@ -72,6 +72,8 @@ Implemented controls:
 - Shell tools default to `DEEPCODEX_SHELL_ENV=minimal`, passing only essential environment variables such as PATH, TEMP, and OS shell variables. `inherit` is available for trusted workspaces that require the parent environment.
 - Shell network access defaults to blocked. CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` can enable common network command patterns for trusted runs.
 - Shell timeout is capped at 180 seconds.
+- Shell output collection is bounded, and timeout or output-overflow termination attempts to stop the spawned process tree.
+- Non-zero exits, timeout termination, signals, and output overflow are reported as failed tool results.
 - A small dangerous-command pattern list requires `full-access`, including destructive delete and hard reset patterns.
 - A network-command pattern list blocks common package installs, git fetch/pull/push/clone, network utilities, and container pull/push/run commands while `allowNetwork` is false.
 

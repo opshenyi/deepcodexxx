@@ -71,6 +71,7 @@ Checklist:
 - Write/edit tools block probable secret content before showing a diff or applying a file change.
 - Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
+- A deliberately failing verification command appears as a failed tool result, not a successful tool event with stderr text.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - Saved live or replay events containing unified diffs render as structured diff blocks, including multi-file diffs, and following `File audit` metadata remains readable.
