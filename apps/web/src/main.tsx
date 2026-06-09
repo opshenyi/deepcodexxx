@@ -55,6 +55,10 @@ type LogItem = {
   tokens?: number;
 };
 
+type RichTextBlock =
+  | { type: "text"; value: string }
+  | { type: "diff"; header: string; lines: string[] };
+
 type TokenUsageSummary = {
   promptTokens: number;
   completionTokens: number;
@@ -1114,7 +1118,7 @@ function App() {
                           <time>{item.timestamp}</time>
                         </div>
                       </div>
-                      {item.body ? <pre className="eventBody">{item.body}</pre> : null}
+                      {item.body ? <RichTextBlockView className="eventBody" value={item.body} /> : null}
                     </article>
                   ))}
                 </div>
@@ -1202,7 +1206,7 @@ function App() {
                           <time>{item.timestamp}</time>
                         </div>
                       </div>
-                      {item.body ? <pre className="eventBody">{item.body}</pre> : null}
+                      {item.body ? <RichTextBlockView className="eventBody" value={item.body} /> : null}
                     </article>
                   ))}
                 </div>
@@ -1256,7 +1260,10 @@ function App() {
                   </div>
                   <div className="sessionRowMeta">{approval.requestedAt}</div>
                   <p className="approvalReason">{approval.reason}</p>
-                  <pre className="approvalInput">{formatApprovalDetails(approval.input, approval.fileAudits)}</pre>
+                  <RichTextBlockView
+                    className="approvalInput"
+                    value={formatApprovalDetails(approval.input, approval.fileAudits)}
+                  />
                   <div className="approvalActions">
                     <button type="button" onClick={() => resolveApproval(approval.approvalId, true)}>
                       Approve
@@ -1516,6 +1523,149 @@ function formatBody(value: unknown) {
   }
   const serialized = JSON.stringify(value, null, 2);
   return serialized ?? String(value);
+}
+
+function RichTextBlockView({ className, value }: { className: string; value: string }) {
+  const blocks = parseRichTextBlocks(value);
+  return (
+    <div className={`${className} richTextBlock`}>
+      {blocks.map((block, index) =>
+        block.type === "diff" ? (
+          <DiffBlockView key={`${block.header}-${index}`} block={block} />
+        ) : (
+          <pre key={`text-${index}`} className="richTextPlain">
+            {block.value}
+          </pre>
+        )
+      )}
+    </div>
+  );
+}
+
+function DiffBlockView({ block }: { block: Extract<RichTextBlock, { type: "diff" }> }) {
+  return (
+    <div className="diffBlock">
+      <div className="diffHeader">{block.header}</div>
+      <div className="diffRows">
+        {block.lines.map((line, index) => {
+          const kind = diffLineKind(line);
+          return (
+            <div key={`${index}-${line}`} className={`diffRow ${kind}`}>
+              <span className="diffMarker">{diffLineMarker(line)}</span>
+              <code>{diffLineText(line)}</code>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function parseRichTextBlocks(value: string): RichTextBlock[] {
+  const lines = value.split("\n");
+  const blocks: RichTextBlock[] = [];
+  let textLines: string[] = [];
+  let index = 0;
+
+  const flushText = () => {
+    const text = trimBlockSeparators(textLines).join("\n");
+    if (text) {
+      blocks.push({ type: "text", value: text });
+    }
+    textLines = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (line.startsWith("diff -- ")) {
+      flushText();
+      const diffLines = [line];
+      index += 1;
+      while (index < lines.length) {
+        const current = lines[index] ?? "";
+        const next = lines[index + 1] ?? "";
+        if (current.startsWith("diff -- ")) {
+          break;
+        }
+        if (current === "" && !isDiffLine(next)) {
+          break;
+        }
+        if (current.startsWith("File audit")) {
+          break;
+        }
+        diffLines.push(current);
+        index += 1;
+      }
+      blocks.push({ type: "diff", header: diffLines[0] ?? "diff", lines: diffLines.slice(1) });
+      continue;
+    }
+    textLines.push(line);
+    index += 1;
+  }
+
+  flushText();
+  return blocks.length > 0 ? blocks : [{ type: "text", value }];
+}
+
+function trimBlockSeparators(lines: string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start] === "") {
+    start += 1;
+  }
+  while (end > start && lines[end - 1] === "") {
+    end -= 1;
+  }
+  return lines.slice(start, end);
+}
+
+function isDiffLine(value: string): boolean {
+  return (
+    value.startsWith("diff -- ") ||
+    value.startsWith("--- ") ||
+    value.startsWith("+++ ") ||
+    value.startsWith("@@") ||
+    value.startsWith("+") ||
+    value.startsWith("-") ||
+    value.startsWith(" ") ||
+    value.startsWith("[diff ")
+  );
+}
+
+function diffLineKind(value: string): "header" | "add" | "remove" | "context" | "meta" {
+  if (value.startsWith("--- ") || value.startsWith("+++ ") || value.startsWith("@@")) {
+    return "header";
+  }
+  if (value.startsWith("+")) {
+    return "add";
+  }
+  if (value.startsWith("-")) {
+    return "remove";
+  }
+  if (value.startsWith("[diff ")) {
+    return "meta";
+  }
+  return "context";
+}
+
+function diffLineMarker(value: string): string {
+  if (value.startsWith("--- ") || value.startsWith("+++ ") || value.startsWith("@@") || value.startsWith("[diff ")) {
+    return " ";
+  }
+  if (value.startsWith("+") || value.startsWith("-") || value.startsWith(" ")) {
+    return value.slice(0, 1);
+  }
+  return " ";
+}
+
+function diffLineText(value: string): string {
+  if (value.startsWith("--- ") || value.startsWith("+++ ") || value.startsWith("@@") || value.startsWith("[diff ")) {
+    return value;
+  }
+  if (value.startsWith("+") || value.startsWith("-") || value.startsWith(" ")) {
+    return value.slice(1);
+  }
+  return value;
 }
 
 function formatApprovalDetails(input: unknown, fileAudits?: FileAuditEntry[]) {

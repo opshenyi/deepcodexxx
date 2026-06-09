@@ -14,7 +14,7 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Phase | Goal | Work items | Exit criteria |
 | --- | --- | --- | --- |
-| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client with retry/backoff, provider/model allowlists, tool loop, workspace config defaults, SHA-256 provenance, signed policy-bundle verification, signed-only policy enforcement, custom team policy profiles, token accounting, budget controls, managed pricing profiles, reusable policy profiles, workspace guardrails, generated/build output deny patterns, media/artifact extension policy, metadata-only artifact inspection, approval metadata, file hash auditing, built-in and workspace-specific event redaction, write-time DLP blocking, audit export/retention, minimal shell environment, network-aware shell command policy, memory, Web session replay, Desktop production-like server bootstrap, CLI, docs. | Checklist passes and limitations are documented. |
+| Current interview slice | Demonstrate an end-to-end local coding agent product. | DeepSeek client with retry/backoff, provider/model allowlists, tool loop, workspace config defaults, SHA-256 provenance, signed policy-bundle verification, signed-only policy enforcement, custom team policy profiles, token accounting, budget controls, managed pricing profiles, reusable policy profiles, workspace guardrails, generated/build output deny patterns, media/artifact extension policy, metadata-only artifact inspection, approval metadata, file hash auditing, structured Web diff review, built-in and workspace-specific event redaction, write-time DLP blocking, audit export/retention, minimal shell environment, network-aware shell command policy, memory, Web session replay, Desktop production-like server bootstrap, CLI, docs. | Checklist passes and limitations are documented. |
 | Phase 1: safer local agent | Make local write-mode use easier to trust. | OS-level shell sandboxing, policy bundle rotation/revocation workflow, policy-controlled OCR/PDF/archive extraction. | User can approve each write or shell command with a visible diff or command body, review the decision later, and understand when shell network access was intentionally enabled. |
 | Phase 2: product operations | Make demos repeatable and measurable. | Structured run history, managed pricing profiles, benchmark tasks, regression evals. | A release can compare behavior across model/config changes. |
 | Phase 3: desktop release | Move beyond production-like Electron launch. | Packaged installers, signing, update policy, crash reporting plan, OS-specific smoke tests. | A reviewer can install and run Desktop without starting dev servers manually. |
@@ -25,9 +25,9 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 
 | Item | Why it matters | Suggested owner area |
 | --- | --- | --- |
-| Diff viewer UI | Lets users inspect generated diffs with better affordances. | Web, CLI. |
+| Side-by-side review mode | Builds on the structured Web diff blocks with richer approval and comparison affordances. | Web. |
 | Policy-controlled artifact extraction | Adds safe OCR, PDF text extraction, and archive listing after the metadata-only inspection path. | Core, config. |
-| Signed provider policy bundles | Lets teams prove policy provenance instead of relying on unsigned local JSON. | Provider config, clients. |
+| Policy bundle rotation workflow | Lets teams rotate trusted keys, revoke stale bundles, and distribute signed policy updates safely. | Provider config, clients. |
 | CLI JSON output | Enables automation and CI-style checks. | CLI. |
 | Desktop packaging | Turns the desktop client into a deliverable artifact. | Desktop, release. |
 

@@ -19,6 +19,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
+- Structured Web diff rendering for live event output, approval details, and session replay, with multi-file unified diffs split into readable blocks.
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
@@ -60,13 +61,13 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, Web diff review, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
 | Desktop release | Closer, but not installer-ready. | Has production-like local server bootstrap; still needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
 ## Next Commercial Milestones
 
-- Add signed policy bundles and provider policy provenance.
+- Add policy bundle rotation/revocation workflow and richer provider fallback policy.
 - Add richer DLP classification and policy-controlled OCR/PDF/archive extraction.
 - Add richer generated-asset handling and file-type policies.
 - Add packaged desktop installers, signed releases, and auto-update policy.

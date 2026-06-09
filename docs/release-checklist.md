@@ -73,6 +73,7 @@ Checklist:
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
+- Saved live or replay events containing unified diffs render as structured diff blocks, including multi-file diffs, and following `File audit` metadata remains readable.
 - Audit retention dry-run can preview sessions that would be pruned before deletion is applied.
 - A missing API key produces the documented local demo response.
 

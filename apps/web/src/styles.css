@@ -610,6 +610,93 @@ pre {
   padding: 12px;
 }
 
+.richTextBlock {
+  display: grid;
+  gap: 12px;
+}
+
+.richTextPlain {
+  margin: 0;
+}
+
+.diffBlock {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.diffHeader {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  background: #f3f5f7;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.diffRows {
+  display: grid;
+  min-width: 0;
+}
+
+.diffRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-width: 0;
+  border-bottom: 1px solid rgba(31, 35, 40, 0.06);
+  color: #302c2c;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diffRow:last-child {
+  border-bottom: 0;
+}
+
+.diffRow.add {
+  background: #edf8f1;
+}
+
+.diffRow.remove {
+  background: #fff1f0;
+}
+
+.diffRow.header,
+.diffRow.meta {
+  background: #f7f8f9;
+  color: var(--muted);
+}
+
+.diffMarker {
+  display: block;
+  border-right: 1px solid rgba(31, 35, 40, 0.08);
+  color: var(--quiet);
+  text-align: center;
+  user-select: none;
+}
+
+.diffRow.add .diffMarker {
+  color: #17623b;
+}
+
+.diffRow.remove .diffMarker {
+  color: #9f2d2d;
+}
+
+.diffRow code {
+  display: block;
+  min-width: 0;
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .replayLayout {
   display: grid;
   grid-template-columns: minmax(190px, 270px) minmax(0, 1fr);

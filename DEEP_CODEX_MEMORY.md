@@ -55,6 +55,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added workspace-specific custom redaction patterns through `.deepcodex/config.json` `policy.redactionPatterns`. Matches are replaced with `[redacted-custom]` before event streaming, session persistence, and model-loop reuse.
 - Added custom team policy profile storage through `.deepcodex/config.json` `policyProfiles`. CLI `profiles list/show --workspace`, server `/api/policy-profiles?workspace=...`, Web/Desktop `Load config`, and agent runs now resolve workspace-defined profiles alongside built-ins while rejecting reserved or duplicate ids.
 - Added workspace provider/model allowlists through `.deepcodex/config.json` `provider`. CLI/server agent runs resolve the effective DeepSeek base URL and model, block unapproved base URLs or model ids before a run starts, and pass the approved base URL/model into the shared agent client.
+- Added structured Web diff rendering for live timelines, session replay, and approval inputs. Unified diffs now render as bordered diff blocks with add/remove/header rows, multiple `diff --` files split into separate blocks, and following `File audit` text preserved as plain audit detail.
+- Verified the Web diff viewer with `npm run build -w @deepcodex/web`, `npm run typecheck`, `npm run verify` (13 files / 93 tests), and an in-app browser replay smoke using a temporary ignored session. Browser DOM checks confirmed two diff blocks, intact `+++` headers, preserved `File audit`, and zero console errors. Browser screenshot capture timed out in the automation channel, so visual verification used DOM/CSS assertions rather than an image artifact.
 
 ## Architecture Decisions
 
@@ -69,6 +71,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env plus network-command pattern blocking, not a full sandbox.
 2. Add policy-controlled OCR/PDF/archive extraction if richer non-text artifact summaries are needed.
-3. Add signed provider/team policy bundles, richer DLP classification, and OS-level shell isolation.
+3. Add policy bundle rotation/revocation workflow, richer DLP classification, and OS-level shell isolation.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.
