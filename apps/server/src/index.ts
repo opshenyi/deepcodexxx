@@ -7,16 +7,19 @@ import {
   SessionNotFoundError,
   appendWorkspaceMemory,
   compareEvalRunRecords,
+  createReleaseEvidenceReport,
   createEvalRunReport,
   createSessionRecorder,
   createWorkspaceContext,
   exportSessionHistory,
+  exportReleaseEvidenceReport,
   applyPricingProfileToBudget,
   listEvalRunRecords,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
   parsePricingProfiles,
+  parseReleaseEvidenceFormat,
   pruneSessionHistories,
   readEvalRunRecord,
   readSessionHistory,
@@ -186,6 +189,31 @@ app.get("/api/evals/compare", async (req, res, next) => {
     const left = await readEvalRunRecord(workspace, leftRunId);
     const right = await readEvalRunRecord(workspace, rightRunId);
     res.json({ left, right, comparison: compareEvalRunRecords(left, right) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/release/evidence", async (req, res, next) => {
+  try {
+    const workspacePath = readWorkspace(req.query.workspace);
+    const report = await createReleaseEvidenceReport(workspacePath, {
+      policyBundleVerification: await readPolicyBundleVerificationOptions(),
+      signedPolicyRequired: readRequireSignedPolicyFromEnv(),
+      deepSeekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
+      evalReport: { recentLimit: readOptionalInteger(req.query.recentEvals) },
+      recentSessionLimit: readOptionalInteger(req.query.recentSessions),
+      securityScan: {
+        maxFiles: readOptionalInteger(req.query.securityMaxFiles),
+        maxFindings: readOptionalInteger(req.query.securityMaxFindings)
+      }
+    });
+    const format = parseReleaseEvidenceFormat(req.query.format);
+    if (format === "json") {
+      res.json({ report });
+      return;
+    }
+    res.type("text/markdown").send(exportReleaseEvidenceReport(report, "markdown"));
   } catch (error) {
     next(error);
   }

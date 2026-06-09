@@ -1219,6 +1219,81 @@ pre {
   margin-top: 5px;
 }
 
+.releaseEvidenceBody {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.releaseCheckList {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.releaseCheck {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 10px;
+}
+
+.releaseCheckHeader {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.releaseCheckHeader strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.releaseCheckStatus {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--quiet);
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.releaseCheckStatus.pass {
+  border-color: #b8ddcf;
+  color: var(--good);
+  background: var(--good-soft);
+}
+
+.releaseCheckStatus.warn {
+  border-color: #f2c7b4;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.releaseCheckStatus.fail {
+  border-color: #f0b8b3;
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.releaseCheck p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .railFoot {
   border-top: 1px solid var(--line);
   color: var(--muted);

@@ -33,6 +33,7 @@ node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."

@@ -35,7 +35,10 @@ import {
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
   createPolicyTrustPackage,
+  createReleaseEvidenceReport,
   createWorkspacePolicyBundle,
+  exportReleaseEvidenceReport,
+  parseReleaseEvidenceFormat,
   resolveProviderSelection,
   runDeepCodexAgent,
   writeEvalRunRecord,
@@ -256,6 +259,7 @@ const profiles = program.command("profiles").description("Inspect reusable DeepC
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
 const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
 const security = program.command("security").description("Run local workspace security checks.");
+const release = program.command("release").description("Collect release and demo readiness evidence.");
 
 security
   .command("scan")
@@ -287,6 +291,47 @@ security
         printSensitiveScanResult(result);
       }
       if (options.failOnFindings && result.findings.length > 0) {
+        process.exitCode = 1;
+      }
+    }
+  );
+
+release
+  .command("evidence")
+  .description("Aggregate workspace config, policy, eval, security, and session evidence.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--format <format>", "markdown or json", "markdown")
+  .option("--json", "Print JSON output", false)
+  .option("--recent-evals <number>", "Recent eval runs to include", "8")
+  .option("--recent-sessions <number>", "Recent sessions to include", "8")
+  .option("--security-max-files <number>", "Maximum text files to scan for security evidence", "500")
+  .option("--security-max-findings <number>", "Maximum security findings to report", "200")
+  .option("--fail-on-fail", "Exit non-zero when release evidence has failing checks", false)
+  .action(
+    async (options: {
+      workspace: string;
+      format: string;
+      json: boolean;
+      recentEvals?: string;
+      recentSessions?: string;
+      securityMaxFiles?: string;
+      securityMaxFindings?: string;
+      failOnFail: boolean;
+    }) => {
+      const report = await createReleaseEvidenceReport(options.workspace, {
+        policyBundleVerification: await readPolicyBundleVerificationOptions(),
+        signedPolicyRequired: readRequireSignedPolicyFromEnv(),
+        deepSeekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
+        evalReport: { recentLimit: readOptionalInteger(options.recentEvals) },
+        recentSessionLimit: readOptionalInteger(options.recentSessions),
+        securityScan: {
+          maxFiles: readOptionalInteger(options.securityMaxFiles),
+          maxFindings: readOptionalInteger(options.securityMaxFindings)
+        }
+      });
+      const format = options.json ? "json" : parseReleaseEvidenceFormat(options.format);
+      output.write(exportReleaseEvidenceReport(report, format));
+      if (options.failOnFail && !report.summary.ready) {
         process.exitCode = 1;
       }
     }

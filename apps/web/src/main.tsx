@@ -346,6 +346,39 @@ type EvalRunReport = {
   latestComparison?: EvalRunComparison;
 };
 
+type ReleaseEvidenceCheck = {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail" | "info";
+  detail: string;
+};
+
+type ReleaseEvidenceReport = {
+  generatedAt: string;
+  workspace: string;
+  signedPolicyRequired: boolean;
+  workspaceConfig: {
+    path: string;
+    exists: boolean;
+    sha256?: string;
+  };
+  policyBundle: PolicyBundleVerificationResult;
+  evals: EvalRunReport;
+  securityScan: SecurityScanResult;
+  sessions: {
+    total: number;
+    recent: SessionSummary[];
+  };
+  checks: ReleaseEvidenceCheck[];
+  summary: {
+    ready: boolean;
+    pass: number;
+    warn: number;
+    fail: number;
+    info: number;
+  };
+};
+
 type PolicyProfileOption = {
   id: string;
   label: string;
@@ -513,6 +546,9 @@ function App() {
   const [evalReportState, setEvalReportState] = useState<LoadState>("idle");
   const [evalReport, setEvalReport] = useState<EvalRunReport | null>(null);
   const [evalReportMessage, setEvalReportMessage] = useState("");
+  const [releaseEvidenceState, setReleaseEvidenceState] = useState<LoadState>("idle");
+  const [releaseEvidence, setReleaseEvidence] = useState<ReleaseEvidenceReport | null>(null);
+  const [releaseEvidenceMessage, setReleaseEvidenceMessage] = useState("");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [configMessage, setConfigMessage] = useState("");
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
@@ -569,6 +605,8 @@ function App() {
   const securityScanTone = formatSecurityScanTone(securityScan, securityScanState);
   const evalReportStatus = formatEvalReportStatus(evalReport, evalReportState);
   const evalReportTone = formatEvalReportTone(evalReport, evalReportState);
+  const releaseEvidenceStatus = formatReleaseEvidenceStatus(releaseEvidence, releaseEvidenceState);
+  const releaseEvidenceTone = formatReleaseEvidenceTone(releaseEvidence, releaseEvidenceState);
   const selectedWorkspaceProfile = workspaceProfiles.find((profile) => profile.id === selectedWorkspaceProfileId);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
@@ -598,6 +636,9 @@ function App() {
     setEvalReport(null);
     setEvalReportState("idle");
     setEvalReportMessage("");
+    setReleaseEvidence(null);
+    setReleaseEvidenceState("idle");
+    setReleaseEvidenceMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -859,6 +900,35 @@ function App() {
       setEvalReport(null);
       setEvalReportMessage(message);
       setEvalReportState("error");
+    }
+  }
+
+  async function loadReleaseEvidence() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    params.set("format", "json");
+    params.set("recentEvals", "8");
+    params.set("recentSessions", "8");
+    params.set("securityMaxFiles", "500");
+    params.set("securityMaxFindings", "200");
+    setReleaseEvidenceState("loading");
+    setReleaseEvidenceMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/release/evidence?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { report: ReleaseEvidenceReport };
+      setReleaseEvidence(body.report);
+      setReleaseEvidenceMessage(formatReleaseEvidenceMessage(body.report));
+      setReleaseEvidenceState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setReleaseEvidence(null);
+      setReleaseEvidenceMessage(message);
+      setReleaseEvidenceState("error");
     }
   }
 
@@ -1782,6 +1852,73 @@ function App() {
           <pre className={finalText ? "railText outputText" : "railText placeholderText"}>
             {finalText || "No final response yet."}
           </pre>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
+              <span className="eyebrow">Release evidence</span>
+              <h2>Readiness report</h2>
+            </div>
+            <span className={`outputStatus ${releaseEvidenceTone}`}>{releaseEvidenceStatus}</span>
+          </div>
+          <div className="releaseEvidenceBody">
+            <p className={releaseEvidenceState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {releaseEvidenceMessage || "No release evidence loaded."}
+            </p>
+            {releaseEvidence ? (
+              <>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Checks</dt>
+                    <dd>
+                      {releaseEvidence.summary.pass}/{releaseEvidence.checks.length} pass
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Evals</dt>
+                    <dd>{releaseEvidence.evals.totalRuns}</dd>
+                  </div>
+                  <div>
+                    <dt>Findings</dt>
+                    <dd>{releaseEvidence.securityScan.findings.length}</dd>
+                  </div>
+                </dl>
+                <div className="releaseCheckList">
+                  {releaseEvidence.checks.map((check) => (
+                    <article key={check.id} className="releaseCheck">
+                      <div className="releaseCheckHeader">
+                        <strong>{check.label}</strong>
+                        <span className={`releaseCheckStatus ${check.status}`}>{check.status}</span>
+                      </div>
+                      <p>{check.detail}</p>
+                    </article>
+                  ))}
+                </div>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Config</dt>
+                    <dd>{releaseEvidence.workspaceConfig.sha256 ? shortFingerprint(releaseEvidence.workspaceConfig.sha256) : "missing"}</dd>
+                  </div>
+                  <div>
+                    <dt>Sessions</dt>
+                    <dd>{releaseEvidence.sessions.total}</dd>
+                  </div>
+                  <div>
+                    <dt>Generated</dt>
+                    <dd>{formatStoredDateTime(releaseEvidence.generatedAt)}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={loadReleaseEvidence}
+              disabled={releaseEvidenceState === "loading"}
+            >
+              {releaseEvidenceState === "loading" ? "Loading evidence" : "Load evidence"}
+            </button>
+          </div>
         </section>
         <section className="railPanel">
           <div className="sectionHeader compact">
@@ -2716,6 +2853,45 @@ function formatEvalReportMessage(report: EvalRunReport): string {
     return "No recorded eval evidence.";
   }
   return `${report.totalRuns} recorded runs. Average score ${formatScoreValue(report.averageScore)}.`;
+}
+
+function formatReleaseEvidenceStatus(report: ReleaseEvidenceReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Loading";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!report) {
+    return "Not loaded";
+  }
+  if (report.summary.fail > 0) {
+    return `${report.summary.fail} fail`;
+  }
+  if (report.summary.warn > 0) {
+    return `${report.summary.warn} warn`;
+  }
+  return "Ready";
+}
+
+function formatReleaseEvidenceTone(report: ReleaseEvidenceReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error" || (report && report.summary.fail > 0)) {
+    return "error";
+  }
+  if (report && report.summary.warn > 0) {
+    return "loading";
+  }
+  if (report) {
+    return "ready";
+  }
+  return "idle";
+}
+
+function formatReleaseEvidenceMessage(report: ReleaseEvidenceReport): string {
+  return `${report.summary.pass} passed, ${report.summary.warn} warnings, ${report.summary.fail} failures.`;
 }
 
 function formatEvalRunScore(score: EvalScore): string {
