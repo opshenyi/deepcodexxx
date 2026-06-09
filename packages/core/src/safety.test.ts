@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertShellCommandAllowed, canRunShell, canWriteFiles } from "./safety.js";
+import { assertShellCommandAllowed, canRunShell, canUseNetwork, canWriteFiles } from "./safety.js";
 
 describe("safety policy", () => {
   it("disables writes and shell in suggest mode", () => {
@@ -27,5 +27,35 @@ describe("safety policy", () => {
       })
     ).not.toThrow();
   });
-});
 
+  it("blocks common network shell commands unless network policy is enabled", () => {
+    expect(() =>
+      assertShellCommandAllowed("npm install", {
+        mode: "workspace-write",
+        allowShell: true,
+        allowFileWrite: true,
+        allowNetwork: false
+      })
+    ).toThrow(/network-enabled/);
+
+    expect(() =>
+      assertShellCommandAllowed("git pull", {
+        mode: "full-access",
+        allowShell: true,
+        allowFileWrite: true,
+        allowNetwork: false
+      })
+    ).toThrow(/network-enabled/);
+  });
+
+  it("allows network shell commands when network policy is enabled", () => {
+    const policy = {
+      mode: "workspace-write" as const,
+      allowShell: true,
+      allowFileWrite: true,
+      allowNetwork: true
+    };
+    expect(canUseNetwork(policy)).toBe(true);
+    expect(() => assertShellCommandAllowed("npm install", policy)).not.toThrow();
+  });
+});

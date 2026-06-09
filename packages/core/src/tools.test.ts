@@ -308,6 +308,19 @@ describe("workspace tools", () => {
     }
   });
 
+  it("blocks common shell network commands by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowShell: true,
+      allowNetwork: false
+    });
+    const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+    expect(runTool).toBeDefined();
+
+    await expect(runTool!.run({ command: "npm install" }, { workspace })).rejects.toThrow(/network-enabled/);
+  });
+
   it("can explicitly inherit the shell environment", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const previousSecret = process.env.DEEPCODEX_TEST_SECRET;

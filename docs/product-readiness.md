@@ -8,7 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
-- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, shell network access, and retention.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
 - Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
 - Local event stream for transparent tool execution.
@@ -34,6 +34,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Configurable file-size limits for read, write, edit, and search tools.
 - Binary-aware read, edit, and search handling for non-text files.
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
+- Network-aware shell command policy blocks common package install, git network, and network utility commands by default unless network access is explicitly enabled.
 - Reference repositories documented for architecture study.
 - Commercialization, runbook, security model, release checklist, and roadmap docs.
 
@@ -53,7 +54,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, strict read-only inspection, and minimal shell env; still needs OS-level sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 

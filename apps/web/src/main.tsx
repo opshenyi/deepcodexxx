@@ -270,7 +270,7 @@ const basePolicyProfileOptions: PolicyProfileOption[] = [
   {
     id: "guarded-write",
     label: "Guarded write",
-    detail: "Workspace-scoped edits with manual review for mutating tools.",
+    detail: "Workspace-scoped edits with manual review and shell network blocked by default.",
     mode: "workspace-write",
     approvalMode: "manual",
     maxSteps: 12
@@ -278,7 +278,7 @@ const basePolicyProfileOptions: PolicyProfileOption[] = [
   {
     id: "full-access-review",
     label: "Full access review",
-    detail: "Full-access command policy with manual review and minimal shell environment.",
+    detail: "Full-access command policy with manual review and shell network blocked by default.",
     mode: "full-access",
     approvalMode: "manual",
     maxSteps: 12

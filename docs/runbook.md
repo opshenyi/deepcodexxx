@@ -37,13 +37,14 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_MAX_SESSIONS` | Optional. | Empty. | Default maximum retained session history files for retention pruning. |
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 | `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
+| `DEEPCODEX_ALLOW_NETWORK` | Optional. | `false` | Blocks common shell network commands by default. Set `true` only for trusted package install, remote git, or network utility tasks. |
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
 | `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, shell network access, and session retention defaults.
 
 Create a template:
 
@@ -96,6 +97,7 @@ Example:
     "maxTokens": 120000
   },
   "policy": {
+    "allowNetwork": false,
     "shellEnvironment": "minimal",
     "maxFileBytes": 524288,
     "deniedPaths": ["secrets"],
@@ -132,6 +134,7 @@ Expected checks:
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
 - Provider allowlist counts print when workspace config defines them.
+- Shell network policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
 
 ## Web Client
@@ -270,6 +273,12 @@ Run a shell-capable task while keeping the shell environment minimal:
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --shell-env minimal "Run the relevant verification command and summarize the result."
 ```
 
+Run a trusted task that needs package install or remote git access:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --allow-network "Install the approved dependency and run the relevant verification."
+```
+
 Run with a token budget:
 
 ```powershell
@@ -294,8 +303,8 @@ Approval modes:
 | Mode | File writes | Shell | Intended use |
 | --- | --- | --- | --- |
 | `suggest` | Disabled for file write/edit tools. | Disabled. | Planning, inspection, and low-risk demos. |
-| `workspace-write` | Enabled inside workspace guardrails. | Enabled, with dangerous command patterns requiring `full-access`. | Local development tasks on a trusted workspace. |
-| `full-access` | Enabled inside workspace guardrails. | Enabled with fewer command-pattern restrictions. | Controlled demos only; use disposable workspaces. |
+| `workspace-write` | Enabled inside workspace guardrails. | Enabled, with dangerous command patterns requiring `full-access` and common network commands requiring explicit network policy. | Local development tasks on a trusted workspace. |
+| `full-access` | Enabled inside workspace guardrails. | Enabled with fewer dangerous-command restrictions; common network commands still require explicit network policy. | Controlled demos only; use disposable workspaces. |
 
 Tool approval modes:
 
@@ -320,6 +329,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
 | Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
+| Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
 | A project-specific secret still appears in output. | Redaction is pattern-based. | Add the pattern to a future project DLP policy and rotate the exposed secret if necessary. |
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |

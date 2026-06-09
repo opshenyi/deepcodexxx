@@ -31,6 +31,7 @@ Expected result:
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
+- CLI `doctor` reports shell network access, defaulting to `blocked`.
 - CLI `doctor` reports workspace config status, and `config show` reports either a valid config or a clear missing state.
 - CLI `profiles list --workspace <path>` includes any workspace-defined team profiles.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
@@ -60,6 +61,7 @@ Checklist:
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.
 - Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
+- Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - Audit retention dry-run can preview sessions that would be pruned before deletion is applied.
@@ -107,6 +109,7 @@ Checklist:
 - Budgeted `ask` prints budget status when the provider returns usage metadata.
 - `--mode suggest` does not allow shell or file write/edit tools.
 - Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.
+- Network-capable shell demos use `--allow-network` only after the command has been reviewed.
 
 ## Write-Mode Demo Verification
 

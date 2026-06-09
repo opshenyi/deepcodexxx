@@ -21,7 +21,7 @@ const POLICY_PROFILES: PolicyProfile[] = [
   {
     id: "guarded-write",
     label: "Guarded write",
-    description: "Workspace-scoped edits with manual review for writes, shell commands, and memory changes.",
+    description: "Workspace-scoped edits with manual review for writes, shell commands, memory changes, and network-denied shell policy.",
     approvalMode: "manual",
     maxSteps: 12,
     policy: {
@@ -36,7 +36,7 @@ const POLICY_PROFILES: PolicyProfile[] = [
   {
     id: "full-access-review",
     label: "Full access review",
-    description: "Full-access command policy with manual review and a minimal shell environment.",
+    description: "Full-access command policy with manual review, a minimal shell environment, and network-denied shell policy.",
     approvalMode: "manual",
     maxSteps: 12,
     policy: {

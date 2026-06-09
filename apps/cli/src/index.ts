@@ -62,6 +62,7 @@ program
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
+  .option("--allow-network", "Allow shell commands that perform network access", false)
   .action(
     async (
       promptParts: string[],
@@ -77,6 +78,7 @@ program
         outputUsdPerMillionTokens?: string;
         pricingProfile?: string;
         shellEnv?: string;
+        allowNetwork?: boolean;
       }
     ) => {
       const workspaceConfig = await readWorkspaceConfig(options.workspace);
@@ -88,7 +90,7 @@ program
       );
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
-        const policy = createPolicy(options.mode, options.shellEnv, profile, workspaceConfig.config);
+        const policy = createPolicy(options.mode, options.shellEnv, options.allowNetwork, profile, workspaceConfig.config);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
@@ -121,6 +123,7 @@ program
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
+  .option("--allow-network", "Allow shell commands that perform network access", false)
   .option("--max-steps <number>", "Maximum agent loop count")
   .action(async (options: {
     workspace: string;
@@ -133,6 +136,7 @@ program
     outputUsdPerMillionTokens?: string;
     pricingProfile?: string;
     shellEnv?: string;
+    allowNetwork?: boolean;
     maxSteps?: string;
   }) => {
     const rl = createInterface({ input, output });
@@ -150,7 +154,7 @@ program
         if (!prompt) {
           break;
         }
-        const policy = createPolicy(options.mode, options.shellEnv, profile, workspaceConfig.config);
+        const policy = createPolicy(options.mode, options.shellEnv, options.allowNetwork, profile, workspaceConfig.config);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
@@ -355,6 +359,8 @@ program
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .action(async (options: { workspace: string }) => {
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const profile = resolveCliProfile(undefined, workspaceConfig.config);
+    const basePolicy: Partial<ApprovalPolicy> = { ...profile?.policy, ...(workspaceConfig.config.policy ?? {}) };
     const provider = readProviderSelection(workspaceConfig.config);
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
     console.log(`DeepSeek base URL: ${provider.baseUrl}`);
@@ -374,7 +380,8 @@ program
     console.log(`Approval mode: ${workspaceConfig.config.approvalMode ?? "profile/default"}`);
     console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom"}`);
     console.log(`Configured pricing profiles: ${readPricingProfilesFromEnv().length}`);
-    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? workspaceConfig.config.policy?.shellEnvironment ?? "minimal"}`);
+    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal"}`);
+    console.log(`Shell network access: ${resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked"}`);
     console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
     console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
     console.log(`Node: ${process.version}`);
@@ -462,6 +469,7 @@ function resolveCliProfile(profileId?: string, config?: WorkspaceConfig): Policy
 function createPolicy(
   mode: string | undefined,
   shellEnv: string | undefined,
+  allowNetwork: boolean | undefined,
   profile?: PolicyProfile,
   config?: WorkspaceConfig
 ): ApprovalPolicy {
@@ -475,13 +483,24 @@ function createPolicy(
     mode: selectedMode,
     allowFileWrite: selectedMode !== "suggest" && (base.allowFileWrite ?? true),
     allowShell: selectedMode !== "suggest" && (base.allowShell ?? true),
-    allowNetwork: false,
+    allowNetwork: selectedMode !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
     allowStateWrite: selectedMode !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
     maxFileBytes: readMaxFileBytesFromEnv() ?? base.maxFileBytes,
     shellEnvironment: parseShellEnvironmentMode(selectedShellEnv)
   };
+}
+
+function readAllowNetworkFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_NETWORK, "DEEPCODEX_ALLOW_NETWORK");
+}
+
+function resolveAllowNetworkPolicy(cliAllowNetwork: boolean | undefined, configuredAllowNetwork: boolean | undefined): boolean {
+  if (cliAllowNetwork === true) {
+    return true;
+  }
+  return readAllowNetworkFromEnv() ?? configuredAllowNetwork ?? false;
 }
 
 function readProviderSelection(config?: WorkspaceConfig) {
@@ -635,6 +654,20 @@ function readMaxFileBytesFromEnv(): number | undefined {
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function readOptionalBooleanEnv(value: string | undefined, name: string): boolean | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`${name} must be true or false.`);
 }
 
 function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {

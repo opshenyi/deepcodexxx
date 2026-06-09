@@ -228,6 +228,7 @@ app.post("/api/agent/run", async (req, res) => {
     profileId?: string;
     pricingProfileId?: string;
     model?: string;
+    allowNetwork?: boolean;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -250,7 +251,7 @@ app.post("/api/agent/run", async (req, res) => {
     const workspacePath = readWorkspace(body.workspace);
     const workspaceConfig = await readWorkspaceConfig(workspacePath);
     const profile = readPolicyProfile(body.profileId, workspaceConfig.config);
-    const policy = createRunPolicy(body.mode, profile, workspaceConfig.config);
+    const policy = createRunPolicy(body.mode, body.allowNetwork, profile, workspaceConfig.config);
     const provider = readProviderSelection(body.model, workspaceConfig.config);
     assertProviderAllowed(provider, workspaceConfig.config.provider);
     const workspace = await createWorkspaceContext(workspacePath, policy);
@@ -320,6 +321,7 @@ function readPolicyProfile(profileId?: string, config?: WorkspaceConfig) {
 
 function createRunPolicy(
   mode: ApprovalMode | undefined,
+  allowNetwork: boolean | undefined,
   profile: ReturnType<typeof readPolicyProfile>,
   config?: WorkspaceConfig
 ) {
@@ -331,7 +333,7 @@ function createRunPolicy(
     mode: selected,
     allowShell: selected !== "suggest" && (base.allowShell ?? true),
     allowFileWrite: selected !== "suggest" && (base.allowFileWrite ?? true),
-    allowNetwork: false,
+    allowNetwork: selected !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
     allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
@@ -364,6 +366,17 @@ function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
     return value;
   }
   throw new Error("DEEPCODEX_SHELL_ENV must be minimal or inherit.");
+}
+
+function readAllowNetworkFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_NETWORK, "DEEPCODEX_ALLOW_NETWORK");
+}
+
+function resolveAllowNetworkPolicy(requestAllowNetwork: boolean | undefined, configuredAllowNetwork: boolean | undefined): boolean {
+  if (requestAllowNetwork === true) {
+    return true;
+  }
+  return readAllowNetworkFromEnv() ?? configuredAllowNetwork ?? false;
 }
 
 function createRetentionPolicy(input?: {
@@ -496,6 +509,20 @@ function readMaxFileBytesFromEnv(): number | undefined {
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function readOptionalBooleanEnv(value: string | undefined, name: string): boolean | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`${name} must be true or false.`);
 }
 
 function mergeStringLists(...lists: Array<string[] | undefined>): string[] | undefined {
