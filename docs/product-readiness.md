@@ -27,6 +27,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Structured Web diff rendering for live event output, approval details, and session replay, with multi-file unified diffs split into readable blocks.
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
+- Built-in read-only CLI smoke evals for repository mapping, safety review, and release-evidence review.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
 - Workspace-specific custom redaction regex patterns for project identifiers or secret formats not covered by built-ins.
@@ -64,6 +65,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Release checklist | `docs/release-checklist.md` | Repeatable demo and smoke-test path. |
 | Roadmap | `docs/roadmap.md` | Sequenced path from interview artifact to pilot and hosted product. |
 | Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
+| Built-in evals | `docs/evals.md` | Repeatable read-only CLI smoke tasks and current scoring limits. |
 
 ## Readiness Levels
 

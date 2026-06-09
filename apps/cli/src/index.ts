@@ -51,6 +51,53 @@ import type {
 
 const program = new Command();
 
+type BuiltInEvalTask = {
+  id: string;
+  label: string;
+  description: string;
+  prompt: string;
+  profile: string;
+  maxSteps: number;
+  budget?: BudgetPolicy;
+  expectedSignals: string[];
+};
+
+const builtInEvalTasks: BuiltInEvalTask[] = [
+  {
+    id: "repo-map",
+    label: "Repository map",
+    description: "Read-only inventory of package layout, clients, and core runtime boundaries.",
+    prompt:
+      "Inspect this repository in read-only mode. Summarize the package layout, clients, shared core, and runtime boundaries. Do not modify files.",
+    profile: "inspection",
+    maxSteps: 6,
+    budget: { maxTokens: 60000 },
+    expectedSignals: ["packages/core", "apps/web", "apps/desktop", "apps/cli", "apps/server"]
+  },
+  {
+    id: "safety-smoke",
+    label: "Safety controls",
+    description: "Read-only review of policy, approval, shell, DLP, and audit controls.",
+    prompt:
+      "Inspect this repository in read-only mode. Summarize the implemented safety controls and identify the highest-risk remaining safety gap. Do not modify files.",
+    profile: "inspection",
+    maxSteps: 8,
+    budget: { maxTokens: 80000 },
+    expectedSignals: ["approval", "DLP", "shell", "policy", "audit"]
+  },
+  {
+    id: "release-evidence",
+    label: "Release evidence",
+    description: "Read-only check of docs, scripts, and demo readiness evidence.",
+    prompt:
+      "Inspect this repository in read-only mode. Summarize the release and demo evidence available to an interviewer, including verification commands and documented limitations. Do not modify files.",
+    profile: "inspection",
+    maxSteps: 6,
+    budget: { maxTokens: 60000 },
+    expectedSignals: ["runbook", "release checklist", "product readiness", "security model"]
+  }
+];
+
 program
   .name("deepcodex")
   .description("DeepSeek-powered coding agent for local workspaces.")
@@ -226,9 +273,121 @@ program
 
 const sessions = program.command("sessions").description("Inspect persisted DeepCodex session history.");
 
+const evals = program.command("evals").description("Run built-in DeepCodex smoke evaluation tasks.");
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
 const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
+
+evals
+  .command("list")
+  .option("--json", "Print JSON output", false)
+  .action((options: { json: boolean }) => {
+    if (options.json) {
+      console.log(JSON.stringify(builtInEvalTasks, null, 2));
+      return;
+    }
+    for (const task of builtInEvalTasks) {
+      console.log(`${task.id}  ${task.label}  ${task.profile}  ${task.maxSteps} steps`);
+      console.log(`  ${task.description}`);
+    }
+  });
+
+evals
+  .command("show")
+  .argument("<eval>", "Built-in eval id")
+  .option("--json", "Print JSON output", false)
+  .action((evalId: string, options: { json: boolean }) => {
+    const task = resolveEvalTask(evalId);
+    if (options.json) {
+      console.log(JSON.stringify(task, null, 2));
+      return;
+    }
+    printEvalTask(task);
+  });
+
+evals
+  .command("run")
+  .argument("<eval>", "Built-in eval id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print newline-delimited JSON events", false)
+  .option("--max-steps <number>", "Override the eval maximum agent loop count")
+  .option("--max-session-tokens <number>", "Stop when cumulative model tokens reach this session limit")
+  .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
+  .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
+  .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
+  .action(
+    async (
+      evalId: string,
+      options: {
+        workspace: string;
+        json: boolean;
+        maxSteps?: string;
+        maxSessionTokens?: string;
+        maxSessionUsd?: string;
+        inputUsdPerMillionTokens?: string;
+        outputUsdPerMillionTokens?: string;
+        pricingProfile?: string;
+      }
+    ) => {
+      const task = resolveEvalTask(evalId);
+      const workspaceConfig = await readWorkspaceConfig(options.workspace);
+      await assertSignedPolicyIfRequired(options.workspace);
+      const profile = resolveCliProfile(task.profile, workspaceConfig.config);
+      const provider = readProviderSelection(workspaceConfig.config);
+      assertProviderAllowed(provider, workspaceConfig.config.provider);
+      const policy = createPolicy("suggest", undefined, undefined, false, false, profile, workspaceConfig.config);
+      const workspace = await createWorkspaceContext(options.workspace, policy);
+      const maxSteps = readOptionalInteger(options.maxSteps) ?? task.maxSteps;
+
+      if (options.json) {
+        console.log(
+          JSON.stringify({
+            type: "eval_started",
+            eval: {
+              id: task.id,
+              label: task.label,
+              profile: task.profile,
+              maxSteps,
+              expectedSignals: task.expectedSignals
+            }
+          })
+        );
+      } else {
+        console.log(chalk.bold(`eval ${task.id}: ${task.label}`));
+        console.log(chalk.gray(task.description));
+        console.log(chalk.gray(`profile ${task.profile} / mode suggest / max steps ${maxSteps}`));
+      }
+
+      const result = await runDeepCodexAgent({
+        prompt: task.prompt,
+        workspace: workspace.root,
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        maxSteps,
+        policy,
+        budget: createBudgetPolicy(options, task.budget, options.pricingProfile, workspaceConfig.config),
+        onEvent: options.json ? createCliJsonEventHandler() : createCliEventHandler()
+      });
+
+      if (options.json) {
+        console.log(
+          JSON.stringify({
+            type: "eval_result",
+            evalId: task.id,
+            label: task.label,
+            sessionId: result.sessionId,
+            finalText: result.finalText,
+            expectedSignals: task.expectedSignals
+          })
+        );
+        return;
+      }
+      console.log(chalk.bold("\neval result"));
+      console.log(`session ${result.sessionId}`);
+      console.log(`expected signals ${task.expectedSignals.join(", ")}`);
+    }
+  );
 
 config
   .command("show")
@@ -624,6 +783,25 @@ try {
   const message = error instanceof Error ? error.message : String(error);
   console.error(chalk.red(message));
   process.exitCode = 1;
+}
+
+function resolveEvalTask(evalId: string): BuiltInEvalTask {
+  const task = builtInEvalTasks.find((entry) => entry.id === evalId);
+  if (!task) {
+    throw new Error(`Unknown eval '${evalId}'. Run 'deepcodex evals list' to see available evals.`);
+  }
+  return task;
+}
+
+function printEvalTask(task: BuiltInEvalTask): void {
+  console.log(`${task.id}  ${task.label}`);
+  console.log(task.description);
+  console.log(`Profile: ${task.profile}`);
+  console.log(`Max steps: ${task.maxSteps}`);
+  console.log(`Budget max tokens: ${task.budget?.maxTokens ?? "not set"}`);
+  console.log(`Expected signals: ${task.expectedSignals.join(", ")}`);
+  console.log("\nPrompt");
+  console.log(task.prompt);
 }
 
 function printEvent(event: AgentEvent): void {

@@ -31,6 +31,7 @@ node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
+node apps/cli/dist/index.js evals list
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
@@ -105,6 +106,7 @@ Use Web `Tool approvals: Manual` or CLI `--approval prompt` to pause write, shel
 - Security model: `docs/security-model.md`
 - Release and demo checklist: `docs/release-checklist.md`
 - Roadmap: `docs/roadmap.md`
+- Built-in evals: `docs/evals.md`
 
 ## Reference Research
 

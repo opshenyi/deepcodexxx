@@ -292,6 +292,16 @@ List configured pricing profiles:
 node apps/cli/dist/index.js pricing list
 ```
 
+List and run built-in smoke evals:
+
+```powershell
+node apps/cli/dist/index.js evals list
+node apps/cli/dist/index.js evals show repo-map
+node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json
+```
+
+Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. They are smoke tasks for repeatable review; automatic scoring is still future work.
+
 Inspect workspace defaults:
 
 ```powershell
