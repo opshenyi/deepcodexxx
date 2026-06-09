@@ -298,9 +298,10 @@ List and run built-in smoke evals:
 node apps/cli/dist/index.js evals list
 node apps/cli/dist/index.js evals show repo-map
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json
+node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --min-score 0.8
 ```
 
-Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. They are smoke tasks for repeatable review; automatic scoring is still future work.
+Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring. Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates.
 
 Inspect workspace defaults:
 

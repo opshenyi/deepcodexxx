@@ -62,6 +62,14 @@ type BuiltInEvalTask = {
   expectedSignals: string[];
 };
 
+type EvalScore = {
+  matchedSignals: string[];
+  missingSignals: string[];
+  totalSignals: number;
+  score: number;
+  passed: boolean;
+};
+
 const builtInEvalTasks: BuiltInEvalTask[] = [
   {
     id: "repo-map",
@@ -316,6 +324,8 @@ evals
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
   .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
+  .option("--min-score <number>", "Exit non-zero unless the eval score is at least this value from 0 to 1")
+  .option("--require-pass", "Exit non-zero unless every expected signal is matched", false)
   .action(
     async (
       evalId: string,
@@ -328,6 +338,8 @@ evals
         inputUsdPerMillionTokens?: string;
         outputUsdPerMillionTokens?: string;
         pricingProfile?: string;
+        minScore?: string;
+        requirePass: boolean;
       }
     ) => {
       const task = resolveEvalTask(evalId);
@@ -339,6 +351,7 @@ evals
       const policy = createPolicy("suggest", undefined, undefined, false, false, profile, workspaceConfig.config);
       const workspace = await createWorkspaceContext(options.workspace, policy);
       const maxSteps = readOptionalInteger(options.maxSteps) ?? task.maxSteps;
+      const scoreThreshold = options.requirePass ? 1 : readOptionalEvalScore(options.minScore);
 
       if (options.json) {
         console.log(
@@ -349,7 +362,8 @@ evals
               label: task.label,
               profile: task.profile,
               maxSteps,
-              expectedSignals: task.expectedSignals
+              expectedSignals: task.expectedSignals,
+              scoreThreshold
             }
           })
         );
@@ -357,6 +371,9 @@ evals
         console.log(chalk.bold(`eval ${task.id}: ${task.label}`));
         console.log(chalk.gray(task.description));
         console.log(chalk.gray(`profile ${task.profile} / mode suggest / max steps ${maxSteps}`));
+        if (scoreThreshold !== undefined) {
+          console.log(chalk.gray(`score threshold ${scoreThreshold}`));
+        }
       }
 
       const result = await runDeepCodexAgent({
@@ -369,6 +386,7 @@ evals
         budget: createBudgetPolicy(options, task.budget, options.pricingProfile, workspaceConfig.config),
         onEvent: options.json ? createCliJsonEventHandler() : createCliEventHandler()
       });
+      const score = scoreEvalResult(task, result.finalText);
 
       if (options.json) {
         console.log(
@@ -378,14 +396,27 @@ evals
             label: task.label,
             sessionId: result.sessionId,
             finalText: result.finalText,
-            expectedSignals: task.expectedSignals
+            expectedSignals: task.expectedSignals,
+            score,
+            scoreThreshold
           })
         );
+        if (evalScoreFailed(score, scoreThreshold)) {
+          process.exitCode = 1;
+        }
         return;
       }
       console.log(chalk.bold("\neval result"));
       console.log(`session ${result.sessionId}`);
       console.log(`expected signals ${task.expectedSignals.join(", ")}`);
+      console.log(`score ${formatEvalScore(score)}`);
+      if (score.missingSignals.length > 0) {
+        console.log(`missing signals ${score.missingSignals.join(", ")}`);
+      }
+      if (evalScoreFailed(score, scoreThreshold)) {
+        console.log(chalk.red("eval score threshold failed"));
+        process.exitCode = 1;
+      }
     }
   );
 
@@ -804,6 +835,35 @@ function printEvalTask(task: BuiltInEvalTask): void {
   console.log(task.prompt);
 }
 
+function scoreEvalResult(task: BuiltInEvalTask, finalText: string): EvalScore {
+  const normalizedFinalText = normalizeEvalText(finalText);
+  const matchedSignals = task.expectedSignals.filter((signal) => normalizedFinalText.includes(normalizeEvalText(signal)));
+  const missingSignals = task.expectedSignals.filter((signal) => !matchedSignals.includes(signal));
+  const totalSignals = task.expectedSignals.length;
+  const score = totalSignals === 0 ? 1 : matchedSignals.length / totalSignals;
+  return {
+    matchedSignals,
+    missingSignals,
+    totalSignals,
+    score,
+    passed: missingSignals.length === 0
+  };
+}
+
+function normalizeEvalText(value: string): string {
+  return value.toLocaleLowerCase();
+}
+
+function evalScoreFailed(score: EvalScore, scoreThreshold: number | undefined): boolean {
+  return scoreThreshold !== undefined && score.score < scoreThreshold;
+}
+
+function formatEvalScore(score: EvalScore): string {
+  return `${score.matchedSignals.length}/${score.totalSignals} (${score.score.toFixed(2)}) ${
+    score.passed ? "passed" : "not passed"
+  }`;
+}
+
 function printEvent(event: AgentEvent): void {
   switch (event.type) {
     case "session_started":
@@ -1166,6 +1226,20 @@ function readOptionalInteger(value: unknown): number | undefined {
   }
   if (!Number.isInteger(parsed)) {
     throw new Error("Retention integer values must be whole numbers.");
+  }
+  return parsed;
+}
+
+function readOptionalEvalScore(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value === "string" && !value.trim()) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error("Eval score threshold must be between 0 and 1.");
   }
   return parsed;
 }

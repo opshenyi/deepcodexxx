@@ -123,6 +123,7 @@ node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js evals list
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --max-steps 1
+node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --max-steps 1 --min-score 0
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and list the main product surfaces."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "Inspect this repository and list the main product surfaces."
@@ -134,7 +135,7 @@ Checklist:
 - CLI prints configuration through `doctor`.
 - CLI can show workspace defaults through `config show`.
 - CLI can list workspace-defined team policy profiles through `profiles list --workspace`.
-- CLI can list built-in evals and run `evals run repo-map --json` as a read-only smoke task.
+- CLI can list built-in evals and run `evals run repo-map --json` as a read-only smoke task with score output and optional CI thresholds.
 - `memory` reads workspace memory without crashing.
 - `ask` prints session, step, tool, and final output events.
 - `ask --json` emits newline-delimited JSON records that can be parsed by automation.

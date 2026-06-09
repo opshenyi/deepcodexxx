@@ -9,9 +9,12 @@ node apps/cli/dist/index.js evals list
 node apps/cli/dist/index.js evals show repo-map
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json
+node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --require-pass
 ```
 
-`evals run` forces `suggest` mode and uses the task's `inspection` profile by default, so it does not write files, run shell commands, append memory, or persist session state. The JSON mode emits newline-delimited records: an `eval_started` record, normal agent event records, and an `eval_result` record with the final text and expected signal list.
+`evals run` forces `suggest` mode and uses the task's `inspection` profile by default, so it does not write files, run shell commands, append memory, or persist session state. The JSON mode emits newline-delimited records: an `eval_started` record, normal agent event records, and an `eval_result` record with the final text, expected signal list, and score.
+
+Scoring is intentionally transparent: DeepCodex checks whether the final answer contains each expected signal, case-insensitively. `--min-score <0-1>` fails the command when the score is below a threshold, and `--require-pass` requires every expected signal. This is useful for CI smoke gates, while deeper semantic scoring remains future work.
 
 ## Tasks
 
@@ -23,6 +26,6 @@ node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex -
 
 ## Current Limits
 
-- Eval output is not automatically scored yet.
-- Expected signals are emitted as review hints for humans or future automation.
+- Scoring is exact expected-signal matching, not semantic grading.
+- Historical eval comparisons and richer benchmark reports are future work.
 - Live DeepSeek-backed evals require `DEEPSEEK_API_KEY`; without it, the same commands run in local demo mode.
