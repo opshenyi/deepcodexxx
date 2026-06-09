@@ -44,6 +44,12 @@ export interface BudgetPolicy {
   outputUsdPerMillionTokens?: number;
 }
 
+export interface ProviderPolicy {
+  baseUrl?: string;
+  allowedBaseUrls?: string[];
+  allowedModels?: string[];
+}
+
 export interface PricingProfile {
   id: string;
   label: string;
@@ -173,6 +179,7 @@ export interface AgentRunOptions {
   maxSteps?: number;
   policy?: ApprovalPolicy;
   model?: string;
+  baseUrl?: string;
   budget?: BudgetPolicy;
   chatClient?: AgentChatClient;
   onEvent?: AgentEventHandler;

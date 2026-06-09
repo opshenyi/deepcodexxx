@@ -8,8 +8,9 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
-- Workspace-level `.deepcodex/config.json` defaults for model, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, and retention.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
+- Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
@@ -57,7 +58,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add signed policy bundles and provider allowlists.
+- Add signed policy bundles and provider policy provenance.
 - Add richer DLP classification and purpose-built media/artifact preview tools.
 - Add richer generated-asset handling and file-type policies.
 - Add packaged desktop installers and signed releases.

@@ -9,7 +9,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. | Add OS-level sandboxing or isolated execution workers. |
-| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model and budget defaults. | Add secrets management and provider allowlists. |
+| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model, provider base URL, provider/model allowlists, and budget defaults. | Add secrets management and signed provider policy bundles. |
 | Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
 
 ## Approval Modes
@@ -87,7 +87,8 @@ Provider usage controls:
 - Token budgets can be set with `DEEPCODEX_MAX_SESSION_TOKENS`, CLI flags, or the Web Budget panel.
 - Estimated cost budgets can be set with `DEEPCODEX_MAX_SESSION_USD`, but require caller-provided input and output token prices.
 - Pricing profiles can be configured with `DEEPCODEX_PRICING_PROFILES` and selected through CLI, server, or Web budget controls.
-- `.deepcodex/config.json` can provide workspace defaults for model, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, and retention.
+- `.deepcodex/config.json` can provide workspace defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, and retention.
+- Provider allowlists block agent runs when the resolved base URL or model is not approved by the workspace policy.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
 - Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.
 
@@ -128,7 +129,7 @@ The next security work should prioritize:
 - Richer generated-asset handling and file-type policies.
 - Signed policy bundles and policy provenance metadata.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
-- Provider allowlists and signed team policy bundles.
+- Signed provider/team policy bundles.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

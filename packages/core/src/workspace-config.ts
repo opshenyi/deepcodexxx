@@ -1,12 +1,14 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listPolicyProfiles } from "./policy-profile.js";
+import { normalizeBaseUrl } from "./provider-policy.js";
 import type { SessionRetentionPolicy } from "./session-store.js";
 import type {
   ApprovalMode,
   ApprovalPolicy,
   BudgetPolicy,
   PolicyProfile,
+  ProviderPolicy,
   ProfileApprovalMode,
   ShellEnvironmentMode
 } from "./types.js";
@@ -18,6 +20,7 @@ export interface WorkspaceConfig {
   model?: string;
   policyProfileId?: string;
   pricingProfileId?: string;
+  provider?: ProviderPolicy;
   approvalMode?: ProfileApprovalMode;
   maxSteps?: number;
   policyProfiles?: PolicyProfile[];
@@ -88,6 +91,11 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
   return {
     version: 1,
     model: "deepseek-chat",
+    provider: {
+      baseUrl: "https://api.deepseek.com",
+      allowedBaseUrls: ["https://api.deepseek.com"],
+      allowedModels: ["deepseek-chat"]
+    },
     policyProfileId: "guarded-write",
     approvalMode: "manual",
     maxSteps: 12,
@@ -147,6 +155,7 @@ function normalizeWorkspaceConfig(value: unknown): WorkspaceConfig {
   return removeUndefinedConfigValues({
     version: readOptionalNumber(entry.version, "version"),
     model: readOptionalString(entry.model, "model"),
+    provider: normalizeProviderConfig(entry.provider),
     policyProfileId: readOptionalString(entry.policyProfileId, "policyProfileId"),
     pricingProfileId: readOptionalString(entry.pricingProfileId, "pricingProfileId"),
     approvalMode: readOptionalApprovalMode(entry.approvalMode),
@@ -155,6 +164,18 @@ function normalizeWorkspaceConfig(value: unknown): WorkspaceConfig {
     budget: normalizeBudgetConfig(entry.budget),
     policy: normalizePolicyConfig(entry.policy),
     retention: normalizeRetentionConfig(entry.retention)
+  });
+}
+
+function normalizeProviderConfig(value: unknown): ProviderPolicy | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const entry = readObject(value, "provider");
+  return removeUndefinedProviderValues({
+    baseUrl: readOptionalBaseUrl(entry.baseUrl, "provider.baseUrl"),
+    allowedBaseUrls: readOptionalBaseUrlArray(entry.allowedBaseUrls, "provider.allowedBaseUrls"),
+    allowedModels: readOptionalStringArray(entry.allowedModels, "provider.allowedModels")
   });
 }
 
@@ -286,6 +307,31 @@ function readOptionalStringArray(value: unknown, field: string): string[] | unde
   return value.map((entry) => entry.trim());
 }
 
+function readOptionalBaseUrl(value: unknown, field: string): string | undefined {
+  const url = readOptionalString(value, field);
+  if (!url) {
+    return undefined;
+  }
+  try {
+    return normalizeBaseUrl(url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${field} is invalid: ${message}`);
+  }
+}
+
+function readOptionalBaseUrlArray(value: unknown, field: string): string[] | undefined {
+  const urls = readOptionalStringArray(value, field);
+  return urls?.map((url) => {
+    try {
+      return normalizeBaseUrl(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${field} contains an invalid URL: ${message}`);
+    }
+  });
+}
+
 function readOptionalRegexArray(value: unknown, field: string): string[] | undefined {
   const patterns = readOptionalStringArray(value, field);
   if (!patterns) {
@@ -376,6 +422,11 @@ function removeUndefinedPolicyValues(policy: Partial<ApprovalPolicy>): Partial<A
 function removeUndefinedBudgetValues(policy: BudgetPolicy): BudgetPolicy | undefined {
   const clean = Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined));
   return Object.keys(clean).length > 0 ? (clean as BudgetPolicy) : undefined;
+}
+
+function removeUndefinedProviderValues(policy: ProviderPolicy): ProviderPolicy | undefined {
+  const clean = Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined));
+  return Object.keys(clean).length > 0 ? (clean as ProviderPolicy) : undefined;
 }
 
 function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): SessionRetentionPolicy | undefined {

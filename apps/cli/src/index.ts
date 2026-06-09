@@ -19,6 +19,8 @@ import {
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
+  assertProviderAllowed,
+  resolveProviderSelection,
   runDeepCodexAgent,
   writeWorkspaceConfigTemplate
 } from "@deepcodex/core";
@@ -79,6 +81,8 @@ program
     ) => {
       const workspaceConfig = await readWorkspaceConfig(options.workspace);
       const profile = resolveCliProfile(options.profile, workspaceConfig.config);
+      const provider = readProviderSelection(workspaceConfig.config);
+      assertProviderAllowed(provider, workspaceConfig.config.provider);
       const approvalMode = parseCliApprovalMode(
         options.approval ?? workspaceConfig.config.approvalMode ?? profile?.approvalMode ?? "auto"
       );
@@ -90,7 +94,8 @@ program
         await runDeepCodexAgent({
           prompt: promptParts.join(" "),
           workspace: workspace.root,
-          model: readModel(workspaceConfig.config),
+          baseUrl: provider.baseUrl,
+          model: provider.model,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -133,6 +138,8 @@ program
     const rl = createInterface({ input, output });
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
     const profile = resolveCliProfile(options.profile, workspaceConfig.config);
+    const provider = readProviderSelection(workspaceConfig.config);
+    assertProviderAllowed(provider, workspaceConfig.config.provider);
     const approvalMode = parseCliApprovalMode(
       options.approval ?? workspaceConfig.config.approvalMode ?? profile?.approvalMode ?? "auto"
     );
@@ -149,7 +156,8 @@ program
         await runDeepCodexAgent({
           prompt,
           workspace: workspace.root,
-          model: readModel(workspaceConfig.config),
+          baseUrl: provider.baseUrl,
+          model: provider.model,
           maxSteps: readOptionalInteger(options.maxSteps) ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps ?? 12,
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
@@ -347,9 +355,12 @@ program
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .action(async (options: { workspace: string }) => {
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const provider = readProviderSelection(workspaceConfig.config);
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
-    console.log(`DeepSeek base URL: ${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}`);
-    console.log(`DeepSeek model: ${readModel(workspaceConfig.config) ?? "deepseek-chat"}`);
+    console.log(`DeepSeek base URL: ${provider.baseUrl}`);
+    console.log(`DeepSeek model: ${provider.model}`);
+    console.log(`Allowed provider base URLs: ${workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0}`);
+    console.log(`Allowed provider models: ${workspaceConfig.config.provider?.allowedModels?.length ?? 0}`);
     console.log(`Max session tokens: ${process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set"}`);
     console.log(`Max session USD: ${process.env.DEEPCODEX_MAX_SESSION_USD ?? "not set"}`);
     console.log(
@@ -369,7 +380,13 @@ program
     console.log(`Node: ${process.version}`);
   });
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(chalk.red(message));
+  process.exitCode = 1;
+}
 
 function printEvent(event: AgentEvent): void {
   switch (event.type) {
@@ -467,9 +484,11 @@ function createPolicy(
   };
 }
 
-function readModel(config?: WorkspaceConfig): string | undefined {
-  const selected = process.env.DEEPSEEK_MODEL || config?.model;
-  return selected?.trim() ? selected.trim() : undefined;
+function readProviderSelection(config?: WorkspaceConfig) {
+  return resolveProviderSelection({
+    baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
+    model: process.env.DEEPSEEK_MODEL || config?.model
+  });
 }
 
 function parseShellEnvironmentMode(value: string): ShellEnvironmentMode {

@@ -92,6 +92,11 @@ type ServerPolicyProfile = {
 type WorkspaceConfig = {
   version?: number;
   model?: string;
+  provider?: {
+    baseUrl?: string;
+    allowedBaseUrls?: string[];
+    allowedModels?: string[];
+  };
   policyProfileId?: string;
   pricingProfileId?: string;
   approvalMode?: ToolApprovalMode;

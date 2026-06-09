@@ -5,9 +5,7 @@ import type {
   DeepSeekConfig,
   ToolDefinition
 } from "./types.js";
-
-const DEFAULT_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_MODEL = "deepseek-chat";
+import { DEFAULT_DEEPSEEK_BASE_URL, DEFAULT_DEEPSEEK_MODEL, normalizeBaseUrl } from "./provider-policy.js";
 
 export class DeepSeekError extends Error {
   constructor(
@@ -28,8 +26,8 @@ export class DeepSeekClient {
 
   constructor(config: DeepSeekConfig = {}) {
     this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY;
-    this.baseUrl = stripTrailingSlash(config.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_BASE_URL);
-    this.model = config.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+    this.baseUrl = normalizeBaseUrl(config.baseUrl ?? process.env.DEEPSEEK_BASE_URL ?? DEFAULT_DEEPSEEK_BASE_URL);
+    this.model = config.model ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL;
     this.timeoutMs = config.timeoutMs ?? 120_000;
   }
 
@@ -108,9 +106,5 @@ export class DeepSeekClient {
       }
     };
   }
-}
-
-function stripTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 

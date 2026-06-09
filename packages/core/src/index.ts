@@ -4,6 +4,7 @@ export * from "./deepseek.js";
 export * from "./file-audit.js";
 export * from "./memory.js";
 export * from "./policy-profile.js";
+export * from "./provider-policy.js";
 export * from "./pricing.js";
 export * from "./redaction.js";
 export * from "./safety.js";

@@ -19,6 +19,8 @@ import {
   readWorkspaceMemory,
   resolvePricingProfile,
   resolvePolicyProfile,
+  assertProviderAllowed,
+  resolveProviderSelection,
   runDeepCodexAgent
 } from "@deepcodex/core";
 import type {
@@ -249,6 +251,8 @@ app.post("/api/agent/run", async (req, res) => {
     const workspaceConfig = await readWorkspaceConfig(workspacePath);
     const profile = readPolicyProfile(body.profileId, workspaceConfig.config);
     const policy = createRunPolicy(body.mode, profile, workspaceConfig.config);
+    const provider = readProviderSelection(body.model, workspaceConfig.config);
+    assertProviderAllowed(provider, workspaceConfig.config.provider);
     const workspace = await createWorkspaceContext(workspacePath, policy);
     if (policy.allowStateWrite !== false) {
       const recorder = createSessionRecorder(workspace);
@@ -265,7 +269,8 @@ app.post("/api/agent/run", async (req, res) => {
     await runDeepCodexAgent({
       prompt,
       workspace: workspace.root,
-      model: readModel(body.model, workspaceConfig.config),
+      baseUrl: provider.baseUrl,
+      model: provider.model,
       maxSteps: body.maxSteps ?? workspaceConfig.config.maxSteps ?? profile?.maxSteps,
       policy,
       budget: createBudgetPolicy(body.budget, profile?.budget, body.pricingProfileId, workspaceConfig.config),
@@ -335,9 +340,11 @@ function createRunPolicy(
   };
 }
 
-function readModel(model: string | undefined, config?: WorkspaceConfig): string | undefined {
-  const selected = model?.trim() || process.env.DEEPSEEK_MODEL || config?.model;
-  return selected?.trim() ? selected.trim() : undefined;
+function readProviderSelection(model: string | undefined, config?: WorkspaceConfig) {
+  return resolveProviderSelection({
+    baseUrl: process.env.DEEPSEEK_BASE_URL || config?.provider?.baseUrl,
+    model: model?.trim() || process.env.DEEPSEEK_MODEL || config?.model
+  });
 }
 
 function resolveRunApprovalMode(

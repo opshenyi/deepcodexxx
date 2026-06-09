@@ -28,6 +28,7 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
+- CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
 - CLI `doctor` reports workspace config status, and `config show` reports either a valid config or a clear missing state.
@@ -54,6 +55,7 @@ Checklist:
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
+- A workspace provider allowlist rejects unapproved base URLs or models before a run starts.
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.

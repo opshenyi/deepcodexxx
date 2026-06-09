@@ -36,6 +36,11 @@ describe("workspace config", () => {
       JSON.stringify({
         version: 1,
         model: "deepseek-coder",
+        provider: {
+          baseUrl: "https://api.deepseek.com/",
+          allowedBaseUrls: ["https://api.deepseek.com/"],
+          allowedModels: ["deepseek-coder", "deepseek-chat"]
+        },
         policyProfileId: "inspection",
         policyProfiles: [
           {
@@ -78,6 +83,11 @@ describe("workspace config", () => {
     expect(result.exists).toBe(true);
     expect(result.config).toMatchObject({
       model: "deepseek-coder",
+      provider: {
+        baseUrl: "https://api.deepseek.com",
+        allowedBaseUrls: ["https://api.deepseek.com"],
+        allowedModels: ["deepseek-coder", "deepseek-chat"]
+      },
       policyProfileId: "inspection",
       policyProfiles: [
         {
@@ -154,6 +164,18 @@ describe("workspace config", () => {
     );
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/policyProfiles\[0\]\.policy\.mode/);
+  });
+
+  it("rejects invalid provider base URLs", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ provider: { allowedBaseUrls: ["ftp://api.deepseek.com"] } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/provider.allowedBaseUrls/);
   });
 
   it("writes a template without overwriting an existing config", async () => {

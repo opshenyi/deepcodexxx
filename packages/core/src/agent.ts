@@ -30,7 +30,7 @@ Operating model:
 export async function runDeepCodexAgent(options: AgentRunOptions): Promise<AgentRunResult> {
   const sessionId = options.sessionId ?? randomUUID();
   const workspace = await createWorkspaceContext(options.workspace, options.policy);
-  const client = options.chatClient ?? new DeepSeekClient({ model: options.model });
+  const client = options.chatClient ?? new DeepSeekClient({ baseUrl: options.baseUrl, model: options.model });
   const redactionOptions: RedactionOptions = { additionalPatterns: workspace.policy.redactionPatterns };
   const budgetPolicy = normalizeBudgetPolicy(options.budget);
   const budgetEnabled = isBudgetPolicyEnabled(budgetPolicy);
