@@ -46,6 +46,7 @@ Implemented controls:
 - `.deepcodex/config.json` can also extend denied path patterns for a specific workspace.
 - Common media, archive, Office/PDF, executable, library, and WebAssembly extensions are denied by default for file listing, reading, writing, editing, and search. `DEEPCODEX_DENIED_EXTENSIONS` can extend the default list.
 - `.deepcodex/config.json` can also extend denied file extensions for a specific workspace.
+- The `inspect_artifact` tool can inspect a workspace file's metadata without returning raw bytes, text extraction, or base64 content. It respects denied paths, reads only a bounded sample, reports type hints, sample SHA-256, byte size, and simple image dimensions when available.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
@@ -58,7 +59,7 @@ Current limitations:
 - The shell tool is not constrained by the same path resolver after a command starts.
 - A shell command can invoke external programs with the user's local permissions.
 - The denial list is intentionally small and should become configurable for real pilots.
-- Specialized media/artifact handling is deny-list based; future work should add purpose-built tools for safe extraction or preview.
+- Artifact inspection is metadata-only; it does not perform OCR, PDF text extraction, archive listing, or malware scanning.
 
 ## Shell Controls
 
@@ -126,7 +127,7 @@ Current limitations:
 
 The next security work should prioritize:
 
-- Richer generated-asset handling and file-type policies.
+- Richer generated-asset handling, OCR/PDF/archive extraction policy, and file-type policies.
 - Signed policy bundles and policy provenance metadata.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Signed provider/team policy bundles.

@@ -167,6 +167,41 @@ describe("workspace tools", () => {
     expect(result.content).toContain("Denied file extension");
   });
 
+  it("safely inspects denied media artifacts without returning raw content", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const png = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
+    png.writeUInt32BE(320, 16);
+    png.writeUInt32BE(180, 20);
+    await writeFile(path.join(tempDir, "image.png"), png);
+    const workspace = await createWorkspaceContext(tempDir);
+    const inspectTool = createDefaultTools().find((tool) => tool.definition.function.name === "inspect_artifact");
+    expect(inspectTool).toBeDefined();
+
+    const result = await inspectTool!.run({ path: "image.png" }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("Artifact: image.png");
+    expect(result.content).toContain("Detected type: image/png");
+    expect(result.content).toContain("Dimensions: 320x180");
+    expect(result.content).toContain("Sample SHA-256:");
+    expect(result.content).toContain("Raw content: not returned by policy.");
+    expect(result.content).not.toContain("base64");
+  });
+
+  it("does not allow artifact inspection to bypass denied paths", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, ".env"), "DEEPSEEK_API_KEY=secret\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir);
+    const inspectTool = createDefaultTools().find((tool) => tool.definition.function.name === "inspect_artifact");
+    expect(inspectTool).toBeDefined();
+
+    const result = await inspectTool!.run({ path: ".env" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied path");
+  });
+
   it("rejects writes to common media and artifact extensions", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir);

@@ -30,6 +30,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Basic workspace guardrails for path traversal and denied folders.
 - Configurable denied path patterns with `**` support, default protection for nested env files, generated/build output, reference repos, and session audit state.
 - Configurable denied media/artifact extensions with default protection for common binary, archive, Office/PDF, executable, library, and WebAssembly file types.
+- Safe `inspect_artifact` tool for metadata-only inspection of non-text artifacts without exposing raw bytes to the model.
 - Configurable file-size limits for read, write, edit, and search tools.
 - Binary-aware read, edit, and search handling for non-text files.
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
@@ -59,7 +60,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 ## Next Commercial Milestones
 
 - Add signed policy bundles and provider policy provenance.
-- Add richer DLP classification and purpose-built media/artifact preview tools.
+- Add richer DLP classification and policy-controlled OCR/PDF/archive extraction.
 - Add richer generated-asset handling and file-type policies.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.

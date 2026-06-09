@@ -59,6 +59,7 @@ Checklist:
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.
+- Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - Audit retention dry-run can preview sessions that would be pruned before deletion is applied.

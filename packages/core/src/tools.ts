@@ -1,5 +1,5 @@
 import { exec } from "node:child_process";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { open, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createBufferHashSnapshot } from "./file-audit.js";
@@ -14,6 +14,7 @@ export function createDefaultTools(): RuntimeTool[] {
   return [
     listFilesTool,
     readFileTool,
+    inspectArtifactTool,
     writeFileTool,
     editFileTool,
     searchFilesTool,
@@ -87,6 +88,54 @@ const readFileTool: RuntimeTool = {
       return fail(`File appears to be binary: ${rel}`);
     }
     return ok(truncateForModel(content));
+  }
+};
+
+const inspectArtifactTool: RuntimeTool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "inspect_artifact",
+      description:
+        "Safely inspect a non-text artifact or media file by returning metadata only. Does not return raw bytes, text extraction, or base64 content.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Relative artifact path." }
+        },
+        required: ["path"]
+      }
+    }
+  },
+  async run(input, runtime) {
+    const args = objectInput(input);
+    const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
+    const rel = workspaceRelative(runtime.workspace, target);
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+      return fail(`Denied path: ${rel}`);
+    }
+
+    const targetStat = await stat(target);
+    if (!targetStat.isFile()) {
+      return fail(`Artifact inspection requires a file: ${rel}`);
+    }
+
+    const sample = await readFileSample(target, Math.min(targetStat.size, 64 * 1024));
+    const detected = detectArtifact(sample, rel);
+    const sampleHash = createBufferHashSnapshot(sample);
+    const lines = [
+      `Artifact: ${rel}`,
+      `Bytes: ${targetStat.size}`,
+      `Extension: ${path.extname(rel).toLowerCase() || "(none)"}`,
+      `Detected type: ${detected.type}`,
+      `Binary-looking: ${isProbablyBinary(sample) ? "yes" : "no"}`,
+      detected.dimensions ? `Dimensions: ${detected.dimensions.width}x${detected.dimensions.height}` : "",
+      `Sample SHA-256: ${sampleHash.sha256}`,
+      `Sample bytes: ${sample.length}`,
+      "Raw content: not returned by policy."
+    ].filter(Boolean);
+
+    return ok(lines.join("\n"));
   }
 };
 
@@ -454,6 +503,20 @@ async function readUtf8TextFile(target: string): Promise<string | undefined> {
   return buffer.toString("utf8");
 }
 
+async function readFileSample(target: string, bytes: number): Promise<Buffer> {
+  if (bytes <= 0) {
+    return Buffer.alloc(0);
+  }
+  const handle = await open(target, "r");
+  try {
+    const buffer = Buffer.alloc(bytes);
+    const result = await handle.read(buffer, 0, bytes, 0);
+    return buffer.subarray(0, result.bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
 function isProbablyBinary(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
   if (sample.length === 0) {
@@ -473,6 +536,103 @@ function isProbablyBinary(buffer: Buffer): boolean {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function detectArtifact(buffer: Buffer, relativePath: string): { type: string; dimensions?: { width: number; height: number } } {
+  if (isPng(buffer)) {
+    return {
+      type: "image/png",
+      dimensions:
+        buffer.length >= 24
+          ? {
+              width: buffer.readUInt32BE(16),
+              height: buffer.readUInt32BE(20)
+            }
+          : undefined
+    };
+  }
+  if (isGif(buffer)) {
+    return {
+      type: "image/gif",
+      dimensions:
+        buffer.length >= 10
+          ? {
+              width: buffer.readUInt16LE(6),
+              height: buffer.readUInt16LE(8)
+            }
+          : undefined
+    };
+  }
+  const jpegDimensions = readJpegDimensions(buffer);
+  if (jpegDimensions || isJpeg(buffer)) {
+    return { type: "image/jpeg", dimensions: jpegDimensions };
+  }
+  if (startsWithAscii(buffer, "%PDF-")) {
+    return { type: "application/pdf" };
+  }
+  if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+    return { type: "application/zip" };
+  }
+  if (buffer.length >= 8 && buffer.toString("ascii", 4, 8) === "ftyp") {
+    return { type: "video/mp4-or-quicktime" };
+  }
+  if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "RIFF") {
+    return { type: "riff-container" };
+  }
+  const extension = path.extname(relativePath).toLowerCase();
+  return { type: extension ? `unknown (${extension})` : "unknown" };
+}
+
+function isPng(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  );
+}
+
+function isGif(buffer: Buffer): boolean {
+  return startsWithAscii(buffer, "GIF87a") || startsWithAscii(buffer, "GIF89a");
+}
+
+function isJpeg(buffer: Buffer): boolean {
+  return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+function readJpegDimensions(buffer: Buffer): { width: number; height: number } | undefined {
+  if (!isJpeg(buffer)) {
+    return undefined;
+  }
+  let offset = 2;
+  while (offset + 9 < buffer.length) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = buffer[offset + 1];
+    const length = buffer.readUInt16BE(offset + 2);
+    if (length < 2 || offset + 2 + length > buffer.length) {
+      return undefined;
+    }
+    if (marker && marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: buffer.readUInt16BE(offset + 5),
+        width: buffer.readUInt16BE(offset + 7)
+      };
+    }
+    offset += 2 + length;
+  }
+  return undefined;
+}
+
+function startsWithAscii(buffer: Buffer, value: string): boolean {
+  return buffer.length >= value.length && buffer.toString("ascii", 0, value.length) === value;
 }
 
 function createUnifiedDiff(relativePath: string, before: string, after: string): string {

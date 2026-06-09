@@ -309,6 +309,8 @@ Approval audit events record request time, decision time, decision latency, and 
 
 For `write_file` and `edit_file`, approval and tool result events also include file audit metadata when the path can be resolved. The approval request records the before-file SHA-256 snapshot; the tool result records before/after SHA-256 snapshots and whether the change was applied or only previewed.
 
+The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, PDF text, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check |
@@ -322,7 +324,7 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
-| A media or artifact file is denied unexpectedly. | The file extension matches the built-in media/artifact deny list or `DEEPCODEX_DENIED_EXTENSIONS`. | Keep binary/media artifacts out of model context or add a purpose-built tool for that file type. |
+| A media or artifact file is denied unexpectedly. | The file extension matches the built-in media/artifact deny list or `DEEPCODEX_DENIED_EXTENSIONS`. | Use `inspect_artifact` for metadata-only inspection, or add a future policy-controlled extraction tool for that file type. |
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
