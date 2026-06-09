@@ -10,7 +10,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
 - Desktop production-like startup can bootstrap the built local server and load the built Web client.
-- Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, or a saved runtime Server URL from the sidebar.
+- Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, a saved runtime Server URL from the sidebar, or saved local workspace profiles for repeated workspace/server/policy setup.
 - Server CORS can remain permissive for local development or be restricted by `DEEPCODEX_CORS_ORIGINS` for controlled demos.
 - Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, and retention.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.

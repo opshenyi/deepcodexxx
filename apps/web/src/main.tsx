@@ -258,6 +258,17 @@ type PolicyProfileOption = {
   maxSteps?: number;
 };
 
+type WorkspaceProfile = {
+  id: string;
+  label: string;
+  workspace: string;
+  serverUrl: string;
+  policyProfileId: string;
+  shellExecutionMode: ShellExecutionMode;
+  maxSteps: string;
+  updatedAt: string;
+};
+
 type PendingApproval = {
   approvalId: string;
   name: string;
@@ -268,6 +279,7 @@ type PendingApproval = {
   fileAudits?: FileAuditEntry[];
 };
 
+const workspaceProfilesStorageKey = "deepcodex.workspaceProfiles";
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
 const defaultMaxSessionTokens = localStorage.getItem("deepcodex.maxSessionTokens") ?? "";
 const defaultMaxSessionUsd = localStorage.getItem("deepcodex.maxSessionUsd") ?? "";
@@ -400,6 +412,10 @@ function App() {
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
   const [policyBundle, setPolicyBundle] = useState<PolicyBundleVerificationResult | null>(null);
   const [policyBundleMessage, setPolicyBundleMessage] = useState("");
+  const [workspaceProfiles, setWorkspaceProfiles] = useState<WorkspaceProfile[]>(readStoredWorkspaceProfiles);
+  const [selectedWorkspaceProfileId, setSelectedWorkspaceProfileId] = useState("");
+  const [workspaceProfileName, setWorkspaceProfileName] = useState("");
+  const [workspaceProfileMessage, setWorkspaceProfileMessage] = useState("");
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>(defaultDiffViewMode);
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
@@ -443,6 +459,7 @@ function App() {
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const policyBundleStatus = formatPolicyBundleStatus(policyBundle, policyBundleState);
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
+  const selectedWorkspaceProfile = workspaceProfiles.find((profile) => profile.id === selectedWorkspaceProfileId);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
     () =>
@@ -945,6 +962,70 @@ function App() {
     localStorage.setItem("deepcodex.diffViewMode", nextMode);
   }
 
+  function selectWorkspaceProfile(profileId: string) {
+    const profile = workspaceProfiles.find((entry) => entry.id === profileId);
+    setSelectedWorkspaceProfileId(profileId);
+    setWorkspaceProfileName(profile?.label ?? "");
+    setWorkspaceProfileMessage("");
+  }
+
+  function saveWorkspaceProfile() {
+    const label = workspaceProfileName.trim() || workspace.trim() || "Local workspace";
+    const existing = selectedWorkspaceProfile;
+    const profile: WorkspaceProfile = {
+      id: existing?.id ?? createWorkspaceProfileId(label),
+      label,
+      workspace,
+      serverUrl,
+      policyProfileId,
+      shellExecutionMode,
+      maxSteps,
+      updatedAt: new Date().toISOString()
+    };
+    const nextProfiles = existing
+      ? workspaceProfiles.map((entry) => (entry.id === existing.id ? profile : entry))
+      : [profile, ...workspaceProfiles].slice(0, 12);
+    setWorkspaceProfiles(nextProfiles);
+    writeStoredWorkspaceProfiles(nextProfiles);
+    setSelectedWorkspaceProfileId(profile.id);
+    setWorkspaceProfileName(profile.label);
+    setWorkspaceProfileMessage(`Saved ${profile.label}.`);
+  }
+
+  function applyWorkspaceProfile() {
+    if (!selectedWorkspaceProfile) {
+      setWorkspaceProfileMessage("No profile selected.");
+      return;
+    }
+    const normalizedServerUrl = normalizeServerUrl(selectedWorkspaceProfile.serverUrl) || configuredServerUrl;
+    setWorkspace(selectedWorkspaceProfile.workspace);
+    setServerUrl(normalizedServerUrl);
+    setServerUrlDraft(normalizedServerUrl);
+    setPolicyProfileId(toPolicyProfileOptionId(selectedWorkspaceProfile.policyProfileId) ?? "custom");
+    setShellExecutionMode(selectedWorkspaceProfile.shellExecutionMode);
+    setMaxSteps(selectedWorkspaceProfile.maxSteps || defaultMaxSteps);
+    setWorkspaceProfileName(selectedWorkspaceProfile.label);
+    localStorage.setItem("deepcodex.workspace", selectedWorkspaceProfile.workspace);
+    localStorage.setItem("deepcodex.serverUrl", normalizedServerUrl);
+    localStorage.setItem("deepcodex.policyProfile", selectedWorkspaceProfile.policyProfileId);
+    localStorage.setItem("deepcodex.shellExecutionMode", selectedWorkspaceProfile.shellExecutionMode);
+    localStorage.setItem("deepcodex.maxSteps", selectedWorkspaceProfile.maxSteps || defaultMaxSteps);
+    setWorkspaceProfileMessage(`Applied ${selectedWorkspaceProfile.label}.`);
+  }
+
+  function removeWorkspaceProfile() {
+    if (!selectedWorkspaceProfile) {
+      setWorkspaceProfileMessage("No profile selected.");
+      return;
+    }
+    const nextProfiles = workspaceProfiles.filter((profile) => profile.id !== selectedWorkspaceProfile.id);
+    setWorkspaceProfiles(nextProfiles);
+    writeStoredWorkspaceProfiles(nextProfiles);
+    setSelectedWorkspaceProfileId("");
+    setWorkspaceProfileName("");
+    setWorkspaceProfileMessage(`Removed ${selectedWorkspaceProfile.label}.`);
+  }
+
   function toPolicyProfileOptionId(value?: string, options = policyProfileOptions): string | undefined {
     if (!value) {
       return undefined;
@@ -1005,6 +1086,49 @@ function App() {
             <span className="fieldStatus">{serverDraftChanged ? "Unsaved" : "Active"}</span>
           </div>
           {serverMessage ? <p className="fieldHelp">{serverMessage}</p> : null}
+        </section>
+
+        <section className="panel">
+          <div className="panelHeading">
+            <label htmlFor="workspace-profile">Workspace profile</label>
+            <span className="fieldStatus">{workspaceProfiles.length} saved</span>
+          </div>
+          <select
+            id="workspace-profile"
+            value={selectedWorkspaceProfileId}
+            onChange={(event) => selectWorkspaceProfile(event.target.value)}
+          >
+            <option value="">No saved profile</option>
+            {workspaceProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+          <label className="singleField" htmlFor="workspace-profile-name">
+            <span>Name</span>
+            <input
+              id="workspace-profile-name"
+              value={workspaceProfileName}
+              onChange={(event) => {
+                setWorkspaceProfileName(event.target.value);
+                setWorkspaceProfileMessage("");
+              }}
+              placeholder={workspace.trim() || "Local workspace"}
+            />
+          </label>
+          <div className="panelActions profileActions">
+            <button type="button" className="secondary" onClick={applyWorkspaceProfile} disabled={!selectedWorkspaceProfile}>
+              Apply
+            </button>
+            <button type="button" onClick={saveWorkspaceProfile}>
+              Save
+            </button>
+            <button type="button" className="secondary" onClick={removeWorkspaceProfile} disabled={!selectedWorkspaceProfile}>
+              Remove
+            </button>
+          </div>
+          {workspaceProfileMessage ? <p className="fieldHelp">{workspaceProfileMessage}</p> : null}
         </section>
 
         <section className="panel">
@@ -1793,6 +1917,52 @@ function formatBody(value: unknown) {
   }
   const serialized = JSON.stringify(value, null, 2);
   return serialized ?? String(value);
+}
+
+function readStoredWorkspaceProfiles(): WorkspaceProfile[] {
+  const raw = localStorage.getItem(workspaceProfilesStorageKey);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter(isWorkspaceProfile).slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredWorkspaceProfiles(profiles: WorkspaceProfile[]) {
+  localStorage.setItem(workspaceProfilesStorageKey, JSON.stringify(profiles.slice(0, 12)));
+}
+
+function isWorkspaceProfile(value: unknown): value is WorkspaceProfile {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const entry = value as Partial<WorkspaceProfile>;
+  return (
+    typeof entry.id === "string" &&
+    typeof entry.label === "string" &&
+    typeof entry.workspace === "string" &&
+    typeof entry.serverUrl === "string" &&
+    typeof entry.policyProfileId === "string" &&
+    (entry.shellExecutionMode === "direct" || entry.shellExecutionMode === "workspace-copy") &&
+    typeof entry.maxSteps === "string" &&
+    typeof entry.updatedAt === "string"
+  );
+}
+
+function createWorkspaceProfileId(label: string): string {
+  const slug = label
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `${slug || "workspace"}-${Date.now().toString(36)}`;
 }
 
 function RichTextBlockView({

@@ -217,6 +217,15 @@ label,
   padding: 9px 11px;
 }
 
+.profileActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profileActions button {
+  padding: 8px 9px;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: 1fr;

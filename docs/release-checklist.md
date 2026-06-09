@@ -65,6 +65,7 @@ Checklist:
 - `http://127.0.0.1:5173` loads the Web client.
 - Workspace path can be entered and saved in the browser.
 - Server URL can be reviewed in the sidebar, saved, and used for memory/session/config calls without console errors.
+- The Workspace profile panel can save the current setup, apply it, remove it, and keep the sidebar layout within the viewport on mobile.
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
