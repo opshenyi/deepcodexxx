@@ -120,6 +120,16 @@ type WorkspaceConfig = {
     allowedBaseUrls?: string[];
     allowedModels?: string[];
   };
+  evals?: Array<{
+    id: string;
+    label: string;
+    description: string;
+    prompt: string;
+    profile: string;
+    maxSteps: number;
+    budget?: BudgetPolicy;
+    expectedSignals: string[];
+  }>;
   policyProfileId?: string;
   pricingProfileId?: string;
   approvalMode?: ToolApprovalMode;
@@ -577,6 +587,7 @@ function App() {
   const [distributionPreflight, setDistributionPreflight] = useState<DistributionPreflightReport | null>(null);
   const [distributionPreflightMessage, setDistributionPreflightMessage] = useState("");
   const [configState, setConfigState] = useState<LoadState>("idle");
+  const [workspaceConfigResult, setWorkspaceConfigResult] = useState<WorkspaceConfigResult | null>(null);
   const [configMessage, setConfigMessage] = useState("");
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
   const [policyBundle, setPolicyBundle] = useState<PolicyBundleVerificationResult | null>(null);
@@ -628,6 +639,8 @@ function App() {
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const policyBundleStatus = formatPolicyBundleStatus(policyBundle, policyBundleState);
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
+  const workspaceConfigStatus = formatWorkspaceConfigStatus(workspaceConfigResult, configState);
+  const workspaceConfigTone = formatWorkspaceConfigTone(workspaceConfigResult, configState);
   const securityScanStatus = formatSecurityScanStatus(securityScan, securityScanState);
   const securityScanTone = formatSecurityScanTone(securityScan, securityScanState);
   const evalReportStatus = formatEvalReportStatus(evalReport, evalReportState);
@@ -674,6 +687,9 @@ function App() {
     setDistributionPreflight(null);
     setDistributionPreflightState("idle");
     setDistributionPreflightMessage("");
+    setWorkspaceConfigResult(null);
+    setConfigState("idle");
+    setConfigMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -843,6 +859,7 @@ function App() {
         throw new Error(await readResponseError(response));
       }
       const result = (await response.json()) as WorkspaceConfigResult;
+      setWorkspaceConfigResult(result);
       if (result.exists) {
         const nextProfiles = mergePolicyProfileOptions(result.config.policyProfiles);
         setPolicyProfileOptions(nextProfiles);
@@ -855,6 +872,7 @@ function App() {
       void loadPolicyBundle(workspace, serverUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      setWorkspaceConfigResult(null);
       setConfigMessage(message);
       setConfigState("error");
     }
@@ -1912,6 +1930,76 @@ function App() {
           <pre className={finalText ? "railText outputText" : "railText placeholderText"}>
             {finalText || "No final response yet."}
           </pre>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
+              <span className="eyebrow">Workspace policy</span>
+              <h2>Config summary</h2>
+            </div>
+            <span className={`outputStatus ${workspaceConfigTone}`}>{workspaceConfigStatus}</span>
+          </div>
+          <div className="policyBundleBody">
+            <p className={configState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {formatWorkspaceConfigMessage(workspaceConfigResult, configMessage)}
+            </p>
+            {workspaceConfigResult ? (
+              <dl className="policyBundleFacts">
+                <div>
+                  <dt>Config</dt>
+                  <dd>{workspaceConfigResult.sha256 ? shortFingerprint(workspaceConfigResult.sha256) : "missing"}</dd>
+                </div>
+                <div>
+                  <dt>Profile</dt>
+                  <dd>{workspaceConfigResult.config.policyProfileId ?? "custom"}</dd>
+                </div>
+                <div>
+                  <dt>Provider</dt>
+                  <dd>{formatProviderPolicySummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>Profiles</dt>
+                  <dd>{workspaceConfigResult.config.policyProfiles?.length ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Evals</dt>
+                  <dd>{workspaceConfigResult.config.evals?.length ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Shell</dt>
+                  <dd>{formatShellPolicySummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>Shell rules</dt>
+                  <dd>{formatShellCommandPatternSummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>DLP</dt>
+                  <dd>{formatDlpPolicySummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>Artifacts</dt>
+                  <dd>{formatArtifactPolicySummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>Retention</dt>
+                  <dd>{formatRetentionPolicySummary(workspaceConfigResult.config)}</dd>
+                </div>
+                <div>
+                  <dt>Path</dt>
+                  <dd>{workspaceConfigResult.path}</dd>
+                </div>
+              </dl>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={loadWorkspaceConfig}
+              disabled={configState === "loading"}
+            >
+              {configState === "loading" ? "Loading config" : "Load config"}
+            </button>
+          </div>
         </section>
         <section className="railPanel">
           <div className="sectionHeader compact">
@@ -3094,6 +3182,81 @@ function formatPolicyBundleTone(policyBundle: PolicyBundleVerificationResult | n
     return "error";
   }
   return "idle";
+}
+
+function formatWorkspaceConfigStatus(result: WorkspaceConfigResult | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Loading";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!result) {
+    return "Not loaded";
+  }
+  return result.exists ? "Loaded" : "Missing";
+}
+
+function formatWorkspaceConfigTone(result: WorkspaceConfigResult | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error") {
+    return "error";
+  }
+  if (result?.exists) {
+    return "ready";
+  }
+  return "idle";
+}
+
+function formatWorkspaceConfigMessage(result: WorkspaceConfigResult | null, fallback: string): string {
+  if (fallback) {
+    return fallback;
+  }
+  if (!result) {
+    return "No workspace config loaded.";
+  }
+  return result.exists ? "Workspace policy defaults are loaded." : `No config at ${result.path}`;
+}
+
+function formatProviderPolicySummary(config: WorkspaceConfig): string {
+  const baseUrls = config.provider?.allowedBaseUrls?.length ?? 0;
+  const models = config.provider?.allowedModels?.length ?? 0;
+  return `${baseUrls} URLs / ${models} models`;
+}
+
+function formatShellPolicySummary(config: WorkspaceConfig): string {
+  const policy = config.policy ?? {};
+  const network = policy.allowNetwork === true ? "network allowed" : "network blocked";
+  return `${policy.shellEnvironment ?? "minimal"} / ${policy.shellExecutionMode ?? "direct"} / ${network}`;
+}
+
+function formatShellCommandPatternSummary(config: WorkspaceConfig): string {
+  const policy = config.policy ?? {};
+  return `${policy.allowedShellCommands?.length ?? 0} allow / ${policy.deniedShellCommands?.length ?? 0} deny`;
+}
+
+function formatDlpPolicySummary(config: WorkspaceConfig): string {
+  const policy = config.policy ?? {};
+  return `${policy.redactionPatterns?.length ?? 0} redact / ${policy.dlpPatterns?.length ?? 0} block`;
+}
+
+function formatArtifactPolicySummary(config: WorkspaceConfig): string {
+  const policy = config.policy ?? {};
+  const archive = policy.allowArchiveListing === true ? "archive allowed" : "archive blocked";
+  const pdf = policy.allowPdfTextExtraction === true ? "PDF allowed" : "PDF blocked";
+  return `${archive} / ${pdf}`;
+}
+
+function formatRetentionPolicySummary(config: WorkspaceConfig): string {
+  const retention = config.retention;
+  if (!retention) {
+    return "default";
+  }
+  const sessions = retention.maxSessions === undefined ? "default sessions" : `${retention.maxSessions} sessions`;
+  const age = retention.maxAgeDays === undefined ? "default age" : `${retention.maxAgeDays} days`;
+  return `${sessions} / ${age}`;
 }
 
 function shortFingerprint(value: string): string {

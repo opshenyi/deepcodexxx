@@ -75,6 +75,7 @@ Checklist:
 - The Workspace profile panel can save the current setup, apply it, remove it, and keep the sidebar layout within the viewport on mobile.
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
+- The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.

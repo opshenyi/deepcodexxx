@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, and CLI CI diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, and CLI CI diagnostics.
 
 ## Quick Start
 
@@ -89,6 +89,7 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - Desktop production-like smoke: `npm run start:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
 - Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
+- Web/Desktop workspace policy: use `Load config` to review config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
 - Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.
 - Health check: `http://127.0.0.1:17361/api/health`.
 

@@ -252,14 +252,15 @@ Recommended demo flow:
 2. Start with the `Inspection` policy profile for read-only prompts.
 3. Use `Guarded write` only on a disposable branch or sample workspace.
 4. Use `Load config` when the workspace has `.deepcodex/config.json`, then confirm profile, approval, max steps, budget, pricing, and retention values.
-5. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
-6. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
-7. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-8. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
-9. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
-10. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-11. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-12. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+5. Review the Workspace policy panel for config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
+6. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
+7. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
+8. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
+9. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
+10. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+11. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+12. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+13. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
