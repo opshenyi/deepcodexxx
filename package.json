@@ -13,6 +13,7 @@
     "check": "tsc -b",
     "dev": "concurrently -n server,web -c gray,blue \"npm:dev -w @deepcodex/server\" \"npm:dev -w @deepcodex/web\"",
     "dev:desktop": "concurrently -n server,web,desktop -c gray,blue,green \"npm:dev -w @deepcodex/server\" \"npm:dev -w @deepcodex/web\" \"wait-on http://127.0.0.1:5173 http://127.0.0.1:17361/api/health && npm:dev -w @deepcodex/desktop\"",
+    "start:desktop": "npm run build && npm run start -w @deepcodex/desktop",
     "test": "vitest run",
     "typecheck": "tsc -b",
     "verify": "npm run build && npm test"

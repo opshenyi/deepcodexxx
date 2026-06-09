@@ -19,6 +19,7 @@ Desktop client:
 
 ```powershell
 npm run dev:desktop
+npm run start:desktop
 ```
 
 CLI client:
@@ -74,7 +75,8 @@ Environment variables and explicit CLI/Web request values override `.deepcodex/c
 Detailed setup and smoke-test steps are in `docs/runbook.md`.
 
 - Web: `npm run dev`, then open `http://127.0.0.1:5173`.
-- Desktop: `npm run dev:desktop`.
+- Desktop dev: `npm run dev:desktop`.
+- Desktop production-like smoke: `npm run start:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
 - Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
 - Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.

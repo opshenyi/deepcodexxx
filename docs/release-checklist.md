@@ -85,12 +85,14 @@ Inspect this repository and summarize the safest next implementation step. Do no
 
 ```powershell
 npm run dev:desktop
+npm run start:desktop
 ```
 
 Checklist:
 
 - Server and Web client both start.
 - Electron window opens the DeepCodex experience.
+- Production-like Desktop launch starts the built local server when no server is already healthy.
 - The same workspace and prompt used in the Web demo can run from Desktop.
 - Window close and process shutdown do not leave confusing orphaned terminals for the presenter.
 
@@ -166,6 +168,7 @@ Checklist:
 - CLI doctor:
 - Web smoke test:
 - Desktop smoke test:
+- Desktop production-like smoke test:
 
 ## Known Limitations
 

@@ -5,7 +5,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - `packages/core`: DeepSeek client, agent loop, tool registry, workspace configuration, workspace safety, persistent memory.
 - `apps/server`: Local HTTP and event-stream API.
 - `apps/web`: Browser client with Codex-inspired agent console.
-- `apps/desktop`: Electron desktop client that hosts the Web experience.
+- `apps/desktop`: Electron desktop client that hosts the Web experience and can bootstrap the local server in production-like launches.
 - `apps/cli`: Terminal client for direct workspace operation.
 
 ## Runtime Flow
@@ -28,6 +28,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
 - `.deepcodex/policy-bundle.json` can bind the active config SHA-256 to an Ed25519 signature that CLI/API verification checks against a trusted public key.
 - `DEEPCODEX_REQUIRE_SIGNED_POLICY=true` makes CLI/server agent runs require a trusted policy bundle before model or tool execution starts.
+- Desktop production-like launches start the built server automatically when `DEEPCODEX_WEB_URL` is not set, wait for local health, then load the built Web client.
 - Dangerous shell commands are blocked unless `full-access` is selected.
 - Common shell network commands are blocked unless network access is explicitly enabled.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.

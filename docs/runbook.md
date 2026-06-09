@@ -186,11 +186,21 @@ Recommended demo flow:
 
 ## Desktop Client
 
+Development launch:
+
 ```powershell
 npm run dev:desktop
 ```
 
 The script starts the server, starts the Web client, waits for both local URLs, then launches Electron. It is the best path for showing the desktop surface during an interview, but it is still a development launch rather than a packaged installer.
+
+Production-like smoke launch:
+
+```powershell
+npm run start:desktop
+```
+
+This builds all workspaces, starts Electron without `DEEPCODEX_WEB_URL`, checks `http://127.0.0.1:17361/api/health`, starts the built server automatically when needed, waits for health, and loads the built Web client from `apps/web/dist/index.html`. Set `DEEPCODEX_DESKTOP_START_SERVER=false` only when an external compatible local server is already managed by another process. `DEEPCODEX_SERVER_ENTRY` can override the built server entry for packaging experiments.
 
 Use the same workspace and approval-mode guidance as the Web client. If Electron opens before the Web UI is ready, wait for the Vite page to finish loading and retry the command after stopping the previous processes.
 
@@ -346,6 +356,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
 | Web UI cannot run the agent. | Server is not listening on `17361`. | Open `/api/health` and keep `DEEPCODEX_PORT=17361`. |
+| Desktop production-like launch opens but cannot run tasks. | Managed server did not start or a different port was configured without rebuilding the Web client. | Use `npm run start:desktop`, keep `DEEPCODEX_PORT=17361`, and check `/api/health`. |
 | CLI stays in demo mode. | `DEEPSEEK_API_KEY` is not available to the shell. | Run `doctor` from the same shell. |
 | Workspace error. | Path does not exist or is not a directory. | Pass an absolute workspace path. |
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |

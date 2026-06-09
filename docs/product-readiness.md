@@ -8,6 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
+- Desktop production-like startup can bootstrap the built local server and load the built Web client.
 - Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, and retention.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
@@ -59,7 +60,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
 | Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
-| Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
+| Desktop release | Closer, but not installer-ready. | Has production-like local server bootstrap; still needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
 ## Next Commercial Milestones
@@ -67,6 +68,6 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Add signed policy bundles and provider policy provenance.
 - Add richer DLP classification and policy-controlled OCR/PDF/archive extraction.
 - Add richer generated-asset handling and file-type policies.
-- Add packaged desktop installers and signed releases.
+- Add packaged desktop installers, signed releases, and auto-update policy.
 - Add benchmark tasks and regression evals inspired by the reference repos.
 - Add auth, RBAC, audit logs, and workspace tenancy before hosted deployment.
