@@ -35,9 +35,12 @@ import {
   verifyWorkspacePolicyBundle,
   assertProviderAllowed,
   createPolicyTrustPackage,
+  createDistributionPreflightReport,
   createReleaseEvidenceReport,
   createWorkspacePolicyBundle,
+  exportDistributionPreflightReport,
   exportReleaseEvidenceReport,
+  parseDistributionPreflightFormat,
   parseReleaseEvidenceFormat,
   resolveProviderSelection,
   runDeepCodexAgent,
@@ -331,6 +334,29 @@ release
       });
       const format = options.json ? "json" : parseReleaseEvidenceFormat(options.format);
       output.write(exportReleaseEvidenceReport(report, format));
+      if (options.failOnFail && !report.summary.ready) {
+        process.exitCode = 1;
+      }
+    }
+  );
+
+release
+  .command("preflight")
+  .description("Check product scripts, clients, artifacts, docs, and local-state safety before distribution.")
+  .option("-r, --root <path>", "Product root path", process.cwd())
+  .option("--format <format>", "markdown or json", "markdown")
+  .option("--json", "Print JSON output", false)
+  .option("--fail-on-fail", "Exit non-zero when distribution preflight has failing checks", false)
+  .action(
+    async (options: {
+      root: string;
+      format: string;
+      json: boolean;
+      failOnFail: boolean;
+    }) => {
+      const report = await createDistributionPreflightReport(options.root);
+      const format = options.json ? "json" : parseDistributionPreflightFormat(options.format);
+      output.write(exportDistributionPreflightReport(report, format));
       if (options.failOnFail && !report.summary.ready) {
         process.exitCode = 1;
       }

@@ -379,6 +379,26 @@ type ReleaseEvidenceReport = {
   };
 };
 
+type DistributionPreflightCheck = {
+  id: string;
+  area: "scripts" | "client" | "desktop" | "artifacts" | "docs" | "safety";
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+};
+
+type DistributionPreflightReport = {
+  generatedAt: string;
+  root: string;
+  checks: DistributionPreflightCheck[];
+  summary: {
+    ready: boolean;
+    pass: number;
+    warn: number;
+    fail: number;
+  };
+};
+
 type PolicyProfileOption = {
   id: string;
   label: string;
@@ -549,6 +569,9 @@ function App() {
   const [releaseEvidenceState, setReleaseEvidenceState] = useState<LoadState>("idle");
   const [releaseEvidence, setReleaseEvidence] = useState<ReleaseEvidenceReport | null>(null);
   const [releaseEvidenceMessage, setReleaseEvidenceMessage] = useState("");
+  const [distributionPreflightState, setDistributionPreflightState] = useState<LoadState>("idle");
+  const [distributionPreflight, setDistributionPreflight] = useState<DistributionPreflightReport | null>(null);
+  const [distributionPreflightMessage, setDistributionPreflightMessage] = useState("");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [configMessage, setConfigMessage] = useState("");
   const [policyBundleState, setPolicyBundleState] = useState<LoadState>("idle");
@@ -607,6 +630,11 @@ function App() {
   const evalReportTone = formatEvalReportTone(evalReport, evalReportState);
   const releaseEvidenceStatus = formatReleaseEvidenceStatus(releaseEvidence, releaseEvidenceState);
   const releaseEvidenceTone = formatReleaseEvidenceTone(releaseEvidence, releaseEvidenceState);
+  const distributionPreflightStatus = formatDistributionPreflightStatus(
+    distributionPreflight,
+    distributionPreflightState
+  );
+  const distributionPreflightTone = formatDistributionPreflightTone(distributionPreflight, distributionPreflightState);
   const selectedWorkspaceProfile = workspaceProfiles.find((profile) => profile.id === selectedWorkspaceProfileId);
   const memoryLabel = memoryStateLabels[memoryState];
   const replayItems = useMemo(
@@ -639,6 +667,9 @@ function App() {
     setReleaseEvidence(null);
     setReleaseEvidenceState("idle");
     setReleaseEvidenceMessage("");
+    setDistributionPreflight(null);
+    setDistributionPreflightState("idle");
+    setDistributionPreflightMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -929,6 +960,31 @@ function App() {
       setReleaseEvidence(null);
       setReleaseEvidenceMessage(message);
       setReleaseEvidenceState("error");
+    }
+  }
+
+  async function loadDistributionPreflight() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("root", workspace);
+    }
+    params.set("format", "json");
+    setDistributionPreflightState("loading");
+    setDistributionPreflightMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/release/preflight?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { report: DistributionPreflightReport };
+      setDistributionPreflight(body.report);
+      setDistributionPreflightMessage(formatDistributionPreflightMessage(body.report));
+      setDistributionPreflightState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDistributionPreflight(null);
+      setDistributionPreflightMessage(message);
+      setDistributionPreflightState("error");
     }
   }
 
@@ -1923,6 +1979,69 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Distribution preflight</span>
+              <h2>Delivery checks</h2>
+            </div>
+            <span className={`outputStatus ${distributionPreflightTone}`}>{distributionPreflightStatus}</span>
+          </div>
+          <div className="releaseEvidenceBody">
+            <p className={distributionPreflightState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {distributionPreflightMessage || "No distribution preflight loaded."}
+            </p>
+            {distributionPreflight ? (
+              <>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Pass</dt>
+                    <dd>{distributionPreflight.summary.pass}</dd>
+                  </div>
+                  <div>
+                    <dt>Warn</dt>
+                    <dd>{distributionPreflight.summary.warn}</dd>
+                  </div>
+                  <div>
+                    <dt>Fail</dt>
+                    <dd>{distributionPreflight.summary.fail}</dd>
+                  </div>
+                </dl>
+                <div className="releaseCheckList">
+                  {distributionPreflight.checks.map((check) => (
+                    <article key={check.id} className="releaseCheck">
+                      <div className="releaseCheckHeader">
+                        <strong>{check.label}</strong>
+                        <span className={`releaseCheckStatus ${check.status}`}>{check.status}</span>
+                      </div>
+                      <p>
+                        {check.area} / {check.detail}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Root</dt>
+                    <dd>{distributionPreflight.root}</dd>
+                  </div>
+                  <div>
+                    <dt>Generated</dt>
+                    <dd>{formatStoredDateTime(distributionPreflight.generatedAt)}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={loadDistributionPreflight}
+              disabled={distributionPreflightState === "loading"}
+            >
+              {distributionPreflightState === "loading" ? "Checking delivery" : "Run preflight"}
+            </button>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Policy bundle</span>
               <h2>Config trust</h2>
             </div>
@@ -2891,6 +3010,45 @@ function formatReleaseEvidenceTone(report: ReleaseEvidenceReport | null, state: 
 }
 
 function formatReleaseEvidenceMessage(report: ReleaseEvidenceReport): string {
+  return `${report.summary.pass} passed, ${report.summary.warn} warnings, ${report.summary.fail} failures.`;
+}
+
+function formatDistributionPreflightStatus(report: DistributionPreflightReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Checking";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!report) {
+    return "Not loaded";
+  }
+  if (report.summary.fail > 0) {
+    return `${report.summary.fail} fail`;
+  }
+  if (report.summary.warn > 0) {
+    return `${report.summary.warn} warn`;
+  }
+  return "Ready";
+}
+
+function formatDistributionPreflightTone(report: DistributionPreflightReport | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error" || (report && report.summary.fail > 0)) {
+    return "error";
+  }
+  if (report && report.summary.warn > 0) {
+    return "loading";
+  }
+  if (report) {
+    return "ready";
+  }
+  return "idle";
+}
+
+function formatDistributionPreflightMessage(report: DistributionPreflightReport): string {
   return `${report.summary.pass} passed, ${report.summary.warn} warnings, ${report.summary.fail} failures.`;
 }
 

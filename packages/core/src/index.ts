@@ -9,6 +9,7 @@ export * from "./policy-profile.js";
 export * from "./provider-policy.js";
 export * from "./pricing.js";
 export * from "./redaction.js";
+export * from "./distribution-preflight.js";
 export * from "./release-evidence.js";
 export * from "./safety.js";
 export * from "./sensitive-scan.js";

@@ -337,6 +337,8 @@ node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> -
 node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json --fail-on-fail
+node apps/cli/dist/index.js release preflight --root D:\Coding\DeepCodex
+node apps/cli/dist/index.js release preflight --root D:\Coding\DeepCodex --json --fail-on-fail
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json --fail-on-findings
 ```
@@ -344,6 +346,8 @@ node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json
 CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs, and `evals report` to aggregate release evidence.
 
 `release evidence` aggregates workspace config provenance, policy-bundle verification, eval evidence, security scan metadata, provider-key status, and recent session summaries into one Markdown or JSON report. It is intended as an interview or CI evidence artifact; it does not replace the individual tests, eval runs, or security review.
+
+`release preflight` checks the product root for expected root scripts, Web/Desktop/CLI/server build scripts, Desktop bootstrap safety settings, built artifacts, required docs, and ignored local-state paths. Missing built artifacts warn so a source-only checkout can still be reviewed, while missing scripts, docs, or safety settings fail the gate.
 
 `security scan` is a read-only preflight for existing probable secrets. Use `--json` for CI artifacts and `--fail-on-findings` when a workspace should fail the gate if any finding metadata is reported. The command reports finding type and label only; it does not print matched values.
 

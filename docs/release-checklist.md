@@ -55,6 +55,7 @@ Expected result:
 - CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.
 - CLI `evals report --json` emits parseable aggregate evidence for recorded eval runs.
 - CLI `release evidence --json` emits parseable readiness evidence across config, policy, evals, security scan, and sessions.
+- CLI `release preflight --json` emits parseable delivery checks for root scripts, client build scripts, Desktop bootstrap safety, built artifacts, docs, and ignored local state.
 - CLI `security scan --json` emits parseable finding metadata without matched secret values.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
 
@@ -87,6 +88,7 @@ Checklist:
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.
 - Workspace-specific DLP patterns from `.deepcodex/config.json` block configured matches before write/edit diffs or file changes.
 - Release evidence can load a readiness report from the right rail without horizontal overflow.
+- Distribution preflight can load delivery checks from the right rail without horizontal overflow.
 - Eval evidence can load recorded eval report summaries from the right rail.
 - Security scan can run from the right rail and reports only finding metadata for existing allowed text files.
 - Write/edit tools block probable secret content before showing a diff or applying a file change.
@@ -138,6 +140,7 @@ node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json
+node apps/cli/dist/index.js release preflight --root D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and list the main product surfaces."
@@ -152,6 +155,7 @@ Checklist:
 - CLI can list workspace-defined team policy profiles through `profiles list --workspace`.
 - CLI can list built-in and workspace-defined evals, run `evals run repo-map --json` as a read-only smoke task with score output and optional CI thresholds, list recorded eval history when `--record` has been used, compare two recorded runs, and produce an aggregate eval report.
 - CLI can produce a release evidence report in JSON or Markdown for demo and CI artifacts.
+- CLI can produce a distribution preflight report in JSON or Markdown for delivery gates.
 - CLI can run `security scan --json` and report probable-secret metadata without matched values.
 - `memory` reads workspace memory without crashing.
 - `ask` prints session, step, tool, and final output events.

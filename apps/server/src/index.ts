@@ -7,10 +7,12 @@ import {
   SessionNotFoundError,
   appendWorkspaceMemory,
   compareEvalRunRecords,
+  createDistributionPreflightReport,
   createReleaseEvidenceReport,
   createEvalRunReport,
   createSessionRecorder,
   createWorkspaceContext,
+  exportDistributionPreflightReport,
   exportSessionHistory,
   exportReleaseEvidenceReport,
   applyPricingProfileToBudget,
@@ -19,6 +21,7 @@ import {
   listPolicyProfiles,
   parseSessionExportFormat,
   parsePricingProfiles,
+  parseDistributionPreflightFormat,
   parseReleaseEvidenceFormat,
   pruneSessionHistories,
   readEvalRunRecord,
@@ -214,6 +217,21 @@ app.get("/api/release/evidence", async (req, res, next) => {
       return;
     }
     res.type("text/markdown").send(exportReleaseEvidenceReport(report, "markdown"));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/release/preflight", async (req, res, next) => {
+  try {
+    const root = readWorkspace(req.query.root ?? req.query.workspace);
+    const report = await createDistributionPreflightReport(root);
+    const format = parseDistributionPreflightFormat(req.query.format);
+    if (format === "json") {
+      res.json({ report });
+      return;
+    }
+    res.type("text/markdown").send(exportDistributionPreflightReport(report, "markdown"));
   } catch (error) {
     next(error);
   }
