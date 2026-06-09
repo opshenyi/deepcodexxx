@@ -106,7 +106,7 @@ Provider usage controls:
 - Provider allowlists block agent runs when the resolved base URL, primary model, or fallback model is not approved by the workspace policy.
 - Provider calls retry 408, 429, 500, 502, 503, 504, and network failures with bounded exponential backoff. Retry exhaustion can move to the next approved fallback model and emits a persisted `provider_fallback` event; request errors and invalid JSON are not retried or hidden by fallback. Provider errors are classified for diagnostics without exposing API keys.
 - The checked provider catalog is available through CLI/API/Web for model-status review. It contains model ids, status, migration targets, and source checked date only; it does not contain provider keys, tenant data, or hard-coded prices.
-- CLI `providers ping` can validate provider config without network access, and only sends a live provider request when `--live` is explicitly provided.
+- Provider ping diagnostics are available through CLI, server API, and Web/Desktop. Configuration checks validate provider config without network access, and live checks send a provider request only when `--live`, `?live=true`, or the Web/Desktop `Live ping` button is explicitly used.
 - DeepCodex sends DeepSeek V4 `thinking` as disabled by default. Enabling thinking mode is explicit; the provider transcript preserves and replays `reasoning_content` after tool-call turns, but reasoning content is not exposed in Web/CLI events or session exports.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
 - Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.

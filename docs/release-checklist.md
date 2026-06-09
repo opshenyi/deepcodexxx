@@ -79,6 +79,7 @@ npm run dev
 Checklist:
 
 - `http://127.0.0.1:17361/api/health` returns `ok: true`.
+- `http://127.0.0.1:17361/api/provider/ping` returns configuration diagnostics without making a provider request.
 - `http://127.0.0.1:5173` loads the Web client.
 - Workspace path can be entered and saved in the browser.
 - Server URL can be reviewed in the sidebar, saved, and used for memory/session/config calls without console errors.
@@ -88,6 +89,7 @@ Checklist:
 - The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist and fallback counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
 - The right-rail Workspace policy panel shows provider thinking mode when workspace config defines it.
 - The right-rail Provider catalog panel shows default model, checked source date, V4 model count, legacy alias count, and migration targets without horizontal overflow.
+- The right-rail Provider diagnostics panel shows `Check provider` configuration status with API-key status, model, fallback count, and thinking mode; `Live ping` is used only when an explicit live connectivity check is intended.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.

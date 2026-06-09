@@ -170,7 +170,10 @@ node apps/cli/dist/index.js providers models
 node apps/cli/dist/index.js providers show deepseek-v4-flash --json
 node apps/cli/dist/index.js providers ping --json
 Invoke-RestMethod http://127.0.0.1:17361/api/provider/models
+Invoke-RestMethod http://127.0.0.1:17361/api/provider/ping
 ```
+
+The server provider ping API accepts `?workspace=<path>` and `?live=true`. The default configuration mode validates the resolved provider settings and workspace allowlists without contacting DeepSeek. Live mode sends one minimal provider request and returns classified provider errors or a missing-key failure without exposing secrets.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output using the actual model that responded. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
@@ -263,6 +266,7 @@ Runtime endpoints:
 - Local server: `http://127.0.0.1:17361`
 - Health check: `http://127.0.0.1:17361/api/health`
 - Provider catalog API: `http://127.0.0.1:17361/api/provider/models`
+- Provider ping API: `http://127.0.0.1:17361/api/provider/ping`
 
 The Web sidebar includes a Server field. It defaults to `VITE_DEEPCODEX_SERVER_URL` or `http://127.0.0.1:17361`, normalizes host-only values such as `127.0.0.1:17361`, and saves the selected API base in browser local storage.
 
@@ -276,15 +280,16 @@ Recommended demo flow:
 4. Use `Load config` when the workspace has `.deepcodex/config.json`, then confirm profile, approval, max steps, budget, pricing, and retention values.
 5. Review the Workspace policy panel for config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
 6. Review the Provider catalog panel for default model, source checked date, V4 model count, legacy alias count, and migration targets.
-7. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
-8. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
-9. Watch the event stream for provider fallback selection, approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-10. Use the Release evidence and Distribution preflight `Download` buttons to save Markdown handoff reports.
-11. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
-12. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
-13. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-14. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-15. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+7. Use the Provider diagnostics panel: `Check provider` validates config without network access, and `Live ping` is only for an intentional DeepSeek connectivity check.
+8. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
+9. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
+10. Watch the event stream for provider fallback selection, approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
+11. Use the Release evidence and Distribution preflight `Download` buttons to save Markdown handoff reports.
+12. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
+13. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+14. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+15. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+16. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 

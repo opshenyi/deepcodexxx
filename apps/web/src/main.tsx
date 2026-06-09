@@ -235,6 +235,32 @@ type DeepSeekModelCatalogResponse = {
   models: DeepSeekModelCatalogEntry[];
 };
 
+type ProviderPingResponse = {
+  ok: boolean;
+  mode: "configuration" | "live";
+  workspace: string;
+  configPath?: string;
+  configExists?: boolean;
+  deepSeekConfigured: boolean;
+  provider?: {
+    baseUrl: string;
+    model: string;
+    fallbackModels: string[];
+    thinking: "enabled" | "disabled";
+    reasoningEffort?: "high" | "max";
+  };
+  response?: {
+    id: string;
+    model: string;
+  };
+  error?: string;
+  providerError?: {
+    kind: string;
+    status?: number;
+    retryable: boolean;
+  };
+};
+
 type BudgetSnapshot = {
   promptTokens: number;
   completionTokens: number;
@@ -616,6 +642,9 @@ function App() {
   const [providerCatalogState, setProviderCatalogState] = useState<LoadState>("idle");
   const [providerCatalog, setProviderCatalog] = useState<DeepSeekModelCatalogResponse | null>(null);
   const [providerCatalogMessage, setProviderCatalogMessage] = useState("");
+  const [providerPingState, setProviderPingState] = useState<LoadState>("idle");
+  const [providerPing, setProviderPing] = useState<ProviderPingResponse | null>(null);
+  const [providerPingMessage, setProviderPingMessage] = useState("");
   const [policyProfileOptions, setPolicyProfileOptions] = useState<PolicyProfileOption[]>(basePolicyProfileOptions);
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
@@ -689,6 +718,8 @@ function App() {
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
   const providerCatalogStatus = formatProviderCatalogStatus(providerCatalog, providerCatalogState);
   const providerCatalogTone = formatProviderCatalogTone(providerCatalog, providerCatalogState);
+  const providerPingStatus = formatProviderPingStatus(providerPing, providerPingState);
+  const providerPingTone = formatProviderPingTone(providerPing, providerPingState);
   const workspaceConfigStatus = formatWorkspaceConfigStatus(workspaceConfigResult, configState);
   const workspaceConfigTone = formatWorkspaceConfigTone(workspaceConfigResult, configState);
   const securityScanStatus = formatSecurityScanStatus(securityScan, securityScanState);
@@ -743,6 +774,9 @@ function App() {
     setWorkspaceConfigResult(null);
     setConfigState("idle");
     setConfigMessage("");
+    setProviderPing(null);
+    setProviderPingState("idle");
+    setProviderPingMessage("");
   }, [workspace, serverUrl]);
 
   async function runAgent() {
@@ -879,6 +913,33 @@ function App() {
       setProviderCatalog(null);
       setProviderCatalogMessage(message);
       setProviderCatalogState("error");
+    }
+  }
+
+  async function loadProviderPing(live = false) {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    if (live) {
+      params.set("live", "true");
+    }
+    setProviderPingState("loading");
+    setProviderPingMessage("");
+    try {
+      const response = await fetch(`${serverUrl}/api/provider/ping?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as ProviderPingResponse;
+      setProviderPing(body);
+      setProviderPingMessage(formatProviderPingMessage(body));
+      setProviderPingState(body.ok ? "ready" : "error");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setProviderPing(null);
+      setProviderPingMessage(message);
+      setProviderPingState("error");
     }
   }
 
@@ -2198,6 +2259,68 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Provider diagnostics</span>
+              <h2>Ping</h2>
+            </div>
+            <span className={`outputStatus ${providerPingTone}`}>{providerPingStatus}</span>
+          </div>
+          <div className="policyBundleBody">
+            <p className={providerPingState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {providerPingMessage || "No provider ping run."}
+            </p>
+            {providerPing ? (
+              <dl className="policyBundleFacts">
+                <div>
+                  <dt>Mode</dt>
+                  <dd>{providerPing.mode}</dd>
+                </div>
+                <div>
+                  <dt>API key</dt>
+                  <dd>{providerPing.deepSeekConfigured ? "configured" : "missing"}</dd>
+                </div>
+                <div>
+                  <dt>Model</dt>
+                  <dd>{providerPing.provider?.model ?? "unknown"}</dd>
+                </div>
+                <div>
+                  <dt>Fallbacks</dt>
+                  <dd>{providerPing.provider?.fallbackModels.length ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Thinking</dt>
+                  <dd>{providerPing.provider?.thinking ?? "unknown"}</dd>
+                </div>
+                {providerPing.providerError ? (
+                  <div>
+                    <dt>Error</dt>
+                    <dd>{providerPing.providerError.kind}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
+            <div className="railButtonRow">
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={() => loadProviderPing(false)}
+                disabled={providerPingState === "loading"}
+              >
+                {providerPingState === "loading" ? "Checking" : "Check provider"}
+              </button>
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={() => loadProviderPing(true)}
+                disabled={providerPingState === "loading"}
+              >
+                {providerPingState === "loading" ? "Checking" : "Live ping"}
+              </button>
+            </div>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Release evidence</span>
               <h2>Readiness report</h2>
             </div>
@@ -3263,6 +3386,40 @@ function formatProviderModelCapabilities(model: DeepSeekModelCatalogEntry): stri
   const fallback = model.fallbackEligible ? "fallback eligible" : "not fallback eligible";
   const toolCalls = model.supportsToolCalls ? "tool calls" : "tool calls not recommended";
   return `${fallback} / ${toolCalls}`;
+}
+
+function formatProviderPingStatus(ping: ProviderPingResponse | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Checking";
+  }
+  if (state === "error") {
+    return "Failed";
+  }
+  if (!ping) {
+    return "Not run";
+  }
+  return ping.ok ? "Ready" : "Failed";
+}
+
+function formatProviderPingTone(ping: ProviderPingResponse | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error" || (ping && !ping.ok)) {
+    return "error";
+  }
+  if (ping) {
+    return "ready";
+  }
+  return "idle";
+}
+
+function formatProviderPingMessage(ping: ProviderPingResponse): string {
+  if (!ping.ok) {
+    return ping.error ?? "Provider ping failed.";
+  }
+  const live = ping.response ? ` Live response ${ping.response.id}.` : "";
+  return `${ping.provider?.model ?? "Provider"} at ${ping.provider?.baseUrl ?? "configured endpoint"} is configured.${live}`;
 }
 
 function formatSecurityScanStatus(scan: SecurityScanResult | null, state: LoadState): string {

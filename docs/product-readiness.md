@@ -33,7 +33,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
 - CLI `completion` generation for PowerShell, bash, zsh, and JSON command specs.
-- CLI provider ping diagnostics for configuration-only checks and explicit live DeepSeek connectivity checks.
+- Provider ping diagnostics across CLI, server API, and Web/Desktop for configuration-only checks and explicit live DeepSeek connectivity checks.
 - Shared release evidence reports through core, CLI, server API, and Web/Desktop, aggregating config provenance, policy-bundle status, eval evidence, security scan metadata, provider config/key/policy status, and recent session summaries.
 - Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
 - Web/Desktop Markdown downloads for release evidence and distribution preflight reports, reusing the same server exporters as CLI/API.
@@ -80,6 +80,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
 | Eval evidence | `docs/evals.md` | Repeatable built-in and workspace-defined read-only smoke tasks, scoring behavior, CI thresholds, optional local history, cross-run comparison, CLI/API report aggregation, Web/Desktop visibility, and current scoring limits. |
 | Provider catalog | `deepcodex providers models`, `/api/provider/models`, and Web/Desktop right rail | Checked DeepSeek V4/legacy model metadata for migration review and fallback policy discussions. |
+| Provider diagnostics | `deepcodex providers ping`, `/api/provider/ping`, and Web/Desktop right rail | Configuration-only and explicit live provider checks with API-key status, selected model, fallback count, thinking mode, and classified provider failures. |
 | Release evidence report | `deepcodex release evidence` and Web/Desktop right rail | Single readiness artifact spanning config, policy, evals, security scan, provider config/key/policy status, and recent sessions. |
 | Distribution preflight report | `deepcodex release preflight` and Web/Desktop right rail | Delivery gate for scripts, three-client/server build coverage, CLI bin/completion readiness, Desktop bootstrap safety, docs, artifacts, and ignored local state. |
 

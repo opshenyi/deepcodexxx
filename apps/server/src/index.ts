@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { readFile } from "node:fs/promises";
 import {
+  DeepSeekClient,
   DeepSeekError,
   InvalidSessionIdError,
   SessionNotFoundError,
@@ -110,6 +111,79 @@ app.get("/api/provider/models", (_req, res) => {
     summary: createDeepSeekModelCatalogSummary(),
     models: listDeepSeekModelCatalog()
   });
+});
+
+app.get("/api/provider/ping", async (req, res) => {
+  const live = req.query.live === "true";
+  const mode = live ? "live" : "configuration";
+  const workspacePath = readWorkspace(req.query.workspace);
+  const deepSeekConfigured = Boolean(process.env.DEEPSEEK_API_KEY);
+  try {
+    const workspaceConfig = await readWorkspaceConfig(workspacePath);
+    const provider = readProviderSelection(undefined, workspaceConfig.config);
+    assertProviderAllowed(provider, workspaceConfig.config.provider);
+    const result = {
+      ok: true,
+      mode,
+      workspace: workspacePath,
+      configPath: workspaceConfig.path,
+      configExists: workspaceConfig.exists,
+      deepSeekConfigured,
+      provider: {
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        fallbackModels: provider.fallbackModels,
+        thinking: provider.thinking,
+        reasoningEffort: provider.reasoningEffort
+      }
+    };
+
+    if (!live) {
+      res.json(result);
+      return;
+    }
+    if (!deepSeekConfigured) {
+      res.json({ ...result, ok: false, error: "DEEPSEEK_API_KEY is not set." });
+      return;
+    }
+
+    try {
+      const client = new DeepSeekClient({
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        fallbackModels: provider.fallbackModels,
+        thinking: provider.thinking,
+        reasoningEffort: provider.reasoningEffort
+      });
+      const response = await client.chat([{ role: "user", content: "Reply with ok." }]);
+      res.json({ ...result, response: { id: response.id, model: client.lastModel ?? provider.model } });
+    } catch (error) {
+      if (error instanceof DeepSeekError) {
+        res.json({
+          ...result,
+          ok: false,
+          error: error.message,
+          providerError: {
+            kind: error.kind,
+            status: error.status,
+            retryable: error.retryable
+          }
+        });
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      res.json({ ...result, ok: false, error: message });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.json({
+      ok: false,
+      mode,
+      workspace: workspacePath,
+      deepSeekConfigured,
+      error: message
+    });
+  }
 });
 
 app.get("/api/workspace-config", async (req, res, next) => {
