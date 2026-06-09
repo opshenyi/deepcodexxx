@@ -87,6 +87,25 @@ type EvalRunRecord = {
   finalText: string;
 };
 
+type EvalRunComparison = {
+  leftRunId: string;
+  rightRunId: string;
+  sameEval: boolean;
+  evalId: string;
+  rightEvalId: string;
+  leftScore: number;
+  rightScore: number;
+  scoreDelta: number;
+  leftPassed: boolean;
+  rightPassed: boolean;
+  thresholdStatusChanged: boolean;
+  matchedSignalsAdded: string[];
+  matchedSignalsRemoved: string[];
+  missingSignalsAdded: string[];
+  missingSignalsRemoved: string[];
+  finalTextLengthDelta: number;
+};
+
 const builtInEvalTasks: BuiltInEvalTask[] = [
   {
     id: "repo-map",
@@ -493,6 +512,24 @@ evals
       return;
     }
     printEvalRunRecord(record);
+  });
+
+evals
+  .command("compare")
+  .argument("<leftRunId>", "Baseline recorded eval run id")
+  .argument("<rightRunId>", "Candidate recorded eval run id")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--json", "Print JSON output", false)
+  .action(async (leftRunId: string, rightRunId: string, options: { workspace: string; json: boolean }) => {
+    const workspace = await createWorkspaceContext(options.workspace, { mode: "suggest" });
+    const left = await readEvalRunRecord(workspace, leftRunId);
+    const right = await readEvalRunRecord(workspace, rightRunId);
+    const comparison = compareEvalRunRecords(left, right);
+    if (options.json) {
+      console.log(JSON.stringify({ left, right, comparison }, null, 2));
+      return;
+    }
+    printEvalRunComparison(comparison);
   });
 
 config
@@ -1041,6 +1078,59 @@ function printEvalRunRecord(record: EvalRunRecord): void {
   }
   console.log("\nFinal");
   console.log(record.finalText);
+}
+
+function compareEvalRunRecords(left: EvalRunRecord, right: EvalRunRecord): EvalRunComparison {
+  return {
+    leftRunId: left.id,
+    rightRunId: right.id,
+    sameEval: left.evalId === right.evalId,
+    evalId: left.evalId,
+    rightEvalId: right.evalId,
+    leftScore: left.score.score,
+    rightScore: right.score.score,
+    scoreDelta: right.score.score - left.score.score,
+    leftPassed: left.score.passed,
+    rightPassed: right.score.passed,
+    thresholdStatusChanged: left.thresholdPassed !== right.thresholdPassed,
+    matchedSignalsAdded: listAdded(left.score.matchedSignals, right.score.matchedSignals),
+    matchedSignalsRemoved: listRemoved(left.score.matchedSignals, right.score.matchedSignals),
+    missingSignalsAdded: listAdded(left.score.missingSignals, right.score.missingSignals),
+    missingSignalsRemoved: listRemoved(left.score.missingSignals, right.score.missingSignals),
+    finalTextLengthDelta: right.finalText.length - left.finalText.length
+  };
+}
+
+function printEvalRunComparison(comparison: EvalRunComparison): void {
+  console.log(`${comparison.leftRunId} -> ${comparison.rightRunId}`);
+  console.log(`Eval: ${comparison.evalId}${comparison.sameEval ? "" : ` -> ${comparison.rightEvalId}`}`);
+  console.log(`Score: ${comparison.leftScore.toFixed(2)} -> ${comparison.rightScore.toFixed(2)} (${formatSignedNumber(comparison.scoreDelta, 2)})`);
+  console.log(`Pass: ${comparison.leftPassed ? "yes" : "no"} -> ${comparison.rightPassed ? "yes" : "no"}`);
+  console.log(`Threshold changed: ${comparison.thresholdStatusChanged ? "yes" : "no"}`);
+  console.log(`Final length delta: ${formatSignedNumber(comparison.finalTextLengthDelta)}`);
+  printSignalDelta("Matched added", comparison.matchedSignalsAdded);
+  printSignalDelta("Matched removed", comparison.matchedSignalsRemoved);
+  printSignalDelta("Missing added", comparison.missingSignalsAdded);
+  printSignalDelta("Missing removed", comparison.missingSignalsRemoved);
+}
+
+function printSignalDelta(label: string, signals: string[]): void {
+  console.log(`${label}: ${signals.length > 0 ? signals.join(", ") : "none"}`);
+}
+
+function listAdded(left: string[], right: string[]): string[] {
+  const leftSet = new Set(left);
+  return right.filter((value) => !leftSet.has(value));
+}
+
+function listRemoved(left: string[], right: string[]): string[] {
+  const rightSet = new Set(right);
+  return left.filter((value) => !rightSet.has(value));
+}
+
+function formatSignedNumber(value: number, fractionDigits?: number): string {
+  const text = fractionDigits === undefined ? String(value) : value.toFixed(fractionDigits);
+  return value > 0 ? `+${text}` : text;
 }
 
 function evalRunDirectory(workspace: WorkspaceContext): string {

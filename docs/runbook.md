@@ -301,9 +301,10 @@ node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex -
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --min-score 0.8
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --record
 node apps/cli/dist/index.js evals history --workspace D:\Coding\DeepCodex
+node apps/cli/dist/index.js evals compare <baseline-run-id> <candidate-run-id> --workspace D:\Coding\DeepCodex
 ```
 
-Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring. Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`.
+Built-in evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring. Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs.
 
 Inspect workspace defaults:
 
