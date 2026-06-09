@@ -91,6 +91,7 @@ Checklist:
 - Workspace-specific DLP patterns from `.deepcodex/config.json` block configured matches before write/edit diffs or file changes.
 - Release evidence can load a readiness report from the right rail without horizontal overflow.
 - Distribution preflight can load delivery checks from the right rail without horizontal overflow.
+- Release evidence and Distribution preflight `Download` buttons save Markdown reports without console errors.
 - Eval evidence can load recorded eval report summaries from the right rail.
 - Security scan can run from the right rail and reports only finding metadata for existing allowed text files.
 - Write/edit tools block probable secret content before showing a diff or applying a file change.

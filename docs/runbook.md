@@ -256,11 +256,12 @@ Recommended demo flow:
 6. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
 7. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
 8. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-9. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
-10. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
-11. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-12. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-13. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+9. Use the Release evidence and Distribution preflight `Download` buttons to save Markdown handoff reports.
+10. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
+11. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+12. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+13. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+14. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 

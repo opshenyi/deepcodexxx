@@ -31,6 +31,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
 - Shared release evidence reports through core, CLI, server API, and Web/Desktop, aggregating config provenance, policy-bundle status, eval evidence, security scan metadata, provider-key status, and recent session summaries.
 - Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
+- Web/Desktop Markdown downloads for release evidence and distribution preflight reports, reusing the same server exporters as CLI/API.
 - Built-in and workspace-defined read-only smoke evals for repository mapping, safety review, release-evidence review, and team-specific checks, with exact expected-signal scoring, CI threshold flags, optional recorded local eval history, cross-run comparison reports, shared server APIs, CLI report aggregation, and a Web/Desktop Eval evidence panel.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.

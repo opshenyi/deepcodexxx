@@ -583,9 +583,11 @@ function App() {
   const [releaseEvidenceState, setReleaseEvidenceState] = useState<LoadState>("idle");
   const [releaseEvidence, setReleaseEvidence] = useState<ReleaseEvidenceReport | null>(null);
   const [releaseEvidenceMessage, setReleaseEvidenceMessage] = useState("");
+  const [releaseEvidenceExportState, setReleaseEvidenceExportState] = useState<LoadState>("idle");
   const [distributionPreflightState, setDistributionPreflightState] = useState<LoadState>("idle");
   const [distributionPreflight, setDistributionPreflight] = useState<DistributionPreflightReport | null>(null);
   const [distributionPreflightMessage, setDistributionPreflightMessage] = useState("");
+  const [distributionPreflightExportState, setDistributionPreflightExportState] = useState<LoadState>("idle");
   const [configState, setConfigState] = useState<LoadState>("idle");
   const [workspaceConfigResult, setWorkspaceConfigResult] = useState<WorkspaceConfigResult | null>(null);
   const [configMessage, setConfigMessage] = useState("");
@@ -684,9 +686,11 @@ function App() {
     setReleaseEvidence(null);
     setReleaseEvidenceState("idle");
     setReleaseEvidenceMessage("");
+    setReleaseEvidenceExportState("idle");
     setDistributionPreflight(null);
     setDistributionPreflightState("idle");
     setDistributionPreflightMessage("");
+    setDistributionPreflightExportState("idle");
     setWorkspaceConfigResult(null);
     setConfigState("idle");
     setConfigMessage("");
@@ -985,6 +989,38 @@ function App() {
     }
   }
 
+  async function exportReleaseEvidenceMarkdown() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("workspace", workspace);
+    }
+    params.set("format", "markdown");
+    params.set("recentEvals", "8");
+    params.set("recentSessions", "8");
+    params.set("securityMaxFiles", "500");
+    params.set("securityMaxFindings", "200");
+    setReleaseEvidenceExportState("loading");
+    try {
+      const response = await fetch(`${serverUrl}/api/release/evidence?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      downloadTextFile(await response.text(), "deepcodex-release-evidence.md", "text/markdown;charset=utf-8");
+      pushItem({
+        kind: "Session",
+        tone: "good",
+        title: "Release evidence export ready",
+        meta: "Markdown",
+        body: "Downloaded release evidence report."
+      });
+      setReleaseEvidenceExportState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      pushItem({ kind: "Error", tone: "bad", title: "Release evidence export failed", meta: "Markdown", body: message });
+      setReleaseEvidenceExportState("error");
+    }
+  }
+
   async function loadDistributionPreflight() {
     const params = new URLSearchParams();
     if (workspace) {
@@ -1007,6 +1043,34 @@ function App() {
       setDistributionPreflight(null);
       setDistributionPreflightMessage(message);
       setDistributionPreflightState("error");
+    }
+  }
+
+  async function exportDistributionPreflightMarkdown() {
+    const params = new URLSearchParams();
+    if (workspace) {
+      params.set("root", workspace);
+    }
+    params.set("format", "markdown");
+    setDistributionPreflightExportState("loading");
+    try {
+      const response = await fetch(`${serverUrl}/api/release/preflight?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      downloadTextFile(await response.text(), "deepcodex-distribution-preflight.md", "text/markdown;charset=utf-8");
+      pushItem({
+        kind: "Session",
+        tone: "good",
+        title: "Distribution preflight export ready",
+        meta: "Markdown",
+        body: "Downloaded distribution preflight report."
+      });
+      setDistributionPreflightExportState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      pushItem({ kind: "Error", tone: "bad", title: "Distribution preflight export failed", meta: "Markdown", body: message });
+      setDistributionPreflightExportState("error");
     }
   }
 
@@ -1083,15 +1147,7 @@ function App() {
       if (!response.ok) {
         throw new Error(await readResponseError(response));
       }
-      const content = await response.text();
-      const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `deepcodex-session-${sessionId}.md`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      downloadTextFile(await response.text(), `deepcodex-session-${sessionId}.md`, "text/markdown;charset=utf-8");
       pushItem({
         kind: "Session",
         tone: "good",
@@ -2058,14 +2114,24 @@ function App() {
                 </dl>
               </>
             ) : null}
-            <button
-              type="button"
-              className="secondary policyBundleButton"
-              onClick={loadReleaseEvidence}
-              disabled={releaseEvidenceState === "loading"}
-            >
-              {releaseEvidenceState === "loading" ? "Loading evidence" : "Load evidence"}
-            </button>
+            <div className="railButtonRow">
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={loadReleaseEvidence}
+                disabled={releaseEvidenceState === "loading"}
+              >
+                {releaseEvidenceState === "loading" ? "Loading" : "Load evidence"}
+              </button>
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={exportReleaseEvidenceMarkdown}
+                disabled={releaseEvidenceExportState === "loading"}
+              >
+                {releaseEvidenceExportState === "loading" ? "Downloading" : "Download"}
+              </button>
+            </div>
           </div>
         </section>
         <section className="railPanel">
@@ -2121,14 +2187,24 @@ function App() {
                 </dl>
               </>
             ) : null}
-            <button
-              type="button"
-              className="secondary policyBundleButton"
-              onClick={loadDistributionPreflight}
-              disabled={distributionPreflightState === "loading"}
-            >
-              {distributionPreflightState === "loading" ? "Checking delivery" : "Run preflight"}
-            </button>
+            <div className="railButtonRow">
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={loadDistributionPreflight}
+                disabled={distributionPreflightState === "loading"}
+              >
+                {distributionPreflightState === "loading" ? "Checking" : "Run preflight"}
+              </button>
+              <button
+                type="button"
+                className="secondary policyBundleButton"
+                onClick={exportDistributionPreflightMarkdown}
+                disabled={distributionPreflightExportState === "loading"}
+              >
+                {distributionPreflightExportState === "loading" ? "Downloading" : "Download"}
+              </button>
+            </div>
           </div>
         </section>
         <section className="railPanel">
@@ -2552,6 +2628,17 @@ async function readResponseError(response: Response) {
   }
   const text = await response.text();
   return text || fallback;
+}
+
+function downloadTextFile(content: string, filename: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function normalizeServerUrl(value: string): string {
