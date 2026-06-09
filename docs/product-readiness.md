@@ -8,7 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
-- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, shell network access, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, and retention.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
 - Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
 - Local event stream for transparent tool execution.
@@ -18,6 +18,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
 - Workspace-specific custom redaction regex patterns for project identifiers or secret formats not covered by built-ins.
+- Write-time DLP blocking for probable secrets and workspace-defined DLP patterns before file diffs or writes are returned.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
@@ -54,7 +55,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, retention pruning, diff-producing tools, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, and default shell network blocking; still needs OS-level sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 

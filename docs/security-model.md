@@ -7,7 +7,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Boundary | Current behavior | Commercial requirement |
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
-| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
+| DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, block probable secret writes by default, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. Common network commands are blocked unless network access is explicitly enabled. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model, provider base URL, provider/model allowlists, and budget defaults. | Add secrets management and signed provider policy bundles. |
 | Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
@@ -49,6 +49,8 @@ Implemented controls:
 - The `inspect_artifact` tool can inspect a workspace file's metadata without returning raw bytes, text extraction, or base64 content. It respects denied paths, reads only a bounded sample, reports type hints, sample SHA-256, byte size, and simple image dimensions when available.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
+- File write and edit tools block probable secret content by default before producing diffs or writing. The detector covers common secret assignments, bearer tokens, token literals, and workspace custom DLP patterns, and reports finding labels without raw secret values.
+- `allowSecretWrites` defaults to false and should be enabled only for trusted fixture or migration workspaces that intentionally need secret-like text.
 - File write and edit tools return unified diffs; in `suggest` mode they preview without writing.
 - File write and edit approval/tool events include SHA-256 file audit metadata. In preview mode, the proposed after-hash is recorded with `applied: false`; in write mode, before/after hashes are recorded with `applied: true`.
 - Search and list operations are bounded to reduce runaway traversal.
@@ -109,10 +111,12 @@ Implemented controls:
 - Bearer authorization headers and common token literals are redacted before events are streamed to clients or recorded in session history.
 - Tool output sent back into the model loop is redacted, reducing the chance that a later assistant message repeats a secret.
 - `.deepcodex/config.json` can add workspace-specific regex redaction patterns through `policy.redactionPatterns`; matches are replaced with `[redacted-custom]` before streaming, persistence, and model-loop reuse.
+- `.deepcodex/config.json` can add workspace-specific write-time DLP regex patterns through `policy.dlpPatterns`; matches block `write_file` and `edit_file` unless `allowSecretWrites` is enabled.
 
 Current limitations:
 
 - Redaction is pattern-based and should be expanded with richer DLP classification before team or hosted use.
+- Write-time DLP is pattern-based and may miss transformed or indirect secrets; it should be expanded with richer classification before team or hosted use.
 - Existing session files created before this control was added are not rewritten retroactively.
 
 ## Data Handling

@@ -113,6 +113,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
           allowFileWrite: true,
           allowNetwork: false,
           allowStateWrite: true,
+          allowSecretWrites: false,
           shellEnvironment: "minimal"
         },
         budget: {
@@ -124,11 +125,13 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
       maxTokens: 120000
     },
     policy: {
+      allowSecretWrites: false,
       shellEnvironment: "minimal",
       maxFileBytes: 512 * 1024,
       deniedPaths: ["secrets"],
       deniedFileExtensions: [".pem", ".sqlite"],
-      redactionPatterns: ["ACME_[A-Z0-9]{16,}"]
+      redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
+      dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"]
     },
     retention: {
       maxSessions: 100,
@@ -233,9 +236,11 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     allowNetwork: readOptionalBoolean(entry.allowNetwork, "policy.allowNetwork"),
     allowFileWrite: readOptionalBoolean(entry.allowFileWrite, "policy.allowFileWrite"),
     allowStateWrite: readOptionalBoolean(entry.allowStateWrite, "policy.allowStateWrite"),
+    allowSecretWrites: readOptionalBoolean(entry.allowSecretWrites, "policy.allowSecretWrites"),
     deniedPaths: readOptionalStringArray(entry.deniedPaths, "policy.deniedPaths"),
     deniedFileExtensions: readOptionalStringArray(entry.deniedFileExtensions, "policy.deniedFileExtensions"),
     redactionPatterns: readOptionalRegexArray(entry.redactionPatterns, "policy.redactionPatterns"),
+    dlpPatterns: readOptionalRegexArray(entry.dlpPatterns, "policy.dlpPatterns"),
     maxFileBytes: readOptionalNumber(entry.maxFileBytes, "policy.maxFileBytes"),
     shellEnvironment: readOptionalShellEnvironment(entry.shellEnvironment)
   });

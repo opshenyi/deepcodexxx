@@ -8,6 +8,7 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowShell: true,
   allowNetwork: false,
   allowStateWrite: true,
+  allowSecretWrites: false,
   deniedPaths: [
     ".git",
     "**/.git",
@@ -103,6 +104,7 @@ export async function createWorkspaceContext(
       ...(policy.deniedFileExtensions ?? [])
     ]),
     redactionPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.redactionPatterns ?? []), ...(policy.redactionPatterns ?? [])]),
+    dlpPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.dlpPatterns ?? []), ...(policy.dlpPatterns ?? [])]),
     maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
     shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment
   };

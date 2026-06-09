@@ -118,7 +118,8 @@ function cloneProfile(profile: PolicyProfile): PolicyProfile {
       ...profile.policy,
       deniedPaths: profile.policy.deniedPaths ? [...profile.policy.deniedPaths] : undefined,
       deniedFileExtensions: profile.policy.deniedFileExtensions ? [...profile.policy.deniedFileExtensions] : undefined,
-      redactionPatterns: profile.policy.redactionPatterns ? [...profile.policy.redactionPatterns] : undefined
+      redactionPatterns: profile.policy.redactionPatterns ? [...profile.policy.redactionPatterns] : undefined,
+      dlpPatterns: profile.policy.dlpPatterns ? [...profile.policy.dlpPatterns] : undefined
     },
     budget: profile.budget ? { ...profile.budget } : undefined
   };

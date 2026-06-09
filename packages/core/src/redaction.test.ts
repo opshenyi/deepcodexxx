@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSensitiveText, redactSensitiveValue } from "./redaction.js";
+import { findSensitiveText, redactSensitiveText, redactSensitiveValue } from "./redaction.js";
 
 describe("redaction", () => {
   it("redacts common secret assignments and bearer tokens", () => {
@@ -44,5 +44,18 @@ describe("redaction", () => {
     ).toEqual({
       command: "echo [redacted-custom]"
     });
+  });
+
+  it("detects sensitive text without returning secret values", () => {
+    const findings = findSensitiveText("DEEPSEEK_API_KEY=live-secret Authorization: Bearer token-value", {
+      additionalPatterns: ["ACME_[A-Z]{16}"]
+    });
+
+    expect(findings).toEqual([
+      { type: "secret-assignment", label: "DEEPSEEK_API_KEY", index: 0 },
+      { type: "bearer-token", label: "Authorization bearer token", index: 29 }
+    ]);
+    expect(JSON.stringify(findings)).not.toContain("live-secret");
+    expect(JSON.stringify(findings)).not.toContain("token-value");
   });
 });

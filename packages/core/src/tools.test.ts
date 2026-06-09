@@ -127,6 +127,64 @@ describe("workspace tools", () => {
     await expect(readFile(path.join(tempDir, "too-large.txt"), "utf8")).rejects.toThrow();
   });
 
+  it("blocks writes that contain probable secrets by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+    const writeTool = createDefaultTools().find((tool) => tool.definition.function.name === "write_file");
+    expect(writeTool).toBeDefined();
+
+    const result = await writeTool!.run(
+      { path: "config.txt", content: "DEEPSEEK_API_KEY=live-secret\n" },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Potential secret content blocked by DLP policy");
+    expect(result.content).toContain("secret-assignment:DEEPSEEK_API_KEY");
+    expect(result.content).not.toContain("live-secret");
+    await expect(readFile(path.join(tempDir, "config.txt"), "utf8")).rejects.toThrow();
+  });
+
+  it("allows probable secret writes only when explicitly enabled", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowSecretWrites: true
+    });
+    const writeTool = createDefaultTools().find((tool) => tool.definition.function.name === "write_file");
+    expect(writeTool).toBeDefined();
+
+    const result = await writeTool!.run(
+      { path: "config.txt", content: "DEEPSEEK_API_KEY=trusted-fixture\n" },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(true);
+    await expect(readFile(path.join(tempDir, "config.txt"), "utf8")).resolves.toContain("trusted-fixture");
+  });
+
+  it("keeps redaction-only patterns separate from write-time DLP patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      redactionPatterns: ["TICKET-[0-9]+"],
+      dlpPatterns: ["PROJECT_SECRET_[A-Z0-9]+"]
+    });
+    const writeTool = createDefaultTools().find((tool) => tool.definition.function.name === "write_file");
+    expect(writeTool).toBeDefined();
+
+    const redactionOnly = await writeTool!.run({ path: "ticket.txt", content: "TICKET-123\n" }, { workspace });
+    const dlpResult = await writeTool!.run(
+      { path: "secret.txt", content: "PROJECT_SECRET_ABC123\n" },
+      { workspace }
+    );
+
+    expect(redactionOnly.ok).toBe(true);
+    expect(dlpResult.ok).toBe(false);
+    expect(dlpResult.content).toContain("custom-pattern:custom pattern 1");
+    expect(dlpResult.content).not.toContain("PROJECT_SECRET_ABC123");
+  });
+
   it("rejects editing files larger than the configured size limit", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     await writeFile(path.join(tempDir, "large.txt"), "alpha", "utf8");
@@ -139,6 +197,24 @@ describe("workspace tools", () => {
     expect(result.ok).toBe(false);
     expect(result.content).toContain("File exceeds maxFileBytes (4)");
     await expect(readFile(path.join(tempDir, "large.txt"), "utf8")).resolves.toBe("alpha");
+  });
+
+  it("blocks edits that introduce probable secrets by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "config.txt"), "token=placeholder\n", "utf8");
+    const workspace = await createWorkspaceContext(tempDir);
+    const editTool = createDefaultTools().find((tool) => tool.definition.function.name === "edit_file");
+    expect(editTool).toBeDefined();
+
+    const result = await editTool!.run(
+      { path: "config.txt", search: "token=placeholder", replace: "ACCESS_TOKEN=live-secret" },
+      { workspace }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Potential secret content blocked by DLP policy");
+    expect(result.content).not.toContain("live-secret");
+    await expect(readFile(path.join(tempDir, "config.txt"), "utf8")).resolves.toBe("token=placeholder\n");
   });
 
   it("rejects reading binary files", async () => {

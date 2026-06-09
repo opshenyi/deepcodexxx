@@ -104,4 +104,14 @@ describe("workspace boundaries", () => {
 
     expect(workspace.policy.redactionPatterns).toContain("ACME_[A-Z]{16}");
   });
+
+  it("supports workspace DLP patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      dlpPatterns: ["ACME_SECRET_[A-Z]{16}"]
+    });
+
+    expect(workspace.policy.dlpPatterns).toContain("ACME_SECRET_[A-Z]{16}");
+  });
 });

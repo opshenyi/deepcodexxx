@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { createBufferHashSnapshot } from "./file-audit.js";
 import { appendWorkspaceMemory, readWorkspaceMemory } from "./memory.js";
+import { findSensitiveText, type SensitiveTextFinding } from "./redaction.js";
 import { assertShellCommandAllowed, canWriteFiles, createShellEnvironment, truncateForModel } from "./safety.js";
 import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./types.js";
 import { isDeniedByPatterns, isDeniedFileExtension, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
@@ -167,6 +168,10 @@ const writeFileTool: RuntimeTool = {
     if (exceedsFileLimit(Buffer.byteLength(next, "utf8"), runtime)) {
       return fail(`Content exceeds maxFileBytes (${runtime.workspace.policy.maxFileBytes}): ${rel}`);
     }
+    const secretDenial = secretWriteDenial(next, runtime);
+    if (secretDenial) {
+      return fail(secretDenial);
+    }
     const previousBuffer = await readFile(target).catch((error: unknown) => {
       if (isNodeError(error) && error.code === "ENOENT") {
         return undefined;
@@ -226,6 +231,10 @@ const editFileTool: RuntimeTool = {
       return fail(`Search text was not found in ${rel}`);
     }
     const next = current.replace(search, stringValue(args.replace));
+    const secretDenial = secretWriteDenial(next, runtime);
+    if (secretDenial) {
+      return fail(secretDenial);
+    }
     const diff = createUnifiedDiff(rel, current, next);
     const nextBuffer = Buffer.from(next, "utf8");
     const audit = fileAudit(rel, "edit", currentBuffer, nextBuffer, false);
@@ -493,6 +502,27 @@ function fileAudit(
 function exceedsFileLimit(size: number, runtime: ToolRuntime): boolean {
   const limit = runtime.workspace.policy.maxFileBytes;
   return typeof limit === "number" && Number.isFinite(limit) && limit >= 0 && size > limit;
+}
+
+function secretWriteDenial(content: string, runtime: ToolRuntime): string | undefined {
+  if (runtime.workspace.policy.allowSecretWrites === true) {
+    return undefined;
+  }
+  const findings = findSensitiveText(content, {
+    additionalPatterns: runtime.workspace.policy.dlpPatterns
+  });
+  if (findings.length === 0) {
+    return undefined;
+  }
+  return `Potential secret content blocked by DLP policy: ${formatSensitiveFindings(findings)}. Use environment variables or enable allowSecretWrites only for a trusted workspace policy.`;
+}
+
+function formatSensitiveFindings(findings: SensitiveTextFinding[]): string {
+  const summary = findings
+    .slice(0, 5)
+    .map((finding) => `${finding.type}:${finding.label}`)
+    .join(", ");
+  return findings.length > 5 ? `${summary}, and ${findings.length - 5} more` : summary;
 }
 
 async function readUtf8TextFile(target: string): Promise<string | undefined> {

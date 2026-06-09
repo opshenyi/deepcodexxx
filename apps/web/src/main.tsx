@@ -80,9 +80,11 @@ type ServerPolicyProfile = {
     allowNetwork?: boolean;
     allowFileWrite?: boolean;
     allowStateWrite?: boolean;
+    allowSecretWrites?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
     redactionPatterns?: string[];
+    dlpPatterns?: string[];
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
   };
@@ -109,8 +111,11 @@ type WorkspaceConfig = {
     allowNetwork?: boolean;
     allowFileWrite?: boolean;
     allowStateWrite?: boolean;
+    allowSecretWrites?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
+    redactionPatterns?: string[];
+    dlpPatterns?: string[];
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
   };

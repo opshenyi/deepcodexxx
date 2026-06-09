@@ -53,6 +53,7 @@ describe("workspace config", () => {
               mode: "workspace-write",
               allowShell: false,
               allowFileWrite: true,
+              allowSecretWrites: false,
               shellEnvironment: "minimal"
             },
             budget: {
@@ -67,9 +68,11 @@ describe("workspace config", () => {
         policy: {
           mode: "suggest",
           allowShell: false,
+          allowSecretWrites: false,
           deniedPaths: ["secrets"],
           deniedFileExtensions: ["sqlite"],
           redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
+          dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
           maxFileBytes: 2048,
           shellEnvironment: "minimal"
         },
@@ -100,6 +103,7 @@ describe("workspace config", () => {
             mode: "workspace-write",
             allowShell: false,
             allowFileWrite: true,
+            allowSecretWrites: false,
             shellEnvironment: "minimal"
           },
           budget: {
@@ -114,9 +118,11 @@ describe("workspace config", () => {
       policy: {
         mode: "suggest",
         allowShell: false,
+        allowSecretWrites: false,
         deniedPaths: ["secrets"],
         deniedFileExtensions: ["sqlite"],
         redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
+        dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
         maxFileBytes: 2048,
         shellEnvironment: "minimal"
       },
@@ -143,6 +149,18 @@ describe("workspace config", () => {
     );
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/redactionPatterns/);
+  });
+
+  it("rejects invalid custom DLP patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ policy: { dlpPatterns: ["["] } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/dlpPatterns/);
   });
 
   it("rejects custom policy profiles without a mode", async () => {

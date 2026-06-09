@@ -60,6 +60,8 @@ Checklist:
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.
+- Workspace-specific DLP patterns from `.deepcodex/config.json` block configured matches before write/edit diffs or file changes.
+- Write/edit tools block probable secret content before showing a diff or applying a file change.
 - Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - `Load memory` returns either existing memory or the empty-memory state.
@@ -124,6 +126,7 @@ Checklist:
 - The task scope is narrow and reversible.
 - The presenter can explain which files changed.
 - Tests or typecheck are run after any product-code change.
+- Write/edit DLP failures do not echo the raw secret value in the event stream.
 - Session replay/export includes before/after file hash audit metadata for write/edit tools.
 - Retention prune is dry-run first if the workspace contains useful demo history.
 - Generated memory is reviewed before sharing the workspace.

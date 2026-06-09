@@ -44,7 +44,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, shell network access, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment mode, shell network access, and session retention defaults.
 
 Create a template:
 
@@ -86,6 +86,7 @@ Example:
         "allowFileWrite": true,
         "allowNetwork": false,
         "allowStateWrite": true,
+        "allowSecretWrites": false,
         "shellEnvironment": "minimal"
       },
       "budget": {
@@ -98,11 +99,13 @@ Example:
   },
   "policy": {
     "allowNetwork": false,
+    "allowSecretWrites": false,
     "shellEnvironment": "minimal",
     "maxFileBytes": 524288,
     "deniedPaths": ["secrets"],
     "deniedFileExtensions": [".pem", ".sqlite"],
-    "redactionPatterns": ["ACME_[A-Z0-9]{16,}"]
+    "redactionPatterns": ["ACME_[A-Z0-9]{16,}"],
+    "dlpPatterns": ["ACME_SECRET_[A-Z0-9]{16,}"]
   },
   "retention": {
     "maxSessions": 100,
@@ -111,13 +114,15 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
+
+Write and edit tools also apply sensitive-text checks before producing diffs or writing files. Probable secrets and workspace `dlpPatterns` matches are blocked by default and reported by finding type without returning raw secret values. Set `policy.allowSecretWrites: true` only in a trusted workspace policy when a fixture or migration intentionally needs secret-like text.
 
 ## Verify Configuration
 
@@ -330,6 +335,7 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Tool command blocked. | Approval mode is `suggest`, or a dangerous command needs `full-access`. | Rerun with the intended mode only after reviewing the command. |
 | Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
 | Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
+| Write or edit is blocked by DLP policy. | The proposed content looks like a secret assignment, bearer token, token literal, or workspace custom DLP match. | Move the value to an environment variable or set `policy.allowSecretWrites: true` only for a trusted fixture/migration workspace. |
 | A project-specific secret still appears in output. | Redaction is pattern-based. | Add the pattern to a future project DLP policy and rotate the exposed secret if necessary. |
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
