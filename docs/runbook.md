@@ -168,6 +168,7 @@ DeepCodex exposes this checked model metadata through the CLI, API, and Web/Desk
 ```powershell
 node apps/cli/dist/index.js providers models
 node apps/cli/dist/index.js providers show deepseek-v4-flash --json
+node apps/cli/dist/index.js providers ping --json
 Invoke-RestMethod http://127.0.0.1:17361/api/provider/models
 ```
 
@@ -393,6 +394,15 @@ node apps/cli/dist/index.js security scan --workspace D:\Coding\DeepCodex --json
 CLI evals use read-only `suggest` mode and emit `eval_started`, normal agent events, and `eval_result` records in JSON mode. Results include exact expected-signal scoring and the task source (`built-in` or `workspace`). Use `--min-score <0-1>` or `--require-pass` to make the command fail for CI smoke gates. Add `--record` only when you want to persist local eval evidence under `.deepcodex/state/evals`; use `evals compare` to review score and signal changes between recorded runs, and `evals report` to aggregate release evidence.
 
 `release evidence` aggregates workspace config provenance, policy-bundle verification, eval evidence, security scan metadata, provider-key status, and recent session summaries into one Markdown or JSON report. It is intended as an interview or CI evidence artifact; it does not replace the individual tests, eval runs, or security review.
+
+Use `providers ping` before live demos:
+
+```powershell
+node apps/cli/dist/index.js providers ping --json
+node apps/cli/dist/index.js providers ping --live --json
+```
+
+Without `--live`, the command validates workspace provider config, allowlists, model, fallback models, thinking mode, and key presence without making a network request. With `--live`, it sends a minimal request to the configured provider and returns classified provider errors when the request fails.
 
 `release preflight` checks the product root for expected root scripts, Web/Desktop/CLI/server build scripts, CLI bin/completion readiness, Desktop bootstrap safety settings, built artifacts, required docs, and ignored local-state paths. Missing built artifacts warn so a source-only checkout can still be reviewed, while missing scripts, docs, CLI packaging metadata, or safety settings fail the gate.
 

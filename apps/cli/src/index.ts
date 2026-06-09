@@ -13,6 +13,8 @@ import {
   createEvalRunRecord,
   createEvalRunReport,
   createWorkspaceContext,
+  DeepSeekClient,
+  DeepSeekError,
   exportSessionHistory,
   evalScoreFailed,
   applyPricingProfileToBudget,
@@ -80,6 +82,32 @@ import type {
 } from "@deepcodex/core";
 
 const program = new Command();
+
+interface ProviderPingResult {
+  ok: boolean;
+  mode: "configuration" | "live";
+  workspace: string;
+  configPath?: string;
+  configExists?: boolean;
+  deepSeekConfigured: boolean;
+  provider?: {
+    baseUrl: string;
+    model: string;
+    fallbackModels: string[];
+    thinking: string;
+    reasoningEffort?: string;
+  };
+  response?: {
+    id: string;
+    model: string;
+  };
+  error?: string;
+  providerError?: {
+    kind: string;
+    status?: number;
+    retryable: boolean;
+  };
+}
 
 program
   .name("deepcodex")
@@ -403,6 +431,24 @@ providers
       return;
     }
     printDeepSeekModelEntry(entry);
+  });
+
+providers
+  .command("ping")
+  .description("Validate provider configuration, optionally making a live DeepSeek request.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--live", "Send a minimal live request to the configured provider", false)
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; live: boolean; json: boolean }) => {
+    const result = await createProviderPingResult(options.workspace, options.live);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      printProviderPingResult(result);
+    }
+    if (!result.ok) {
+      process.exitCode = 1;
+    }
   });
 
 evals
@@ -1366,6 +1412,110 @@ function printDeepSeekModelEntry(model: DeepSeekModelCatalogEntry): void {
     console.log(`Retires at: ${model.retiresAt}`);
   }
   console.log(model.notes);
+}
+
+async function createProviderPingResult(workspace: string, live: boolean): Promise<ProviderPingResult> {
+  const mode = live ? "live" : "configuration";
+  const deepSeekConfigured = Boolean(process.env.DEEPSEEK_API_KEY);
+  try {
+    const workspaceConfig = await readWorkspaceConfig(workspace);
+    const provider = readProviderSelection(workspaceConfig.config);
+    assertProviderAllowed(provider, workspaceConfig.config.provider);
+    const result: ProviderPingResult = {
+      ok: true,
+      mode,
+      workspace,
+      configPath: workspaceConfig.path,
+      configExists: workspaceConfig.exists,
+      deepSeekConfigured,
+      provider: {
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        fallbackModels: provider.fallbackModels,
+        thinking: provider.thinking,
+        reasoningEffort: provider.reasoningEffort
+      }
+    };
+
+    if (!live) {
+      return result;
+    }
+    if (!deepSeekConfigured) {
+      return { ...result, ok: false, error: "DEEPSEEK_API_KEY is not set." };
+    }
+
+    try {
+      const client = new DeepSeekClient({
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        fallbackModels: provider.fallbackModels,
+        thinking: provider.thinking,
+        reasoningEffort: provider.reasoningEffort
+      });
+      const response = await client.chat([{ role: "user", content: "Reply with ok." }]);
+      return {
+        ...result,
+        response: {
+          id: response.id,
+          model: client.lastModel ?? provider.model
+        }
+      };
+    } catch (error) {
+      if (error instanceof DeepSeekError) {
+        return {
+          ...result,
+          ok: false,
+          error: error.message,
+          providerError: {
+            kind: error.kind,
+            status: error.status,
+            retryable: error.retryable
+          }
+        };
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      return { ...result, ok: false, error: message };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      mode,
+      workspace,
+      deepSeekConfigured,
+      error: message
+    };
+  }
+}
+
+function printProviderPingResult(result: ProviderPingResult): void {
+  console.log(chalk.bold("DeepSeek provider ping"));
+  console.log(`Status: ${result.ok ? "ok" : "failed"}`);
+  console.log(`Mode: ${result.mode}`);
+  console.log(`Workspace: ${result.workspace}`);
+  if (result.configPath) {
+    console.log(`Workspace config: ${result.configExists ? result.configPath : "missing"}`);
+  }
+  console.log(`API key: ${result.deepSeekConfigured ? "configured" : "missing"}`);
+  if (result.provider) {
+    console.log(`Base URL: ${result.provider.baseUrl}`);
+    console.log(`Model: ${result.provider.model}`);
+    console.log(`Fallback models: ${result.provider.fallbackModels.length}`);
+    console.log(`Thinking: ${result.provider.thinking}`);
+    console.log(`Reasoning effort: ${result.provider.reasoningEffort ?? "not set"}`);
+  }
+  if (result.response) {
+    console.log(`Response id: ${result.response.id}`);
+    console.log(`Response model: ${result.response.model}`);
+  }
+  if (result.providerError) {
+    console.log(`Provider error: ${result.providerError.kind}`);
+    console.log(`Provider status: ${result.providerError.status ?? "n/a"}`);
+    console.log(`Retryable: ${result.providerError.retryable ? "yes" : "no"}`);
+  }
+  if (result.error) {
+    console.log(`Error: ${result.error}`);
+  }
 }
 
 function formatEvalScore(score: EvalScore): string {

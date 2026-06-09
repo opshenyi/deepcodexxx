@@ -33,6 +33,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - CLI `ask --json` and `doctor --json` for machine-readable event streams and environment diagnostics, with optional `doctor --require-*` gates that return non-zero exit codes for CI preflight requirements.
 - CLI `completion` generation for PowerShell, bash, zsh, and JSON command specs.
+- CLI provider ping diagnostics for configuration-only checks and explicit live DeepSeek connectivity checks.
 - Shared release evidence reports through core, CLI, server API, and Web/Desktop, aggregating config provenance, policy-bundle status, eval evidence, security scan metadata, provider-key status, and recent session summaries.
 - Shared distribution preflight reports through core, CLI, server API, and Web/Desktop, checking root scripts, package build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, required docs, and ignored local-state paths before delivery.
 - Web/Desktop Markdown downloads for release evidence and distribution preflight reports, reusing the same server exporters as CLI/API.

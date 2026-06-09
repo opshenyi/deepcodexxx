@@ -23,6 +23,7 @@ node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js completion json
 node apps/cli/dist/index.js completion powershell
 node apps/cli/dist/index.js providers models --json
+node apps/cli/dist/index.js providers ping --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
@@ -35,6 +36,7 @@ Expected result:
 - CLI `doctor` reports the effective DeepSeek fallback model count.
 - CLI `doctor` reports DeepSeek thinking mode as `disabled` unless a planned demo explicitly enables it.
 - CLI `providers models --json` emits parseable checked DeepSeek model metadata with `deepseek-v4-flash` as the default and legacy aliases marked for migration.
+- CLI `providers ping --json` succeeds without network for configuration validation, and `providers ping --live --json` fails clearly when no API key is configured.
 - CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
 - CLI `completion json` emits a parseable command spec, and shell-specific completion scripts include top-level commands, subcommands, and options.
 - CLI `doctor --json --require-*` exits non-zero when a requested API-key, workspace-config, or trusted-policy-bundle condition is not met; run the strict flags that match the planned demo workspace.

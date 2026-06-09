@@ -32,6 +32,7 @@ node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js providers models
+node apps/cli/dist/index.js providers ping --json
 node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json
