@@ -47,6 +47,7 @@ Checklist:
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
+- Event stream and exports redact common secret patterns in tool output and assistant text.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - Audit retention dry-run can preview sessions that would be pruned before deletion is applied.

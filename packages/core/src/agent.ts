@@ -10,6 +10,7 @@ import {
 import { DeepSeekClient } from "./deepseek.js";
 import { createApprovalFileAudits } from "./file-audit.js";
 import { readWorkspaceMemory } from "./memory.js";
+import { redactSensitiveText, redactSensitiveValue } from "./redaction.js";
 import { createDefaultTools } from "./tools.js";
 import type { AgentEvent, AgentRunOptions, AgentRunResult, ChatMessage, RuntimeTool, ToolApprovalRisk } from "./types.js";
 import { createWorkspaceContext } from "./workspace.js";
@@ -36,8 +37,9 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   const tools = createDefaultTools();
   const events: AgentEvent[] = [];
   const emit = async (event: AgentEvent) => {
-    events.push(event);
-    await options.onEvent?.(event);
+    const redactedEvent = redactAgentEvent(event);
+    events.push(redactedEvent);
+    await options.onEvent?.(redactedEvent);
   };
 
   await emit({ type: "session_started", sessionId, workspace: workspace.root, model: client.model });
@@ -96,7 +98,8 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
 
     messages.push(assistant);
     const toolCalls = assistant.tool_calls ?? [];
-    const text = assistant.content ?? "";
+    const text = redactSensitiveText(assistant.content ?? "");
+    messages[messages.length - 1] = { ...assistant, content: text };
 
     if (text.trim()) {
       await emit({ type: "assistant_message", content: text });
@@ -146,7 +149,7 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
           const approvalRequest = {
             approvalId,
             name: call.function.name,
-            input,
+            input: redactSensitiveValue(input),
             risk,
             reason,
             requestedAt,
@@ -185,17 +188,18 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
       const result = tool
         ? await tool.run(input, { workspace })
         : { ok: false, content: `Unknown tool: ${call.function.name}` };
+      const safeToolContent = redactSensitiveText(result.content);
       await emit({
         type: "tool_finished",
         name: call.function.name,
-        output: result.content,
+        output: safeToolContent,
         ok: result.ok,
         audit: result.audit
       });
       messages.push({
         role: "tool",
         tool_call_id: call.id,
-        content: result.content
+        content: safeToolContent
       });
     }
   }
@@ -203,6 +207,26 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   const content = finalText || "Reached the maximum agent step count before a final answer.";
   await emit({ type: "final", content });
   return { sessionId, finalText: content, events };
+}
+
+function redactAgentEvent(event: AgentEvent): AgentEvent {
+  switch (event.type) {
+    case "assistant_message":
+    case "final":
+      return { ...event, content: redactSensitiveText(event.content) };
+    case "tool_approval_requested":
+      return { ...event, input: redactSensitiveValue(event.input), reason: redactSensitiveText(event.reason) };
+    case "tool_approval_resolved":
+      return { ...event, reason: event.reason ? redactSensitiveText(event.reason) : event.reason };
+    case "tool_started":
+      return { ...event, input: redactSensitiveValue(event.input) };
+    case "tool_finished":
+      return { ...event, output: redactSensitiveText(event.output) };
+    case "error":
+      return { ...event, message: redactSensitiveText(event.message) };
+    default:
+      return event;
+  }
 }
 
 function findTool(tools: RuntimeTool[], name: string): RuntimeTool | undefined {

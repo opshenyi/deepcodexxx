@@ -10,7 +10,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, and optional token/cost budgets can stop further work after a limit is reached. | Add secrets management, provider allowlists, and managed pricing policy. |
-| Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions` and can be pruned by count or age. | Add review and redaction controls. |
+| Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
 
 ## Approval Modes
 
@@ -84,12 +84,25 @@ Current limitations:
 - The Web client currently assumes the local server runs on `127.0.0.1:17361`.
 - CORS is open for local development and should be restricted before hosted use.
 
+## Redaction Controls
+
+Implemented controls:
+
+- Agent events redact common secret assignments such as `*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, and `*_PRIVATE_KEY`.
+- Bearer authorization headers and common token literals are redacted before events are streamed to clients or recorded in session history.
+- Tool output sent back into the model loop is redacted, reducing the chance that a later assistant message repeats a secret.
+
+Current limitations:
+
+- Redaction is pattern-based and should be expanded with project-specific DLP policies before team or hosted use.
+- Existing session files created before this control was added are not rewritten retroactively.
+
 ## Data Handling
 
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
-| Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, and prunable by retention policy. | Add export review controls and redaction. |
+| Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, redacted for common secret patterns before event persistence, and prunable by retention policy. | Add export review controls and broader DLP coverage. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |
 
@@ -99,7 +112,7 @@ The next security work should prioritize:
 
 - Richer generated-asset handling and file-type policies.
 - Policy profile metadata.
-- Redaction policy for prompts, tool outputs, and audit exports.
+- Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Managed provider pricing profiles for budget policy.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

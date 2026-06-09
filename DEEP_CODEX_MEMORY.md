@@ -39,6 +39,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added session audit retention pruning by max retained session count or max age days, with dry-run support in core, server API, CLI `sessions prune`, and Web/desktop Audit trail controls. Env defaults are `DEEPCODEX_MAX_SESSIONS` and `DEEPCODEX_SESSION_RETENTION_DAYS`.
 - Added minimal shell environment mode for `run_command`: default `DEEPCODEX_SHELL_ENV=minimal` keeps provider keys and arbitrary parent env vars out of shell child processes; `inherit` remains available for trusted tasks.
 - Added generated/build output path policy: default denied paths now cover nested env files, nested `node_modules`, and common generated folders (`dist`, `build`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.vite`, `.parcel-cache`), with `**` glob support for custom deny patterns like `**/*.map`.
+- Added event redaction for common secret assignments, bearer headers, and token literals before agent events are streamed/persisted; redacted tool output is also sent back into the model loop.
 
 ## Architecture Decisions
 
@@ -51,8 +52,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 ## Next Steps
 
-1. Commit and push the generated/build output path policy work if it has not already been committed.
+1. Commit and push the event redaction work if it has not already been committed.
 2. Add OS-level shell sandboxing and richer media/artifact-type policies.
-3. Add managed pricing profiles, reusable policy profiles, and redaction policy.
+3. Add managed pricing profiles, reusable policy profiles, and project-specific DLP controls.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

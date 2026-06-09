@@ -170,6 +170,29 @@ describe("agent approval risk", () => {
     );
   });
 
+  it("redacts sensitive assistant content before emitting or returning it", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const events: AgentEvent[] = [];
+
+    const result = await runDeepCodexAgent({
+      prompt: "show a secret",
+      workspace: tempDir,
+      chatClient: secretFinalClient(),
+      onEvent: (event) => {
+        events.push(event);
+      }
+    });
+
+    expect(result.finalText).toContain("DEEPSEEK_API_KEY=[redacted]");
+    expect(result.finalText).not.toContain("live-secret");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "assistant_message",
+        content: expect.stringContaining("DEEPSEEK_API_KEY=[redacted]")
+      })
+    );
+  });
+
   it("stops before tool execution when the session token budget is reached", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const events: AgentEvent[] = [];
@@ -258,6 +281,26 @@ function finalOnlyClient(): AgentChatClient {
           completion_tokens: 5,
           total_tokens: 15
         }
+      };
+    }
+  };
+}
+
+function secretFinalClient(): AgentChatClient {
+  return {
+    model: "test-model",
+    async chat(): Promise<DeepSeekChatResponse> {
+      return {
+        id: "test-secret-final",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Do not leak DEEPSEEK_API_KEY=live-secret"
+            }
+          }
+        ]
       };
     }
   };
