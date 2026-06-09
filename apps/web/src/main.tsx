@@ -85,6 +85,7 @@ type ServerPolicyProfile = {
     allowFileWrite?: boolean;
     allowStateWrite?: boolean;
     allowSecretWrites?: boolean;
+    allowArchiveListing?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
     redactionPatterns?: string[];
@@ -116,6 +117,7 @@ type WorkspaceConfig = {
     allowFileWrite?: boolean;
     allowStateWrite?: boolean;
     allowSecretWrites?: boolean;
+    allowArchiveListing?: boolean;
     deniedPaths?: string[];
     deniedFileExtensions?: string[];
     redactionPatterns?: string[];

@@ -67,6 +67,7 @@ program
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
   .option("--allow-network", "Allow shell commands that perform network access", false)
+  .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
   .option("--json", "Print newline-delimited JSON events", false)
   .action(
     async (
@@ -84,6 +85,7 @@ program
         pricingProfile?: string;
         shellEnv?: string;
         allowNetwork?: boolean;
+        allowArchiveListing?: boolean;
         json?: boolean;
       }
     ) => {
@@ -100,7 +102,14 @@ program
       }
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
-        const policy = createPolicy(options.mode, options.shellEnv, options.allowNetwork, profile, workspaceConfig.config);
+        const policy = createPolicy(
+          options.mode,
+          options.shellEnv,
+          options.allowNetwork,
+          options.allowArchiveListing,
+          profile,
+          workspaceConfig.config
+        );
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         const result = await runDeepCodexAgent({
@@ -137,6 +146,7 @@ program
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
   .option("--allow-network", "Allow shell commands that perform network access", false)
+  .option("--allow-archive-listing", "Allow ZIP archive entry metadata listing without extraction", false)
   .option("--max-steps <number>", "Maximum agent loop count")
   .action(async (options: {
     workspace: string;
@@ -150,6 +160,7 @@ program
     pricingProfile?: string;
     shellEnv?: string;
     allowNetwork?: boolean;
+    allowArchiveListing?: boolean;
     maxSteps?: string;
   }) => {
     const rl = createInterface({ input, output });
@@ -168,7 +179,14 @@ program
         if (!prompt) {
           break;
         }
-        const policy = createPolicy(options.mode, options.shellEnv, options.allowNetwork, profile, workspaceConfig.config);
+        const policy = createPolicy(
+          options.mode,
+          options.shellEnv,
+          options.allowNetwork,
+          options.allowArchiveListing,
+          profile,
+          workspaceConfig.config
+        );
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
@@ -419,6 +437,7 @@ program
       configuredPricingProfiles: readPricingProfilesFromEnv().length,
       shellEnvironment: process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal",
       shellNetworkAccess: resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked",
+      archiveListing: resolveAllowArchiveListingPolicy(false, basePolicy.allowArchiveListing) ? "allowed" : "blocked",
       workspaceConfig: {
         status: workspaceConfig.exists ? "present" : "missing",
         path: workspaceConfig.exists ? workspaceConfig.path : undefined,
@@ -451,6 +470,7 @@ program
     console.log(`Configured pricing profiles: ${diagnostics.configuredPricingProfiles}`);
     console.log(`Shell environment: ${diagnostics.shellEnvironment}`);
     console.log(`Shell network access: ${diagnostics.shellNetworkAccess}`);
+    console.log(`Archive listing: ${diagnostics.archiveListing}`);
     console.log(`Workspace config: ${diagnostics.workspaceConfig.status === "present" ? diagnostics.workspaceConfig.path : "missing"}`);
     console.log(
       `Workspace config SHA-256: ${diagnostics.workspaceConfig.sha256 ? diagnostics.workspaceConfig.sha256.slice(0, 12) : "not available"}`
@@ -544,6 +564,7 @@ function createPolicy(
   mode: string | undefined,
   shellEnv: string | undefined,
   allowNetwork: boolean | undefined,
+  allowArchiveListing: boolean | undefined,
   profile?: PolicyProfile,
   config?: WorkspaceConfig
 ): ApprovalPolicy {
@@ -558,6 +579,7 @@ function createPolicy(
     allowFileWrite: selectedMode !== "suggest" && (base.allowFileWrite ?? true),
     allowShell: selectedMode !== "suggest" && (base.allowShell ?? true),
     allowNetwork: selectedMode !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
+    allowArchiveListing: resolveAllowArchiveListingPolicy(allowArchiveListing, base.allowArchiveListing),
     allowStateWrite: selectedMode !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
@@ -575,6 +597,20 @@ function resolveAllowNetworkPolicy(cliAllowNetwork: boolean | undefined, configu
     return true;
   }
   return readAllowNetworkFromEnv() ?? configuredAllowNetwork ?? false;
+}
+
+function readAllowArchiveListingFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_ARCHIVE_LISTING, "DEEPCODEX_ALLOW_ARCHIVE_LISTING");
+}
+
+function resolveAllowArchiveListingPolicy(
+  cliAllowArchiveListing: boolean | undefined,
+  configuredAllowArchiveListing: boolean | undefined
+): boolean {
+  if (cliAllowArchiveListing === true) {
+    return true;
+  }
+  return readAllowArchiveListingFromEnv() ?? configuredAllowArchiveListing ?? false;
 }
 
 function readProviderSelection(config?: WorkspaceConfig) {

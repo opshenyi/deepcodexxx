@@ -278,6 +278,110 @@ describe("workspace tools", () => {
     expect(result.content).toContain("Denied path");
   });
 
+  it("blocks archive listing by default", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "bundle.zip"), createZip([{ name: "src/app.ts", content: "console.log('hi')\n" }]));
+    const workspace = await createWorkspaceContext(tempDir);
+    const archiveTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_archive_entries");
+    expect(archiveTool).toBeDefined();
+
+    const result = await archiveTool!.run({ path: "bundle.zip" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Archive listing is disabled by policy");
+  });
+
+  it("lists ZIP archive entry metadata without returning file contents", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(
+      path.join(tempDir, "bundle.zip"),
+      createZip([
+        { name: "src/", directory: true },
+        { name: "src/app.ts", content: "const privateValue = 'do-not-return';\n" },
+        { name: "README.md", content: "hello\n" }
+      ])
+    );
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowArchiveListing: true
+    });
+    const archiveTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_archive_entries");
+    expect(archiveTool).toBeDefined();
+
+    const result = await archiveTool!.run({ path: "bundle.zip", maxEntries: 10 }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("Archive: bundle.zip");
+    expect(result.content).toContain("Format: ZIP central directory");
+    expect(result.content).toContain("Entries listed: 3");
+    expect(result.content).toContain("- src/ | directory");
+    expect(result.content).toContain("- src/app.ts | file");
+    expect(result.content).toContain("method=store");
+    expect(result.content).toContain("Extraction: not performed.");
+    expect(result.content).not.toContain("do-not-return");
+  });
+
+  it("does not allow archive listing to bypass denied archive paths", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, "secrets"));
+    await writeFile(path.join(tempDir, "secrets", "bundle.zip"), createZip([{ name: "src/app.ts", content: "safe\n" }]));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowArchiveListing: true,
+      deniedPaths: ["secrets"]
+    });
+    const archiveTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_archive_entries");
+    expect(archiveTool).toBeDefined();
+
+    const result = await archiveTool!.run({ path: "secrets/bundle.zip" }, { workspace });
+
+    expect(result.ok).toBe(false);
+    expect(result.content).toContain("Denied path");
+  });
+
+  it("omits archive entries that match denied path policy", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(
+      path.join(tempDir, "bundle.zip"),
+      createZip([
+        { name: ".env", content: "DEEPSEEK_API_KEY=do-not-return\n" },
+        { name: "src/index.ts", content: "export const value = 1;\n" }
+      ])
+    );
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowArchiveListing: true
+    });
+    const archiveTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_archive_entries");
+    expect(archiveTool).toBeDefined();
+
+    const result = await archiveTool!.run({ path: "bundle.zip" }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("Denied entries omitted: 1");
+    expect(result.content).toContain("src/index.ts");
+    expect(result.content).not.toContain(".env");
+    expect(result.content).not.toContain("do-not-return");
+  });
+
+  it("marks unsafe archive entry paths without extracting them", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await writeFile(path.join(tempDir, "bundle.zip"), createZip([{ name: "../escape.txt", content: "escape\n" }]));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowArchiveListing: true
+    });
+    const archiveTool = createDefaultTools().find((tool) => tool.definition.function.name === "list_archive_entries");
+    expect(archiveTool).toBeDefined();
+
+    const result = await archiveTool!.run({ path: "bundle.zip" }, { workspace });
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain("../escape.txt");
+    expect(result.content).toContain("flags=unsafe-path");
+    expect(result.content).toContain("Extraction: not performed.");
+  });
+
   it("rejects writes to common media and artifact extensions", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir);
@@ -466,4 +570,59 @@ describe("workspace tools", () => {
 
 function quoteCommandPath(value: string): string {
   return `"${value.replaceAll('"', '\\"')}"`;
+}
+
+function createZip(entries: Array<{ name: string; content?: string | Buffer; directory?: boolean }>): Buffer {
+  const localChunks: Buffer[] = [];
+  const centralChunks: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = entry.directory && !entry.name.endsWith("/") ? `${entry.name}/` : entry.name;
+    const nameBuffer = Buffer.from(name, "utf8");
+    const contentBuffer =
+      entry.directory === true
+        ? Buffer.alloc(0)
+        : Buffer.isBuffer(entry.content)
+          ? entry.content
+          : Buffer.from(entry.content ?? "", "utf8");
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(contentBuffer.length, 18);
+    localHeader.writeUInt32LE(contentBuffer.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+    localChunks.push(localHeader, nameBuffer, contentBuffer);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x800, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt32LE(0, 16);
+    centralHeader.writeUInt32LE(contentBuffer.length, 20);
+    centralHeader.writeUInt32LE(contentBuffer.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt32LE(entry.directory === true ? 0x10 : 0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralChunks.push(centralHeader, nameBuffer);
+    offset += localHeader.length + nameBuffer.length + contentBuffer.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralChunks);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirectory.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+  return Buffer.concat([...localChunks, centralDirectory, eocd]);
 }

@@ -67,6 +67,9 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Verified CORS allowlisting by launching a temporary built server on port 17461 with `DEEPCODEX_CORS_ORIGINS=http://allowed.test`; allowed origin returned the CORS header, blocked origin did not, both health checks returned 200, and the temporary process was stopped.
 - Added policy-bundle key rotation and revocation foundations. Core verification now accepts multiple trusted public keys, revoked bundle SHA-256 hashes, revoked signing-key SHA-256 hashes, trusted issuer allowlists, and deterministic test clocks. CLI `config verify-bundle --public-key` accepts multiple key files, CLI/server honor `DEEPCODEX_POLICY_BUNDLE_PUBLIC_KEY_FILES`, `DEEPCODEX_REVOKED_POLICY_BUNDLES`, `DEEPCODEX_REVOKED_POLICY_KEYS`, and `DEEPCODEX_POLICY_BUNDLE_TRUSTED_ISSUERS`, and signed-only enforcement uses the same trust policy.
 - Verified policy-bundle rotation/revocation with `npx vitest run packages/core/src/policy-bundle.test.ts` (8 tests), `npm run typecheck`, and final `npm run verify` (13 files / 99 tests).
+- Added default-off policy-controlled ZIP archive manifest listing. New `list_archive_entries` reads only the ZIP end-of-central-directory and a bounded central directory range, reports entry metadata, omits denied-path entries, flags unsafe member paths, and never extracts, decompresses, or returns member contents.
+- Added archive-listing policy plumbing across core/config/CLI/server/Web types. `allowArchiveListing` defaults to false, `.deepcodex/config.json` can set it, CLI/server honor `DEEPCODEX_ALLOW_ARCHIVE_LISTING`, CLI has `--allow-archive-listing`, server requests can pass `allowArchiveListing`, and CLI `doctor` reports archive listing as blocked/allowed.
+- Verified archive listing with `npx vitest run packages/core/src/tools.test.ts packages/core/src/workspace-config.test.ts` (38 tests), `npm run typecheck`, final `npm run verify` (13 files / 104 tests), and CLI `doctor`/`doctor --json` showing default `Archive listing: blocked`.
 
 ## Architecture Decisions
 
@@ -80,7 +83,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 ## Next Steps
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env plus network-command pattern blocking, not a full sandbox.
-2. Add policy-controlled OCR/PDF/archive extraction if richer non-text artifact summaries are needed.
-3. Add richer DLP classification, policy-controlled artifact extraction, OS-level shell isolation, and higher-level policy-bundle administration tooling.
+2. Add policy-controlled OCR/PDF extraction and richer archive analysis if deeper non-text artifact summaries are needed.
+3. Add richer DLP classification, OS-level shell isolation, and higher-level policy-bundle administration tooling.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

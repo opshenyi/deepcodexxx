@@ -42,6 +42,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 | `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
 | `DEEPCODEX_ALLOW_NETWORK` | Optional. | `false` | Blocks common shell network commands by default. Set `true` only for trusted package install, remote git, or network utility tasks. |
+| `DEEPCODEX_ALLOW_ARCHIVE_LISTING` | Optional. | `false` | Enables ZIP-compatible archive entry metadata listing without extraction. Keep disabled unless a trusted workspace needs archive manifests. |
 | `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
 | `DEEPCODEX_PRICING_PROFILES` | Optional. | Empty. | JSON array or object map of caller-managed pricing profiles. Each profile needs `id`, `label`, `inputUsdPerMillionTokens`, and `outputUsdPerMillionTokens`. |
 | `DEEPCODEX_PRICING_PROFILE` | Optional. | Empty/custom. | Default pricing profile id used to fill input/output token prices for cost estimates. |
@@ -55,7 +56,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment mode, shell network access, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, shell environment mode, shell network access, and session retention defaults.
 
 Create a template:
 
@@ -98,6 +99,7 @@ Example:
         "allowNetwork": false,
         "allowStateWrite": true,
         "allowSecretWrites": false,
+        "allowArchiveListing": false,
         "shellEnvironment": "minimal"
       },
       "budget": {
@@ -111,6 +113,7 @@ Example:
   "policy": {
     "allowNetwork": false,
     "allowSecretWrites": false,
+    "allowArchiveListing": false,
     "shellEnvironment": "minimal",
     "maxFileBytes": 524288,
     "deniedPaths": ["secrets"],
@@ -145,6 +148,8 @@ Agent events are redacted for common secret patterns before they are streamed to
 
 Write and edit tools also apply sensitive-text checks before producing diffs or writing files. Probable secrets and workspace `dlpPatterns` matches are blocked by default and reported by finding type without returning raw secret values. Set `policy.allowSecretWrites: true` only in a trusted workspace policy when a fixture or migration intentionally needs secret-like text.
 
+ZIP-compatible archive listing is disabled by default. When `policy.allowArchiveListing: true`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or CLI `--allow-archive-listing` is set, the agent can call `list_archive_entries` to read the ZIP central directory and return bounded entry metadata. It does not extract files, decompress data, return entry contents, return archive comments, or bypass denied workspace paths. Entries matching denied path policy are omitted from the manifest.
+
 ## Verify Configuration
 
 ```powershell
@@ -165,6 +170,7 @@ Expected checks:
 - Signed policy required prints `yes` when `DEEPCODEX_REQUIRE_SIGNED_POLICY=true`.
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
+- Archive listing policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
 
 ## Web Client
@@ -380,6 +386,8 @@ For `run_command`, a zero exit code is required for a successful tool result. No
 
 The `inspect_artifact` tool is available to the agent for media or binary-adjacent files that should not be read as text. It returns metadata such as byte size, detected type, sample hash, and simple image dimensions, while omitting raw bytes, base64 data, OCR, PDF text, and archive contents. It still respects denied path patterns such as `.env` and `.deepcodex/state`.
 
+The `list_archive_entries` tool can list ZIP-compatible archive entry metadata only when archive listing policy is explicitly enabled. It reads the end-of-central-directory record and a bounded central directory range, reports entry names, directory/file status, compressed and uncompressed sizes, compression method, unsafe-path flags, truncation status, and denied-entry counts. It never extracts archive members or returns member content.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check |
@@ -398,7 +406,8 @@ The `inspect_artifact` tool is available to the agent for media or binary-adjace
 | Agent appears paused. | Tool approvals are manual and a tool is waiting for approval. | Approve or deny the pending tool in the Web approval queue, or answer the CLI prompt. |
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
-| A media or artifact file is denied unexpectedly. | The file extension matches the built-in media/artifact deny list or `DEEPCODEX_DENIED_EXTENSIONS`. | Use `inspect_artifact` for metadata-only inspection, or add a future policy-controlled extraction tool for that file type. |
+| A media or artifact file is denied unexpectedly. | The file extension matches the built-in media/artifact deny list or `DEEPCODEX_DENIED_EXTENSIONS`. | Use `inspect_artifact` for metadata-only inspection. For trusted ZIP manifests, enable `allowArchiveListing` and use `list_archive_entries`. |
+| Archive listing is blocked. | `allowArchiveListing` is false. | Use CLI `--allow-archive-listing`, `DEEPCODEX_ALLOW_ARCHIVE_LISTING=true`, or workspace policy `allowArchiveListing: true` only for trusted archive manifests. |
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |

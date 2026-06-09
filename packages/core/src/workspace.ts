@@ -9,6 +9,7 @@ const DEFAULT_POLICY: ApprovalPolicy = {
   allowNetwork: false,
   allowStateWrite: true,
   allowSecretWrites: false,
+  allowArchiveListing: false,
   deniedPaths: [
     ".git",
     "**/.git",

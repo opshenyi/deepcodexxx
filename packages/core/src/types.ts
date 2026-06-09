@@ -156,6 +156,7 @@ export interface ApprovalPolicy {
   allowFileWrite?: boolean;
   allowStateWrite?: boolean;
   allowSecretWrites?: boolean;
+  allowArchiveListing?: boolean;
   deniedPaths?: string[];
   deniedFileExtensions?: string[];
   redactionPatterns?: string[];

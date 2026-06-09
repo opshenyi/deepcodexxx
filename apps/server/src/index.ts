@@ -240,6 +240,7 @@ app.post("/api/agent/run", async (req, res) => {
     pricingProfileId?: string;
     model?: string;
     allowNetwork?: boolean;
+    allowArchiveListing?: boolean;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -263,7 +264,13 @@ app.post("/api/agent/run", async (req, res) => {
     const workspaceConfig = await readWorkspaceConfig(workspacePath);
     await assertSignedPolicyIfRequired(workspacePath);
     const profile = readPolicyProfile(body.profileId, workspaceConfig.config);
-    const policy = createRunPolicy(body.mode, body.allowNetwork, profile, workspaceConfig.config);
+    const policy = createRunPolicy(
+      body.mode,
+      body.allowNetwork,
+      body.allowArchiveListing,
+      profile,
+      workspaceConfig.config
+    );
     const provider = readProviderSelection(body.model, workspaceConfig.config);
     assertProviderAllowed(provider, workspaceConfig.config.provider);
     const workspace = await createWorkspaceContext(workspacePath, policy);
@@ -361,6 +368,7 @@ function readPolicyProfile(profileId?: string, config?: WorkspaceConfig) {
 function createRunPolicy(
   mode: ApprovalMode | undefined,
   allowNetwork: boolean | undefined,
+  allowArchiveListing: boolean | undefined,
   profile: ReturnType<typeof readPolicyProfile>,
   config?: WorkspaceConfig
 ) {
@@ -373,6 +381,7 @@ function createRunPolicy(
     allowShell: selected !== "suggest" && (base.allowShell ?? true),
     allowFileWrite: selected !== "suggest" && (base.allowFileWrite ?? true),
     allowNetwork: selected !== "suggest" && resolveAllowNetworkPolicy(allowNetwork, base.allowNetwork),
+    allowArchiveListing: resolveAllowArchiveListingPolicy(allowArchiveListing, base.allowArchiveListing),
     allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: mergeStringLists(base.deniedPaths, readDeniedPathsFromEnv()),
     deniedFileExtensions: mergeStringLists(base.deniedFileExtensions, readDeniedFileExtensionsFromEnv()),
@@ -449,6 +458,20 @@ function resolveAllowNetworkPolicy(requestAllowNetwork: boolean | undefined, con
     return true;
   }
   return readAllowNetworkFromEnv() ?? configuredAllowNetwork ?? false;
+}
+
+function readAllowArchiveListingFromEnv(): boolean | undefined {
+  return readOptionalBooleanEnv(process.env.DEEPCODEX_ALLOW_ARCHIVE_LISTING, "DEEPCODEX_ALLOW_ARCHIVE_LISTING");
+}
+
+function resolveAllowArchiveListingPolicy(
+  requestAllowArchiveListing: boolean | undefined,
+  configuredAllowArchiveListing: boolean | undefined
+): boolean {
+  if (requestAllowArchiveListing === true) {
+    return true;
+  }
+  return readAllowArchiveListingFromEnv() ?? configuredAllowArchiveListing ?? false;
 }
 
 function createRetentionPolicy(input?: {

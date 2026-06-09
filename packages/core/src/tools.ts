@@ -9,12 +9,20 @@ import type { FileAuditEntry, RuntimeTool, ToolResult, ToolRuntime } from "./typ
 import { isDeniedByPatterns, isDeniedFileExtension, resolveWorkspacePath, workspaceRelative } from "./workspace.js";
 
 const SHELL_MAX_BUFFER_BYTES = 1024 * 1024 * 4;
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
+const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
+const ZIP_EOCD_MIN_BYTES = 22;
+const ZIP_EOCD_MAX_SEARCH_BYTES = ZIP_EOCD_MIN_BYTES + 0xffff;
+const ZIP_MAX_CENTRAL_DIRECTORY_BYTES = 512 * 1024;
+const ZIP_MAX_LISTED_ENTRIES = 200;
+const ZIP_MAX_PARSED_ENTRIES = 1000;
 
 export function createDefaultTools(): RuntimeTool[] {
   return [
     listFilesTool,
     readFileTool,
     inspectArtifactTool,
+    listArchiveEntriesTool,
     writeFileTool,
     editFileTool,
     searchFilesTool,
@@ -136,6 +144,51 @@ const inspectArtifactTool: RuntimeTool = {
     ].filter(Boolean);
 
     return ok(lines.join("\n"));
+  }
+};
+
+const listArchiveEntriesTool: RuntimeTool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "list_archive_entries",
+      description:
+        "Safely list ZIP-compatible archive entries as bounded metadata when policy allows it. Does not extract files, decompress content, or return file contents.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Relative ZIP-compatible archive path." },
+          maxEntries: { type: "number", description: "Maximum listed entries, up to 200.", default: 80 }
+        },
+        required: ["path"]
+      }
+    }
+  },
+  async run(input, runtime) {
+    if (runtime.workspace.policy.allowArchiveListing !== true) {
+      return fail(
+        "Archive listing is disabled by policy. Enable policy.allowArchiveListing only for trusted workspaces that need ZIP entry metadata."
+      );
+    }
+
+    const args = objectInput(input);
+    const target = resolveWorkspacePath(runtime.workspace, stringValue(args.path));
+    const rel = workspaceRelative(runtime.workspace, target);
+    if (isDeniedByPatterns(rel, runtime.workspace.policy.deniedPaths ?? [])) {
+      return fail(`Denied path: ${rel}`);
+    }
+
+    const targetStat = await stat(target);
+    if (!targetStat.isFile()) {
+      return fail(`Archive listing requires a file: ${rel}`);
+    }
+
+    const maxEntries = Math.min(Math.max(Math.floor(numberValue(args.maxEntries, 80)), 1), ZIP_MAX_LISTED_ENTRIES);
+    const manifest = await readZipManifest(target, rel, targetStat.size, maxEntries, runtime);
+    if (!manifest.ok) {
+      return fail(manifest.content);
+    }
+    return ok(formatZipManifest(manifest.manifest));
   }
 };
 
@@ -662,16 +715,297 @@ async function readUtf8TextFile(target: string): Promise<string | undefined> {
 }
 
 async function readFileSample(target: string, bytes: number): Promise<Buffer> {
+  return readFileRange(target, 0, bytes);
+}
+
+async function readFileRange(target: string, offset: number, bytes: number): Promise<Buffer> {
   if (bytes <= 0) {
     return Buffer.alloc(0);
   }
   const handle = await open(target, "r");
   try {
     const buffer = Buffer.alloc(bytes);
-    const result = await handle.read(buffer, 0, bytes, 0);
+    const result = await handle.read(buffer, 0, bytes, offset);
     return buffer.subarray(0, result.bytesRead);
   } finally {
     await handle.close();
+  }
+}
+
+interface ZipEndOfCentralDirectory {
+  entriesTotal: number;
+  centralDirectorySize: number;
+  centralDirectoryOffset: number;
+  eocdOffset: number;
+}
+
+interface ZipEntryMetadata {
+  name: string;
+  directory: boolean;
+  compressedSize: number | "zip64";
+  uncompressedSize: number | "zip64";
+  compressionMethod: number;
+  encrypted: boolean;
+  unsafePath: boolean;
+}
+
+interface ZipManifest {
+  archivePath: string;
+  bytes: number;
+  extension: string;
+  entriesDeclared: number;
+  entriesParsed: number;
+  entriesListed: ZipEntryMetadata[];
+  visibleEntriesOmitted: number;
+  deniedEntriesOmitted: number;
+  centralDirectoryBytesRead: number;
+  centralDirectoryBytesDeclared: number;
+  truncated: boolean;
+}
+
+async function readZipManifest(
+  target: string,
+  relativePath: string,
+  fileSize: number,
+  maxEntries: number,
+  runtime: ToolRuntime
+): Promise<{ ok: true; manifest: ZipManifest } | { ok: false; content: string }> {
+  const tailBytes = Math.min(fileSize, ZIP_EOCD_MAX_SEARCH_BYTES);
+  const tail = await readFileRange(target, Math.max(0, fileSize - tailBytes), tailBytes);
+  const eocd = findZipEndOfCentralDirectory(tail, fileSize);
+  if (!eocd.ok) {
+    return { ok: false, content: eocd.content };
+  }
+  if (eocd.eocd.centralDirectoryOffset + eocd.eocd.centralDirectorySize > eocd.eocd.eocdOffset) {
+    return { ok: false, content: `Invalid ZIP central directory bounds: ${relativePath}` };
+  }
+
+  const centralDirectoryBytesRead = Math.min(eocd.eocd.centralDirectorySize, ZIP_MAX_CENTRAL_DIRECTORY_BYTES);
+  const centralDirectory = await readFileRange(
+    target,
+    eocd.eocd.centralDirectoryOffset,
+    centralDirectoryBytesRead
+  );
+  const parsed = parseZipCentralDirectory(
+    centralDirectory,
+    eocd.eocd.entriesTotal,
+    maxEntries,
+    runtime.workspace.policy.deniedPaths ?? []
+  );
+
+  return {
+    ok: true,
+    manifest: {
+      archivePath: relativePath,
+      bytes: fileSize,
+      extension: path.extname(relativePath).toLowerCase() || "(none)",
+      entriesDeclared: eocd.eocd.entriesTotal,
+      entriesParsed: parsed.entriesParsed,
+      entriesListed: parsed.entriesListed,
+      visibleEntriesOmitted: parsed.visibleEntriesOmitted,
+      deniedEntriesOmitted: parsed.deniedEntriesOmitted,
+      centralDirectoryBytesRead,
+      centralDirectoryBytesDeclared: eocd.eocd.centralDirectorySize,
+      truncated:
+        centralDirectoryBytesRead < eocd.eocd.centralDirectorySize ||
+        parsed.entriesParsed < eocd.eocd.entriesTotal ||
+        parsed.visibleEntriesOmitted > 0
+    }
+  };
+}
+
+function findZipEndOfCentralDirectory(
+  buffer: Buffer,
+  fileSize: number
+): { ok: true; eocd: ZipEndOfCentralDirectory } | { ok: false; content: string } {
+  for (let offset = buffer.length - ZIP_EOCD_MIN_BYTES; offset >= 0; offset -= 1) {
+    if (buffer.readUInt32LE(offset) !== ZIP_EOCD_SIGNATURE) {
+      continue;
+    }
+    const commentLength = buffer.readUInt16LE(offset + 20);
+    if (offset + ZIP_EOCD_MIN_BYTES + commentLength !== buffer.length) {
+      continue;
+    }
+
+    const diskNumber = buffer.readUInt16LE(offset + 4);
+    const centralDirectoryDisk = buffer.readUInt16LE(offset + 6);
+    const entriesOnDisk = buffer.readUInt16LE(offset + 8);
+    const entriesTotal = buffer.readUInt16LE(offset + 10);
+    const centralDirectorySize = buffer.readUInt32LE(offset + 12);
+    const centralDirectoryOffset = buffer.readUInt32LE(offset + 16);
+    if (diskNumber !== 0 || centralDirectoryDisk !== 0 || entriesOnDisk !== entriesTotal) {
+      return { ok: false, content: "Multi-disk ZIP archives are not supported by the safe archive manifest reader." };
+    }
+    if (entriesTotal === 0xffff || centralDirectorySize === 0xffffffff || centralDirectoryOffset === 0xffffffff) {
+      return { ok: false, content: "ZIP64 archives are not supported by the safe archive manifest reader." };
+    }
+
+    return {
+      ok: true,
+      eocd: {
+        entriesTotal,
+        centralDirectorySize,
+        centralDirectoryOffset,
+        eocdOffset: fileSize - buffer.length + offset
+      }
+    };
+  }
+  return { ok: false, content: "ZIP end-of-central-directory record was not found." };
+}
+
+function parseZipCentralDirectory(
+  buffer: Buffer,
+  declaredEntries: number,
+  maxEntries: number,
+  deniedPaths: string[]
+): {
+  entriesParsed: number;
+  entriesListed: ZipEntryMetadata[];
+  visibleEntriesOmitted: number;
+  deniedEntriesOmitted: number;
+} {
+  let offset = 0;
+  let entriesParsed = 0;
+  let visibleEntries = 0;
+  let deniedEntriesOmitted = 0;
+  const entriesListed: ZipEntryMetadata[] = [];
+  const maxParsedEntries = Math.min(declaredEntries, ZIP_MAX_PARSED_ENTRIES);
+
+  while (offset + 46 <= buffer.length && entriesParsed < maxParsedEntries) {
+    if (buffer.readUInt32LE(offset) !== ZIP_CENTRAL_DIRECTORY_SIGNATURE) {
+      break;
+    }
+    const flags = buffer.readUInt16LE(offset + 8);
+    const compressionMethod = buffer.readUInt16LE(offset + 10);
+    const compressedSizeRaw = buffer.readUInt32LE(offset + 20);
+    const uncompressedSizeRaw = buffer.readUInt32LE(offset + 24);
+    const fileNameLength = buffer.readUInt16LE(offset + 28);
+    const extraFieldLength = buffer.readUInt16LE(offset + 30);
+    const fileCommentLength = buffer.readUInt16LE(offset + 32);
+    const externalAttributes = buffer.readUInt32LE(offset + 38);
+    const entryEnd = offset + 46 + fileNameLength + extraFieldLength + fileCommentLength;
+    if (entryEnd > buffer.length) {
+      break;
+    }
+
+    const nameBuffer = buffer.subarray(offset + 46, offset + 46 + fileNameLength);
+    const rawName = decodeZipEntryName(nameBuffer, flags);
+    const policyPath = archiveEntryPathForPolicy(rawName);
+    if (policyPath && isDeniedByPatterns(policyPath, deniedPaths)) {
+      deniedEntriesOmitted += 1;
+    } else {
+      visibleEntries += 1;
+      if (entriesListed.length < maxEntries) {
+        const displayName = sanitizeArchiveEntryName(rawName);
+        entriesListed.push({
+          name: displayName,
+          directory: rawName.endsWith("/") || (externalAttributes & 0x10) !== 0,
+          compressedSize: compressedSizeRaw === 0xffffffff ? "zip64" : compressedSizeRaw,
+          uncompressedSize: uncompressedSizeRaw === 0xffffffff ? "zip64" : uncompressedSizeRaw,
+          compressionMethod,
+          encrypted: (flags & 0x1) !== 0,
+          unsafePath: isUnsafeArchivePath(rawName)
+        });
+      }
+    }
+
+    entriesParsed += 1;
+    offset = entryEnd;
+  }
+
+  return {
+    entriesParsed,
+    entriesListed,
+    visibleEntriesOmitted: Math.max(0, visibleEntries - entriesListed.length),
+    deniedEntriesOmitted
+  };
+}
+
+function decodeZipEntryName(buffer: Buffer, flags: number): string {
+  return (flags & 0x800) !== 0 ? buffer.toString("utf8") : buffer.toString("latin1");
+}
+
+function archiveEntryPathForPolicy(value: string): string {
+  return value.replaceAll("\\", "/").replace(/^[A-Za-z]:/, "").replace(/^\/+/, "");
+}
+
+function sanitizeArchiveEntryName(value: string): string {
+  const printable = value.replaceAll("\\", "/").replace(/[\u0000-\u001f\u007f]/g, "?");
+  if (!printable) {
+    return "(empty name)";
+  }
+  return printable.length > 180 ? `${printable.slice(0, 177)}...` : printable;
+}
+
+function isUnsafeArchivePath(value: string): boolean {
+  const normalized = value.replaceAll("\\", "/");
+  return (
+    normalized.includes("\0") ||
+    normalized.startsWith("/") ||
+    /^[A-Za-z]:/.test(normalized) ||
+    normalized.split("/").some((part) => part === "..")
+  );
+}
+
+function formatZipManifest(manifest: ZipManifest): string {
+  const lines = [
+    `Archive: ${manifest.archivePath}`,
+    `Bytes: ${manifest.bytes}`,
+    `Extension: ${manifest.extension}`,
+    `Format: ZIP central directory`,
+    `Entries declared: ${manifest.entriesDeclared}`,
+    `Entries parsed: ${manifest.entriesParsed}`,
+    `Entries listed: ${manifest.entriesListed.length}`,
+    `Denied entries omitted: ${manifest.deniedEntriesOmitted}`,
+    `Visible entries omitted: ${manifest.visibleEntriesOmitted}`,
+    `Central directory bytes read: ${manifest.centralDirectoryBytesRead}`,
+    `Central directory bytes declared: ${manifest.centralDirectoryBytesDeclared}`,
+    `Truncated: ${manifest.truncated ? "yes" : "no"}`,
+    "Raw content: not returned by policy.",
+    "Extraction: not performed."
+  ];
+
+  if (manifest.entriesListed.length === 0) {
+    return [...lines, "", "Entries: none listed."].join("\n");
+  }
+
+  return [
+    ...lines,
+    "",
+    "Entries:",
+    ...manifest.entriesListed.map((entry) => {
+      const flags = [
+        entry.encrypted ? "encrypted" : "",
+        entry.unsafePath ? "unsafe-path" : ""
+      ].filter(Boolean);
+      const suffix = flags.length > 0 ? ` | flags=${flags.join(",")}` : "";
+      return `- ${entry.name} | ${entry.directory ? "directory" : "file"} | compressed=${formatZipSize(
+        entry.compressedSize
+      )} | uncompressed=${formatZipSize(entry.uncompressedSize)} | method=${zipCompressionMethodLabel(
+        entry.compressionMethod
+      )}${suffix}`;
+    })
+  ].join("\n");
+}
+
+function formatZipSize(value: number | "zip64"): string {
+  return value === "zip64" ? "zip64" : String(value);
+}
+
+function zipCompressionMethodLabel(method: number): string {
+  switch (method) {
+    case 0:
+      return "store";
+    case 8:
+      return "deflate";
+    case 12:
+      return "bzip2";
+    case 14:
+      return "lzma";
+    case 93:
+      return "zstd";
+    default:
+      return `method-${method}`;
   }
 }
 

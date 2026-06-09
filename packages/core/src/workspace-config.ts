@@ -118,6 +118,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
           allowNetwork: false,
           allowStateWrite: true,
           allowSecretWrites: false,
+          allowArchiveListing: false,
           shellEnvironment: "minimal"
         },
         budget: {
@@ -130,6 +131,7 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     },
     policy: {
       allowSecretWrites: false,
+      allowArchiveListing: false,
       shellEnvironment: "minimal",
       maxFileBytes: 512 * 1024,
       deniedPaths: ["secrets"],
@@ -241,6 +243,7 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     allowFileWrite: readOptionalBoolean(entry.allowFileWrite, "policy.allowFileWrite"),
     allowStateWrite: readOptionalBoolean(entry.allowStateWrite, "policy.allowStateWrite"),
     allowSecretWrites: readOptionalBoolean(entry.allowSecretWrites, "policy.allowSecretWrites"),
+    allowArchiveListing: readOptionalBoolean(entry.allowArchiveListing, "policy.allowArchiveListing"),
     deniedPaths: readOptionalStringArray(entry.deniedPaths, "policy.deniedPaths"),
     deniedFileExtensions: readOptionalStringArray(entry.deniedFileExtensions, "policy.deniedFileExtensions"),
     redactionPatterns: readOptionalRegexArray(entry.redactionPatterns, "policy.redactionPatterns"),

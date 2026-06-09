@@ -55,6 +55,7 @@ describe("workspace config", () => {
               allowShell: false,
               allowFileWrite: true,
               allowSecretWrites: false,
+              allowArchiveListing: false,
               shellEnvironment: "minimal"
             },
             budget: {
@@ -70,6 +71,7 @@ describe("workspace config", () => {
           mode: "suggest",
           allowShell: false,
           allowSecretWrites: false,
+          allowArchiveListing: false,
           deniedPaths: ["secrets"],
           deniedFileExtensions: ["sqlite"],
           redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
@@ -106,6 +108,7 @@ describe("workspace config", () => {
             allowShell: false,
             allowFileWrite: true,
             allowSecretWrites: false,
+            allowArchiveListing: false,
             shellEnvironment: "minimal"
           },
           budget: {
@@ -121,6 +124,7 @@ describe("workspace config", () => {
         mode: "suggest",
         allowShell: false,
         allowSecretWrites: false,
+        allowArchiveListing: false,
         deniedPaths: ["secrets"],
         deniedFileExtensions: ["sqlite"],
         redactionPatterns: ["ACME_[A-Z0-9]{16,}"],

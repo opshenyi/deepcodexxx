@@ -34,6 +34,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Common shell network commands are blocked unless network access is explicitly enabled.
 - Shell command failures, timeouts, signals, and output overflows are reported as failed tool results so verification failures remain visible to the agent and user.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.
+- ZIP archive entry listing is blocked unless `allowArchiveListing` is explicitly enabled, and even then returns only bounded central-directory metadata without extraction.
 - Missing API keys trigger demo mode instead of crashing the product.
 
 ## DeepSeek Integration

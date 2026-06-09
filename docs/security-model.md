@@ -47,6 +47,7 @@ Implemented controls:
 - Common media, archive, Office/PDF, executable, library, and WebAssembly extensions are denied by default for file listing, reading, writing, editing, and search. `DEEPCODEX_DENIED_EXTENSIONS` can extend the default list.
 - `.deepcodex/config.json` can also extend denied file extensions for a specific workspace.
 - The `inspect_artifact` tool can inspect a workspace file's metadata without returning raw bytes, text extraction, or base64 content. It respects denied paths, reads only a bounded sample, reports type hints, sample SHA-256, byte size, and simple image dimensions when available.
+- The `list_archive_entries` tool can list ZIP-compatible archive manifests only when `allowArchiveListing` is explicitly enabled by policy, environment, CLI flag, or server request. It reads bounded central-directory metadata, omits entries matching denied path policy, marks unsafe member paths, and never extracts or returns member contents.
 - File read, write, edit, and search tools enforce a configurable file-size limit through `DEEPCODEX_MAX_FILE_BYTES`; the default is 512 KiB.
 - File read and edit tools reject files that appear to be binary; search skips binary-looking files.
 - File write and edit tools block probable secret content by default before producing diffs or writing. The detector covers common secret assignments, bearer tokens, token literals, and workspace custom DLP patterns, and reports finding labels without raw secret values.
@@ -61,7 +62,7 @@ Current limitations:
 - The shell tool is not constrained by the same path resolver after a command starts.
 - A shell command can invoke external programs with the user's local permissions.
 - The denial list is intentionally small and should become configurable for real pilots.
-- Artifact inspection is metadata-only; it does not perform OCR, PDF text extraction, archive listing, or malware scanning.
+- Artifact inspection and archive listing are metadata-only; they do not perform OCR, PDF text extraction, archive extraction, or malware scanning.
 
 ## Shell Controls
 
@@ -135,7 +136,7 @@ Current limitations:
 
 The next security work should prioritize:
 
-- Richer generated-asset handling, OCR/PDF/archive extraction policy, and file-type policies.
+- Richer generated-asset handling, OCR/PDF extraction policy, archive malware scanning, and file-type policies.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Policy bundle creation/distribution UI and audit workflows.
 - Isolated shell execution with filesystem and network controls.

@@ -35,6 +35,7 @@ Expected result:
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
 - CLI `doctor` reports shell network access, defaulting to `blocked`.
+- CLI `doctor` reports archive listing, defaulting to `blocked`.
 - CLI `doctor` reports a workspace config SHA-256 when a config file exists.
 - CLI `doctor` reports policy bundle status.
 - CLI `doctor` reports whether signed policy is required.
@@ -75,6 +76,7 @@ Checklist:
 - Workspace-specific DLP patterns from `.deepcodex/config.json` block configured matches before write/edit diffs or file changes.
 - Write/edit tools block probable secret content before showing a diff or applying a file change.
 - Artifact inspection returns metadata only and does not expose raw bytes, base64 content, or denied paths.
+- Archive listing remains blocked by default; when enabled for a trusted ZIP fixture, entry manifests omit denied entries and do not expose member contents.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
 - A deliberately failing verification command appears as a failed tool result, not a successful tool event with stderr text.
 - `Load memory` returns either existing memory or the empty-memory state.
@@ -130,6 +132,7 @@ Checklist:
 - `--mode suggest` does not allow shell or file write/edit tools.
 - Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.
 - Network-capable shell demos use `--allow-network` only after the command has been reviewed.
+- Archive manifest demos use `--allow-archive-listing` only for trusted ZIP-compatible fixtures.
 
 ## Write-Mode Demo Verification
 
