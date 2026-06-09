@@ -46,6 +46,7 @@ describe("workspace config", () => {
           allowShell: false,
           deniedPaths: ["secrets"],
           deniedFileExtensions: ["sqlite"],
+          redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
           maxFileBytes: 2048,
           shellEnvironment: "minimal"
         },
@@ -69,6 +70,7 @@ describe("workspace config", () => {
         allowShell: false,
         deniedPaths: ["secrets"],
         deniedFileExtensions: ["sqlite"],
+        redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
         maxFileBytes: 2048,
         shellEnvironment: "minimal"
       },
@@ -83,6 +85,18 @@ describe("workspace config", () => {
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/Invalid DeepCodex workspace config/);
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/approvalMode/);
+  });
+
+  it("rejects invalid custom redaction patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ policy: { redactionPatterns: ["["] } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/redactionPatterns/);
   });
 
   it("writes a template without overwriting an existing config", async () => {

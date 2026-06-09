@@ -102,6 +102,7 @@ export async function createWorkspaceContext(
       ...(DEFAULT_POLICY.deniedFileExtensions ?? []),
       ...(policy.deniedFileExtensions ?? [])
     ]),
+    redactionPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.redactionPatterns ?? []), ...(policy.redactionPatterns ?? [])]),
     maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
     shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment
   };

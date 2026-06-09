@@ -28,4 +28,21 @@ describe("redaction", () => {
       }
     });
   });
+
+  it("applies caller-provided redaction patterns", () => {
+    expect(redactSensitiveText("ticket ACME_ABCDEFGHIJKLMNOP should hide", {
+      additionalPatterns: ["ACME_[A-Z]{16}"]
+    })).toBe("ticket [redacted-custom] should hide");
+
+    expect(
+      redactSensitiveValue(
+        {
+          command: "echo ACME_ABCDEFGHIJKLMNOP"
+        },
+        { additionalPatterns: ["ACME_[A-Z]{16}"] }
+      )
+    ).toEqual({
+      command: "echo [redacted-custom]"
+    });
+  });
 });

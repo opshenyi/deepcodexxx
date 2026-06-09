@@ -36,7 +36,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-to
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
-Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model, policy profile, approval mode, max steps, budget, file policy additions, pricing profile, and session retention defaults:
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model, policy profile, approval mode, max steps, budget, file policy additions, custom redaction patterns, pricing profile, and session retention defaults:
 
 ```powershell
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex

@@ -90,7 +90,8 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
       shellEnvironment: "minimal",
       maxFileBytes: 512 * 1024,
       deniedPaths: ["secrets"],
-      deniedFileExtensions: [".pem", ".sqlite"]
+      deniedFileExtensions: [".pem", ".sqlite"],
+      redactionPatterns: ["ACME_[A-Z0-9]{16,}"]
     },
     retention: {
       maxSessions: 100,
@@ -140,6 +141,7 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     allowStateWrite: readOptionalBoolean(entry.allowStateWrite, "policy.allowStateWrite"),
     deniedPaths: readOptionalStringArray(entry.deniedPaths, "policy.deniedPaths"),
     deniedFileExtensions: readOptionalStringArray(entry.deniedFileExtensions, "policy.deniedFileExtensions"),
+    redactionPatterns: readOptionalRegexArray(entry.redactionPatterns, "policy.redactionPatterns"),
     maxFileBytes: readOptionalNumber(entry.maxFileBytes, "policy.maxFileBytes"),
     shellEnvironment: readOptionalShellEnvironment(entry.shellEnvironment)
   });
@@ -201,6 +203,22 @@ function readOptionalStringArray(value: unknown, field: string): string[] | unde
     throw new Error(`${field} must be an array of non-empty strings.`);
   }
   return value.map((entry) => entry.trim());
+}
+
+function readOptionalRegexArray(value: unknown, field: string): string[] | undefined {
+  const patterns = readOptionalStringArray(value, field);
+  if (!patterns) {
+    return undefined;
+  }
+  for (const pattern of patterns) {
+    try {
+      new RegExp(pattern, "g");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${field} contains an invalid regular expression: ${message}`);
+    }
+  }
+  return patterns;
 }
 
 function readOptionalBoolean(value: unknown, field: string): boolean | undefined {

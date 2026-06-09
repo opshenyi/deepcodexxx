@@ -94,4 +94,14 @@ describe("workspace boundaries", () => {
 
     expect(workspace.policy.maxFileBytes).toBe(2048);
   });
+
+  it("supports workspace redaction patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      redactionPatterns: ["ACME_[A-Z]{16}"]
+    });
+
+    expect(workspace.policy.redactionPatterns).toContain("ACME_[A-Z]{16}");
+  });
 });

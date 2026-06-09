@@ -43,7 +43,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, shell environment mode, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, and session retention defaults.
 
 Create a template:
 
@@ -74,7 +74,8 @@ Example:
     "shellEnvironment": "minimal",
     "maxFileBytes": 524288,
     "deniedPaths": ["secrets"],
-    "deniedFileExtensions": [".pem", ".sqlite"]
+    "deniedFileExtensions": [".pem", ".sqlite"],
+    "redactionPatterns": ["ACME_[A-Z0-9]{16,}"]
   },
   "retention": {
     "maxSessions": 100,
@@ -83,13 +84,13 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
-Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals.
+Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
 ## Verify Configuration
 
@@ -293,6 +294,6 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Pricing profile is rejected. | `DEEPCODEX_PRICING_PROFILE` or `--pricing-profile` does not match a configured profile id. | Run `deepcodex pricing list` and choose one of the configured ids. |
-| Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON or unsupported values. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
+| Workspace config is rejected. | `.deepcodex/config.json` has invalid JSON, unsupported values, or an invalid redaction regex. | Run `deepcodex config show --workspace <path>` and fix the reported field. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |
 | Session history grows too large. | Retention variables are not set and pruning has not been run. | Use Web Audit retention controls or `deepcodex sessions prune --dry-run` before applying deletion. |

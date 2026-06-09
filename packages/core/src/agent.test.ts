@@ -193,6 +193,33 @@ describe("agent approval risk", () => {
     );
   });
 
+  it("applies workspace redaction patterns to agent events and final text", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const events: AgentEvent[] = [];
+
+    const result = await runDeepCodexAgent({
+      prompt: "show a project secret",
+      workspace: tempDir,
+      policy: {
+        mode: "workspace-write",
+        redactionPatterns: ["ACME_[A-Z]{16}"]
+      },
+      chatClient: customSecretFinalClient(),
+      onEvent: (event) => {
+        events.push(event);
+      }
+    });
+
+    expect(result.finalText).toContain("[redacted-custom]");
+    expect(result.finalText).not.toContain("ACME_ABCDEFGHIJKLMNOP");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "assistant_message",
+        content: "Project token [redacted-custom]"
+      })
+    );
+  });
+
   it("stops before tool execution when the session token budget is reached", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const events: AgentEvent[] = [];
@@ -298,6 +325,26 @@ function secretFinalClient(): AgentChatClient {
             message: {
               role: "assistant",
               content: "Do not leak DEEPSEEK_API_KEY=live-secret"
+            }
+          }
+        ]
+      };
+    }
+  };
+}
+
+function customSecretFinalClient(): AgentChatClient {
+  return {
+    model: "test-model",
+    async chat(): Promise<DeepSeekChatResponse> {
+      return {
+        id: "test-custom-secret-final",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Project token ACME_ABCDEFGHIJKLMNOP"
             }
           }
         ]

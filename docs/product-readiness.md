@@ -8,7 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
-- Workspace-level `.deepcodex/config.json` defaults for model, policy profile, approval mode, max steps, budget, pricing profile, file policy additions, shell environment, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction patterns, shell environment, and retention.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs.
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
@@ -16,6 +16,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
 - Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Event redaction for common secret assignments, bearer headers, and token literals before streaming/persistence.
+- Workspace-specific custom redaction regex patterns for project identifiers or secret formats not covered by built-ins.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
@@ -57,7 +58,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 ## Next Commercial Milestones
 
 - Add custom team policy profile storage.
-- Add project-specific DLP policies and purpose-built media/artifact preview tools.
+- Add richer DLP classification and purpose-built media/artifact preview tools.
 - Add richer generated-asset handling and file-type policies.
 - Add packaged desktop installers and signed releases.
 - Add benchmark tasks and regression evals inspired by the reference repos.

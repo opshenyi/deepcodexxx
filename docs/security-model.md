@@ -104,10 +104,11 @@ Implemented controls:
 - Agent events redact common secret assignments such as `*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, and `*_PRIVATE_KEY`.
 - Bearer authorization headers and common token literals are redacted before events are streamed to clients or recorded in session history.
 - Tool output sent back into the model loop is redacted, reducing the chance that a later assistant message repeats a secret.
+- `.deepcodex/config.json` can add workspace-specific regex redaction patterns through `policy.redactionPatterns`; matches are replaced with `[redacted-custom]` before streaming, persistence, and model-loop reuse.
 
 Current limitations:
 
-- Redaction is pattern-based and should be expanded with project-specific DLP policies before team or hosted use.
+- Redaction is pattern-based and should be expanded with richer DLP classification before team or hosted use.
 - Existing session files created before this control was added are not rewritten retroactively.
 
 ## Data Handling

@@ -10,7 +10,7 @@ import {
 import { DeepSeekClient } from "./deepseek.js";
 import { createApprovalFileAudits } from "./file-audit.js";
 import { readWorkspaceMemory } from "./memory.js";
-import { redactSensitiveText, redactSensitiveValue } from "./redaction.js";
+import { redactSensitiveText, redactSensitiveValue, type RedactionOptions } from "./redaction.js";
 import { createDefaultTools } from "./tools.js";
 import type { AgentEvent, AgentRunOptions, AgentRunResult, ChatMessage, RuntimeTool, ToolApprovalRisk } from "./types.js";
 import { createWorkspaceContext } from "./workspace.js";
@@ -31,13 +31,14 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   const sessionId = options.sessionId ?? randomUUID();
   const workspace = await createWorkspaceContext(options.workspace, options.policy);
   const client = options.chatClient ?? new DeepSeekClient({ model: options.model });
+  const redactionOptions: RedactionOptions = { additionalPatterns: workspace.policy.redactionPatterns };
   const budgetPolicy = normalizeBudgetPolicy(options.budget);
   const budgetEnabled = isBudgetPolicyEnabled(budgetPolicy);
   let budgetSnapshot = createInitialBudgetSnapshot(budgetPolicy);
   const tools = createDefaultTools();
   const events: AgentEvent[] = [];
   const emit = async (event: AgentEvent) => {
-    const redactedEvent = redactAgentEvent(event);
+    const redactedEvent = redactAgentEvent(event, redactionOptions);
     events.push(redactedEvent);
     await options.onEvent?.(redactedEvent);
   };
@@ -98,7 +99,7 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
 
     messages.push(assistant);
     const toolCalls = assistant.tool_calls ?? [];
-    const text = redactSensitiveText(assistant.content ?? "");
+    const text = redactSensitiveText(assistant.content ?? "", redactionOptions);
     messages[messages.length - 1] = { ...assistant, content: text };
 
     if (text.trim()) {
@@ -149,7 +150,7 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
           const approvalRequest = {
             approvalId,
             name: call.function.name,
-            input: redactSensitiveValue(input),
+            input: redactSensitiveValue(input, redactionOptions),
             risk,
             reason,
             requestedAt,
@@ -188,7 +189,7 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
       const result = tool
         ? await tool.run(input, { workspace })
         : { ok: false, content: `Unknown tool: ${call.function.name}` };
-      const safeToolContent = redactSensitiveText(result.content);
+      const safeToolContent = redactSensitiveText(result.content, redactionOptions);
       await emit({
         type: "tool_finished",
         name: call.function.name,
@@ -209,21 +210,25 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   return { sessionId, finalText: content, events };
 }
 
-function redactAgentEvent(event: AgentEvent): AgentEvent {
+function redactAgentEvent(event: AgentEvent, options: RedactionOptions): AgentEvent {
   switch (event.type) {
     case "assistant_message":
     case "final":
-      return { ...event, content: redactSensitiveText(event.content) };
+      return { ...event, content: redactSensitiveText(event.content, options) };
     case "tool_approval_requested":
-      return { ...event, input: redactSensitiveValue(event.input), reason: redactSensitiveText(event.reason) };
+      return {
+        ...event,
+        input: redactSensitiveValue(event.input, options),
+        reason: redactSensitiveText(event.reason, options)
+      };
     case "tool_approval_resolved":
-      return { ...event, reason: event.reason ? redactSensitiveText(event.reason) : event.reason };
+      return { ...event, reason: event.reason ? redactSensitiveText(event.reason, options) : event.reason };
     case "tool_started":
-      return { ...event, input: redactSensitiveValue(event.input) };
+      return { ...event, input: redactSensitiveValue(event.input, options) };
     case "tool_finished":
-      return { ...event, output: redactSensitiveText(event.output) };
+      return { ...event, output: redactSensitiveText(event.output, options) };
     case "error":
-      return { ...event, message: redactSensitiveText(event.message) };
+      return { ...event, message: redactSensitiveText(event.message, options) };
     default:
       return event;
   }
