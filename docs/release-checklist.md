@@ -19,6 +19,7 @@ npm run typecheck
 npm test
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
@@ -28,6 +29,7 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
+- CLI `doctor --json` emits parseable diagnostics.
 - CLI `doctor` reports provider retry settings.
 - CLI `doctor` reports provider allowlist counts when workspace policy defines them.
 - CLI `doctor` reports configured budget environment values when present.
@@ -110,6 +112,7 @@ node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and list the main product surfaces."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "Inspect this repository and list the main product surfaces."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-tokens 20000 "Inspect this repository with a token budget."
 ```
 
@@ -120,6 +123,7 @@ Checklist:
 - CLI can list workspace-defined team policy profiles through `profiles list --workspace`.
 - `memory` reads workspace memory without crashing.
 - `ask` prints session, step, tool, and final output events.
+- `ask --json` emits newline-delimited JSON records that can be parsed by automation.
 - Budgeted `ask` prints budget status when the provider returns usage metadata.
 - `--mode suggest` does not allow shell or file write/edit tools.
 - Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.

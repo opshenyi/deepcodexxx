@@ -61,6 +61,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Verified shell failure handling with `npx vitest run packages/core/src/tools.test.ts` (25 tests), `npm run typecheck`, and final `npm run verify` (13 files / 95 tests).
 - Added runtime-configurable Web server URL. `VITE_DEEPCODEX_SERVER_URL` sets the build/default API base, the Web sidebar exposes a Server field, values are normalized and saved to `localStorage`, and the setting is shared by agent runs, memory, config, sessions, exports, retention, approvals, profiles, and pricing calls.
 - Verified the Web server URL control with `npm run build -w @deepcodex/web`, `npm run typecheck`, and an in-app browser smoke: Server input rendered, Save server normalized/saved `http://127.0.0.1:17361`, status stayed `Default`, and console errors were zero.
+- Added CLI machine-readable output for automation: `deepcodex ask --json` emits newline-delimited JSON event records plus a final result record, and `deepcodex doctor --json` emits a structured diagnostics object. Prompt/manual approvals are rejected in `ask --json` to keep stdout machine-readable.
+- Verified CLI JSON output with `npm run build -w @deepcodex/cli`, `node apps/cli/dist/index.js doctor --json | ConvertFrom-Json`, and `node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "..."` parsed line-by-line as JSON.
 
 ## Architecture Decisions
 

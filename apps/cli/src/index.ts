@@ -66,6 +66,7 @@ program
   .option("--pricing-profile <profile>", "Pricing profile id from DEEPCODEX_PRICING_PROFILES")
   .option("--shell-env <mode>", "minimal or inherit")
   .option("--allow-network", "Allow shell commands that perform network access", false)
+  .option("--json", "Print newline-delimited JSON events", false)
   .action(
     async (
       promptParts: string[],
@@ -82,6 +83,7 @@ program
         pricingProfile?: string;
         shellEnv?: string;
         allowNetwork?: boolean;
+        json?: boolean;
       }
     ) => {
       const workspaceConfig = await readWorkspaceConfig(options.workspace);
@@ -92,12 +94,15 @@ program
       const approvalMode = parseCliApprovalMode(
         options.approval ?? workspaceConfig.config.approvalMode ?? profile?.approvalMode ?? "auto"
       );
+      if (options.json && approvalMode === "prompt") {
+        throw new Error("ask --json cannot use prompt/manual approval mode.");
+      }
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
         const policy = createPolicy(options.mode, options.shellEnv, options.allowNetwork, profile, workspaceConfig.config);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
-        await runDeepCodexAgent({
+        const result = await runDeepCodexAgent({
           prompt: promptParts.join(" "),
           workspace: workspace.root,
           baseUrl: provider.baseUrl,
@@ -106,8 +111,11 @@ program
           policy,
           budget: createBudgetPolicy(options, profile?.budget, options.pricingProfile, workspaceConfig.config),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
-          onEvent: createCliEventHandler(recorder)
+          onEvent: options.json ? createCliJsonEventHandler(recorder) : createCliEventHandler(recorder)
         });
+        if (options.json) {
+          console.log(JSON.stringify({ type: "result", sessionId: result.sessionId, finalText: result.finalText }));
+        }
       } finally {
         rl?.close();
       }
@@ -382,40 +390,72 @@ sessions
 program
   .command("doctor")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
-  .action(async (options: { workspace: string }) => {
+  .option("--json", "Print JSON output", false)
+  .action(async (options: { workspace: string; json: boolean }) => {
     const workspaceConfig = await readWorkspaceConfig(options.workspace);
     const profile = resolveCliProfile(undefined, workspaceConfig.config);
     const basePolicy: Partial<ApprovalPolicy> = { ...profile?.policy, ...(workspaceConfig.config.policy ?? {}) };
     const provider = readProviderSelection(workspaceConfig.config);
     const policyBundleStatus = await readPolicyBundleStatus(options.workspace);
-    console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
-    console.log(`DeepSeek base URL: ${provider.baseUrl}`);
-    console.log(`DeepSeek model: ${provider.model}`);
-    console.log(`Provider max retries: ${process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2"}`);
-    console.log(`Provider retry base delay ms: ${process.env.DEEPCODEX_PROVIDER_RETRY_BASE_MS ?? "500"}`);
-    console.log(`Allowed provider base URLs: ${workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0}`);
-    console.log(`Allowed provider models: ${workspaceConfig.config.provider?.allowedModels?.length ?? 0}`);
-    console.log(`Max session tokens: ${process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set"}`);
-    console.log(`Max session USD: ${process.env.DEEPCODEX_MAX_SESSION_USD ?? "not set"}`);
+    const diagnostics = {
+      deepSeekApiKey: process.env.DEEPSEEK_API_KEY ? "configured" : "missing",
+      deepSeekBaseUrl: provider.baseUrl,
+      deepSeekModel: provider.model,
+      providerMaxRetries: process.env.DEEPCODEX_PROVIDER_MAX_RETRIES ?? "2",
+      providerRetryBaseDelayMs: process.env.DEEPCODEX_PROVIDER_RETRY_BASE_MS ?? "500",
+      allowedProviderBaseUrls: workspaceConfig.config.provider?.allowedBaseUrls?.length ?? 0,
+      allowedProviderModels: workspaceConfig.config.provider?.allowedModels?.length ?? 0,
+      maxSessionTokens: process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set",
+      maxSessionUsd: process.env.DEEPCODEX_MAX_SESSION_USD ?? "not set",
+      inputUsdPerMillionTokens: process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS ?? "not set",
+      outputUsdPerMillionTokens: process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set",
+      policyProfile: process.env.DEEPCODEX_POLICY_PROFILE ?? workspaceConfig.config.policyProfileId ?? "custom",
+      workspacePolicyProfiles: workspaceConfig.config.policyProfiles?.length ?? 0,
+      approvalMode: workspaceConfig.config.approvalMode ?? "profile/default",
+      pricingProfile: process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom",
+      configuredPricingProfiles: readPricingProfilesFromEnv().length,
+      shellEnvironment: process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal",
+      shellNetworkAccess: resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked",
+      workspaceConfig: {
+        status: workspaceConfig.exists ? "present" : "missing",
+        path: workspaceConfig.exists ? workspaceConfig.path : undefined,
+        sha256: workspaceConfig.sha256
+      },
+      policyBundle: policyBundleStatus,
+      signedPolicyRequired: readRequireSignedPolicyFromEnv(),
+      workspaceMaxSteps: workspaceConfig.config.maxSteps ?? "profile/default",
+      node: process.version
+    };
+    if (options.json) {
+      console.log(JSON.stringify(diagnostics, null, 2));
+      return;
+    }
+    console.log(`DeepSeek API key: ${diagnostics.deepSeekApiKey}`);
+    console.log(`DeepSeek base URL: ${diagnostics.deepSeekBaseUrl}`);
+    console.log(`DeepSeek model: ${diagnostics.deepSeekModel}`);
+    console.log(`Provider max retries: ${diagnostics.providerMaxRetries}`);
+    console.log(`Provider retry base delay ms: ${diagnostics.providerRetryBaseDelayMs}`);
+    console.log(`Allowed provider base URLs: ${diagnostics.allowedProviderBaseUrls}`);
+    console.log(`Allowed provider models: ${diagnostics.allowedProviderModels}`);
+    console.log(`Max session tokens: ${diagnostics.maxSessionTokens}`);
+    console.log(`Max session USD: ${diagnostics.maxSessionUsd}`);
+    console.log(`Input USD per million tokens: ${diagnostics.inputUsdPerMillionTokens}`);
+    console.log(`Output USD per million tokens: ${diagnostics.outputUsdPerMillionTokens}`);
+    console.log(`Policy profile: ${diagnostics.policyProfile}`);
+    console.log(`Workspace policy profiles: ${diagnostics.workspacePolicyProfiles}`);
+    console.log(`Approval mode: ${diagnostics.approvalMode}`);
+    console.log(`Pricing profile: ${diagnostics.pricingProfile}`);
+    console.log(`Configured pricing profiles: ${diagnostics.configuredPricingProfiles}`);
+    console.log(`Shell environment: ${diagnostics.shellEnvironment}`);
+    console.log(`Shell network access: ${diagnostics.shellNetworkAccess}`);
+    console.log(`Workspace config: ${diagnostics.workspaceConfig.status === "present" ? diagnostics.workspaceConfig.path : "missing"}`);
     console.log(
-      `Input USD per million tokens: ${process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
+      `Workspace config SHA-256: ${diagnostics.workspaceConfig.sha256 ? diagnostics.workspaceConfig.sha256.slice(0, 12) : "not available"}`
     );
-    console.log(
-      `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
-    );
-    console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? workspaceConfig.config.policyProfileId ?? "custom"}`);
-    console.log(`Workspace policy profiles: ${workspaceConfig.config.policyProfiles?.length ?? 0}`);
-    console.log(`Approval mode: ${workspaceConfig.config.approvalMode ?? "profile/default"}`);
-    console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom"}`);
-    console.log(`Configured pricing profiles: ${readPricingProfilesFromEnv().length}`);
-    console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal"}`);
-    console.log(`Shell network access: ${resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked"}`);
-    console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
-    console.log(`Workspace config SHA-256: ${workspaceConfig.sha256 ? workspaceConfig.sha256.slice(0, 12) : "not available"}`);
-    console.log(`Policy bundle: ${policyBundleStatus}`);
-    console.log(`Signed policy required: ${readRequireSignedPolicyFromEnv() ? "yes" : "no"}`);
-    console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
-    console.log(`Node: ${process.version}`);
+    console.log(`Policy bundle: ${diagnostics.policyBundle}`);
+    console.log(`Signed policy required: ${diagnostics.signedPolicyRequired ? "yes" : "no"}`);
+    console.log(`Workspace max steps: ${diagnostics.workspaceMaxSteps}`);
+    console.log(`Node: ${diagnostics.node}`);
   });
 
 try {
@@ -874,6 +914,21 @@ function createCliEventHandler(recorder?: SessionEventRecorder) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.gray(`session audit skipped: ${message}`));
+    }
+  };
+}
+
+function createCliJsonEventHandler(recorder?: SessionEventRecorder) {
+  return async (event: AgentEvent) => {
+    console.log(JSON.stringify({ type: "event", event }));
+    if (!recorder) {
+      return;
+    }
+    try {
+      await recorder.record(event);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({ type: "warning", message: `session audit skipped: ${message}` }));
     }
   };
 }

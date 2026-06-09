@@ -28,7 +28,7 @@ The roadmap prioritizes safety and product evidence before broader automation. D
 | Side-by-side review mode | Builds on the structured Web diff blocks with richer approval and comparison affordances. | Web. |
 | Policy-controlled artifact extraction | Adds safe OCR, PDF text extraction, and archive listing after the metadata-only inspection path. | Core, config. |
 | Policy bundle rotation workflow | Lets teams rotate trusted keys, revoke stale bundles, and distribute signed policy updates safely. | Provider config, clients. |
-| CLI JSON output | Enables automation and CI-style checks. | CLI. |
+| CLI CI polish | Extends existing `ask --json`, `doctor --json`, and session JSON surfaces with exit-code conventions and CI examples. | CLI. |
 | Desktop packaging | Turns the desktop client into a deliverable artifact. | Desktop, release. |
 
 ## Decision Points

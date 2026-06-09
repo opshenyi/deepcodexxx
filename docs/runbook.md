@@ -224,6 +224,12 @@ Configuration check:
 node apps/cli/dist/index.js doctor
 ```
 
+Machine-readable diagnostics:
+
+```powershell
+node apps/cli/dist/index.js doctor --json
+```
+
 List reusable policy profiles:
 
 ```powershell
@@ -289,6 +295,14 @@ Run an inspection task:
 ```powershell
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and summarize the safest next step."
 ```
+
+Emit newline-delimited JSON events for automation:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection --json "Inspect this repository and summarize the safest next step."
+```
+
+`ask --json` writes one JSON object per line for each event and a final `result` record. It rejects prompt/manual approval mode so stdout stays machine-readable.
 
 Run a bounded write-mode task on a disposable workspace:
 
