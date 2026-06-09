@@ -68,8 +68,8 @@ describe("DeepSeekClient", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const client = new DeepSeekClient({
       apiKey: "test-key",
-      model: "deepseek-chat",
-      fallbackModels: ["deepseek-reasoner", "deepseek-chat"],
+      model: "deepseek-v4-flash",
+      fallbackModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
       maxRetries: 1,
       retryBaseDelayMs: 0
     });
@@ -77,9 +77,9 @@ describe("DeepSeekClient", () => {
     const response = await client.chat([{ role: "user", content: "hello" }]);
 
     expect(response.id).toBe("ok-on-fallback");
-    expect(client.models).toEqual(["deepseek-chat", "deepseek-reasoner"]);
-    expect(client.lastModel).toBe("deepseek-reasoner");
-    expect(requestedModels(fetchMock)).toEqual(["deepseek-chat", "deepseek-chat", "deepseek-reasoner"]);
+    expect(client.models).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
+    expect(client.lastModel).toBe("deepseek-v4-pro");
+    expect(requestedModels(fetchMock)).toEqual(["deepseek-v4-flash", "deepseek-v4-flash", "deepseek-v4-pro"]);
   });
 
   it("does not retry non-retryable provider status codes", async () => {
@@ -87,7 +87,7 @@ describe("DeepSeekClient", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const client = new DeepSeekClient({
       apiKey: "test-key",
-      fallbackModels: ["deepseek-reasoner"],
+      fallbackModels: ["deepseek-v4-pro"],
       maxRetries: 2,
       retryBaseDelayMs: 0
     });
@@ -97,7 +97,7 @@ describe("DeepSeekClient", () => {
       retryable: false
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(requestedModels(fetchMock)).toEqual(["deepseek-chat"]);
+    expect(requestedModels(fetchMock)).toEqual(["deepseek-v4-flash"]);
   });
 
   it("reports the final attempt count when retryable failures are exhausted", async () => {
@@ -114,7 +114,7 @@ describe("DeepSeekClient", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const client = new DeepSeekClient({
       apiKey: "test-key",
-      fallbackModels: ["deepseek-reasoner"],
+      fallbackModels: ["deepseek-v4-pro"],
       maxRetries: 2,
       retryBaseDelayMs: 0
     });
@@ -123,7 +123,7 @@ describe("DeepSeekClient", () => {
     await expect(promise).rejects.toBeInstanceOf(DeepSeekError);
     await expect(promise).rejects.toThrow(/invalid JSON/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(requestedModels(fetchMock)).toEqual(["deepseek-chat"]);
+    expect(requestedModels(fetchMock)).toEqual(["deepseek-v4-flash"]);
   });
 });
 

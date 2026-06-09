@@ -107,12 +107,12 @@ export async function writeWorkspaceConfigTemplate(
 export function createWorkspaceConfigTemplate(): WorkspaceConfig {
   return {
     version: 1,
-    model: "deepseek-chat",
+    model: "deepseek-v4-flash",
     provider: {
       baseUrl: "https://api.deepseek.com",
       fallbackModels: [],
       allowedBaseUrls: ["https://api.deepseek.com"],
-      allowedModels: ["deepseek-chat"]
+      allowedModels: ["deepseek-v4-flash"]
     },
     policyProfileId: "guarded-write",
     approvalMode: "manual",

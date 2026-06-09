@@ -47,4 +47,4 @@ DeepCodex is a TypeScript monorepo with five production packages:
 
 ## DeepSeek Integration
 
-The client uses the OpenAI-compatible chat completions endpoint at `DEEPSEEK_BASE_URL`, defaulting to `https://api.deepseek.com`. The primary model is controlled by `DEEPSEEK_MODEL`, defaulting to `deepseek-chat` for compatibility with common DeepSeek examples. Optional fallback models can come from `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`; each fallback receives the same retry budget and is attempted only after retryable failures exhaust the current model.
+The client uses the OpenAI-compatible chat completions endpoint at `DEEPSEEK_BASE_URL`, defaulting to `https://api.deepseek.com`. The primary model is controlled by `DEEPSEEK_MODEL`, defaulting to `deepseek-v4-flash` for current DeepSeek OpenAI-format chat completions. Optional fallback models can come from `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`; each fallback receives the same retry budget and is attempted only after retryable failures exhaust the current model.

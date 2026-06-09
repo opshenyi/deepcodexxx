@@ -23,7 +23,7 @@ describe("provider policy", () => {
   it("resolves default DeepSeek-compatible provider values", () => {
     expect(resolveProviderSelection({})).toEqual({
       baseUrl: "https://api.deepseek.com",
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       fallbackModels: []
     });
   });
@@ -31,13 +31,13 @@ describe("provider policy", () => {
   it("normalizes fallback models while removing duplicates and the primary model", () => {
     expect(
       resolveProviderSelection({
-        model: "deepseek-chat",
-        fallbackModels: [" deepseek-reasoner ", "deepseek-chat", "deepseek-reasoner"]
+        model: "deepseek-v4-flash",
+        fallbackModels: [" deepseek-v4-pro ", "deepseek-v4-flash", "deepseek-v4-pro"]
       })
     ).toEqual({
       baseUrl: "https://api.deepseek.com",
-      model: "deepseek-chat",
-      fallbackModels: ["deepseek-reasoner"]
+      model: "deepseek-v4-flash",
+      fallbackModels: ["deepseek-v4-pro"]
     });
   });
 
@@ -48,8 +48,8 @@ describe("provider policy", () => {
   it("allows approved provider base URLs and models", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://api.deepseek.com", model: "deepseek-chat", fallbackModels: ["deepseek-reasoner"] },
-        { allowedBaseUrls: ["https://api.deepseek.com/"], allowedModels: ["deepseek-chat", "deepseek-reasoner"] }
+        { baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash", fallbackModels: ["deepseek-v4-pro"] },
+        { allowedBaseUrls: ["https://api.deepseek.com/"], allowedModels: ["deepseek-v4-flash", "deepseek-v4-pro"] }
       )
     ).not.toThrow();
   });
@@ -57,7 +57,7 @@ describe("provider policy", () => {
   it("rejects unapproved provider base URLs", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://unapproved.example.com", model: "deepseek-chat", fallbackModels: [] },
+        { baseUrl: "https://unapproved.example.com", model: "deepseek-v4-flash", fallbackModels: [] },
         { allowedBaseUrls: ["https://api.deepseek.com"] }
       )
     ).toThrow(/base URL is not allowed/);
@@ -67,7 +67,7 @@ describe("provider policy", () => {
     expect(() =>
       assertProviderAllowed(
         { baseUrl: "https://api.deepseek.com", model: "experimental-model", fallbackModels: [] },
-        { allowedModels: ["deepseek-chat"] }
+        { allowedModels: ["deepseek-v4-flash"] }
       )
     ).toThrow(/model is not allowed/);
   });
@@ -75,8 +75,8 @@ describe("provider policy", () => {
   it("rejects unapproved provider fallback models", () => {
     expect(() =>
       assertProviderAllowed(
-        { baseUrl: "https://api.deepseek.com", model: "deepseek-chat", fallbackModels: ["experimental-model"] },
-        { allowedModels: ["deepseek-chat"] }
+        { baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash", fallbackModels: ["experimental-model"] },
+        { allowedModels: ["deepseek-v4-flash"] }
       )
     ).toThrow(/fallback model is not allowed/);
   });

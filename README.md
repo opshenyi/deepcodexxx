@@ -57,7 +57,7 @@ node apps/cli/dist/index.js config export-trust-package --workspace D:\Coding\De
 
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
 - `DEEPSEEK_BASE_URL`: Defaults to `https://api.deepseek.com`.
-- `DEEPSEEK_MODEL`: Defaults to `deepseek-chat`.
+- `DEEPSEEK_MODEL`: Defaults to `deepseek-v4-flash`.
 - `DEEPCODEX_PROVIDER_FALLBACK_MODELS`: Optional comma-separated fallback models. Each fallback must be allowed by workspace `provider.allowedModels` when an allowlist is configured.
 - `DEEPCODEX_PROVIDER_MAX_RETRIES`: Defaults to `2`; retries retryable provider failures before surfacing an error.
 - `DEEPCODEX_PROVIDER_RETRY_BASE_MS`: Defaults to `500`; exponential backoff base delay for provider retries.

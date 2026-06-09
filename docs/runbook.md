@@ -24,7 +24,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | --- | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | Required for live model runs. | Empty. | If missing, DeepCodex runs in local demo mode and does not call DeepSeek. |
 | `DEEPSEEK_BASE_URL` | Optional. | `https://api.deepseek.com` | The client calls `${DEEPSEEK_BASE_URL}/chat/completions`; trailing slash is stripped. |
-| `DEEPSEEK_MODEL` | Optional. | `deepseek-chat` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
+| `DEEPSEEK_MODEL` | Optional. | `deepseek-v4-flash` | Use a DeepSeek model compatible with the OpenAI-style chat completions API. |
 | `DEEPCODEX_PROVIDER_FALLBACK_MODELS` | Optional. | Empty. | Comma-separated fallback model ids. Fallback is tried only after retryable failures exhaust the retry budget for the current model. |
 | `DEEPCODEX_PROVIDER_MAX_RETRIES` | Optional. | `2` | Retries retryable DeepSeek-compatible provider failures. Set `0` to disable retries. |
 | `DEEPCODEX_PROVIDER_RETRY_BASE_MS` | Optional. | `500` | Exponential backoff base delay in milliseconds for provider retries. |
@@ -78,12 +78,12 @@ Example:
 ```json
 {
   "version": 1,
-  "model": "deepseek-chat",
+  "model": "deepseek-v4-flash",
   "provider": {
     "baseUrl": "https://api.deepseek.com",
     "fallbackModels": [],
     "allowedBaseUrls": ["https://api.deepseek.com"],
-    "allowedModels": ["deepseek-chat"]
+    "allowedModels": ["deepseek-v4-flash"]
   },
   "policyProfileId": "guarded-write",
   "approvalMode": "manual",
@@ -155,6 +155,8 @@ Example:
 Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL, primary model, and fallback models are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. `allowedShellCommands` and `deniedShellCommands` entries are JavaScript regular expression sources applied to the raw shell command before execution; deny matches block immediately, allowlists restrict commands when non-empty, and built-in dangerous/network gates still apply after allowlist matching. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; when those retryable failures exhaust the retry budget for a model, the next approved fallback model is tried and a `provider_fallback` event is streamed and persisted. 400-class request errors and invalid JSON are surfaced without retry or fallback.
+
+As of 2026-06-09, official DeepSeek API docs list `deepseek-v4-flash` and `deepseek-v4-pro` for the OpenAI-format chat completions API, and the legacy `deepseek-chat` and `deepseek-reasoner` aliases are scheduled to stop working on 2026-07-24 15:59 UTC. DeepCodex keeps model ids configurable for migration, but new templates use V4 model ids.
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output using the actual model that responded. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 

@@ -39,9 +39,9 @@ describe("workspace config", () => {
         model: "deepseek-coder",
         provider: {
           baseUrl: "https://api.deepseek.com/",
-          fallbackModels: ["deepseek-reasoner"],
+          fallbackModels: ["deepseek-v4-pro"],
           allowedBaseUrls: ["https://api.deepseek.com/"],
-          allowedModels: ["deepseek-coder", "deepseek-chat", "deepseek-reasoner"]
+          allowedModels: ["deepseek-coder", "deepseek-v4-flash", "deepseek-v4-pro"]
         },
         policyProfileId: "inspection",
         policyProfiles: [
@@ -113,9 +113,9 @@ describe("workspace config", () => {
       model: "deepseek-coder",
       provider: {
         baseUrl: "https://api.deepseek.com",
-        fallbackModels: ["deepseek-reasoner"],
+        fallbackModels: ["deepseek-v4-pro"],
         allowedBaseUrls: ["https://api.deepseek.com"],
-        allowedModels: ["deepseek-coder", "deepseek-chat", "deepseek-reasoner"]
+        allowedModels: ["deepseek-coder", "deepseek-v4-flash", "deepseek-v4-pro"]
       },
       policyProfileId: "inspection",
       policyProfiles: [
@@ -183,14 +183,14 @@ describe("workspace config", () => {
     await mkdir(path.join(tempDir, ".deepcodex"));
     await writeFile(
       path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
-      `\uFEFF${JSON.stringify({ model: "deepseek-chat" })}`,
+      `\uFEFF${JSON.stringify({ model: "deepseek-v4-flash" })}`,
       "utf8"
     );
 
     const result = await readWorkspaceConfig(tempDir);
 
     expect(result.exists).toBe(true);
-    expect(result.config.model).toBe("deepseek-chat");
+    expect(result.config.model).toBe("deepseek-v4-flash");
     expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -394,7 +394,7 @@ describe("workspace config", () => {
     await mkdir(path.join(tempDir, ".deepcodex"));
     await writeFile(
       path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
-      JSON.stringify({ provider: { fallbackModels: ["deepseek-chat", ""] } }),
+      JSON.stringify({ provider: { fallbackModels: ["deepseek-v4-flash", ""] } }),
       "utf8"
     );
 
@@ -407,8 +407,10 @@ describe("workspace config", () => {
     const created = await writeWorkspaceConfigTemplate(tempDir);
 
     expect(created.exists).toBe(true);
+    expect(created.config.model).toBe("deepseek-v4-flash");
     expect(created.config.policyProfileId).toBe("guarded-write");
     expect(created.config.provider?.fallbackModels).toEqual([]);
+    expect(created.config.provider?.allowedModels).toEqual(["deepseek-v4-flash"]);
     expect(created.config.evals?.[0]?.id).toBe("workspace-release-smoke");
     expect(created.config.policy?.deniedShellCommands).toContain("\\bterraform\\s+apply\\b");
     expect(created.config.policyProfiles?.[0]?.policy.deniedShellCommands).toContain("\\bkubectl\\s+delete\\b");
