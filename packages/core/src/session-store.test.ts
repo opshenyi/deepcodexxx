@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import {
   exportSessionHistory,
   listSessionHistories,
   parseSessionExportFormat,
+  pruneSessionHistories,
   readSessionHistory,
   sessionDirectory
 } from "./session-store.js";
@@ -173,4 +174,52 @@ describe("session store", () => {
 
     await expect(readSessionHistory(workspace, "../outside")).rejects.toBeInstanceOf(InvalidSessionIdError);
   });
+
+  it("prunes old session history files with dry-run support", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir);
+    await mkdir(sessionDirectory(workspace), { recursive: true });
+    await writeSessionFixture(workspace.root, "old-session", "2026-01-01T00:00:00.000Z");
+    await writeSessionFixture(workspace.root, "mid-session", "2026-02-01T00:00:00.000Z");
+    await writeSessionFixture(workspace.root, "new-session", "2026-03-01T00:00:00.000Z");
+
+    const dryRun = await pruneSessionHistories(workspace, { maxSessions: 2, dryRun: true });
+
+    expect(dryRun).toEqual({
+      scanned: 3,
+      retained: 2,
+      deleted: ["old-session"],
+      dryRun: true
+    });
+    expect(await listSessionHistories(workspace)).toHaveLength(3);
+
+    const pruned = await pruneSessionHistories(workspace, { maxSessions: 2 });
+
+    expect(pruned).toMatchObject({ scanned: 3, retained: 2, deleted: ["old-session"], dryRun: false });
+    expect((await listSessionHistories(workspace)).map((session) => session.sessionId)).toEqual([
+      "new-session",
+      "mid-session"
+    ]);
+  });
 });
+
+async function writeSessionFixture(root: string, sessionId: string, updatedAt: string) {
+  await writeFile(
+    path.join(root, ".deepcodex", "state", "sessions", `${sessionId}.json`),
+    `${JSON.stringify(
+      {
+        sessionId,
+        workspace: root,
+        model: "deepseek-chat",
+        status: "completed",
+        createdAt: updatedAt,
+        updatedAt,
+        eventCount: 0,
+        events: []
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}

@@ -12,6 +12,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
 - Markdown and JSON session export through core, server, Web, and CLI surfaces.
+- Session history retention pruning by count or age, with dry-run support in CLI and Web/API surfaces.
 - Diff output for file writes and edits; `suggest` mode previews write/edit changes without applying them.
 - Manual tool approval for workspace write, shell, and memory mutation tools in Web and CLI clients.
 - Approval audit events include request time, decision time, decision latency, and actor.
@@ -43,14 +44,14 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, diff-producing tools, file hash audit metadata, manual approvals, and strict read-only inspection; still needs sandboxed shell. |
+| Local pilot | Close, but still controlled. | Has local audit history, retention pruning, diff-producing tools, file hash audit metadata, manual approvals, and strict read-only inspection; still needs sandboxed shell. |
 | Desktop release | Not ready by default. | Needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 
 ## Next Commercial Milestones
 
 - Add reusable policy profiles.
-- Add audit retention controls and redaction policies.
+- Add redaction policies.
 - Add richer generated-asset handling and file-type policies.
 - Add managed pricing profiles and per-workspace budget policy templates.
 - Add packaged desktop installers and signed releases.

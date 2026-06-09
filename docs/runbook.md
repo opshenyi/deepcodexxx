@@ -33,6 +33,8 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_MAX_SESSION_USD` | Optional. | Empty. | Stops a run when estimated provider cost reaches this USD limit. Requires both pricing variables below. |
 | `DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS` | Optional. | Empty. | Input token price used for local cost estimates. Prices are external configuration, not hard-coded. |
 | `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS` | Optional. | Empty. | Output token price used for local cost estimates. Prices are external configuration, not hard-coded. |
+| `DEEPCODEX_MAX_SESSIONS` | Optional. | Empty. | Default maximum retained session history files for retention pruning. |
+| `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -125,6 +127,18 @@ Export one session as Markdown:
 node apps/cli/dist/index.js sessions export <session-id> --workspace D:\Coding\DeepCodex --format markdown
 ```
 
+Preview retention pruning without deleting files:
+
+```powershell
+node apps/cli/dist/index.js sessions prune --workspace D:\Coding\DeepCodex --max-sessions 100 --dry-run
+```
+
+Apply retention pruning:
+
+```powershell
+node apps/cli/dist/index.js sessions prune --workspace D:\Coding\DeepCodex --max-sessions 100 --max-age-days 30
+```
+
 Run an inspection task:
 
 ```powershell
@@ -183,3 +197,4 @@ For `write_file` and `edit_file`, approval and tool result events also include f
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
 | Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
 | Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |
+| Session history grows too large. | Retention variables are not set and pruning has not been run. | Use Web Audit retention controls or `deepcodex sessions prune --dry-run` before applying deletion. |

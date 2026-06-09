@@ -10,6 +10,7 @@ import {
   exportSessionHistory,
   listSessionHistories,
   parseSessionExportFormat,
+  pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
   runDeepCodexAgent
@@ -21,6 +22,7 @@ import type {
   BudgetSnapshot,
   FileAuditEntry,
   FileHashSnapshot,
+  SessionRetentionPolicy,
   ToolAuditMetadata,
   SessionEventRecorder,
   ToolApprovalDecision,
@@ -197,6 +199,28 @@ sessions
     output.write(exportSessionHistory(history, parseSessionExportFormat(options.format)));
   });
 
+sessions
+  .command("prune")
+  .description("Prune persisted session history files by count or age.")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .option("--max-sessions <number>", "Keep only the newest N sessions")
+  .option("--max-age-days <number>", "Delete sessions older than this many days")
+  .option("--dry-run", "Show what would be deleted without removing files", false)
+  .action(
+    async (options: { workspace: string; maxSessions?: string; maxAgeDays?: string; dryRun: boolean }) => {
+      const workspace = await createWorkspaceContext(options.workspace);
+      const result = await pruneSessionHistories(workspace, createRetentionPolicy(options));
+      console.log(
+        `scanned ${result.scanned} sessions, retained ${result.retained}, ${
+          result.dryRun ? "would delete" : "deleted"
+        } ${result.deleted.length}`
+      );
+      for (const sessionId of result.deleted) {
+        console.log(sessionId);
+      }
+    }
+  );
+
 program
   .command("doctor")
   .action(() => {
@@ -292,6 +316,23 @@ function createPolicy(mode: string): ApprovalPolicy {
   };
 }
 
+function createRetentionPolicy(options: {
+  maxSessions?: string;
+  maxAgeDays?: string;
+  dryRun?: boolean;
+}): SessionRetentionPolicy {
+  const merged: SessionRetentionPolicy = {
+    maxSessions: readOptionalInteger(process.env.DEEPCODEX_MAX_SESSIONS),
+    maxAgeDays: readOptionalNumber(process.env.DEEPCODEX_SESSION_RETENTION_DAYS)
+  };
+  const cliPolicy = removeUndefinedRetentionValues({
+    maxSessions: readOptionalInteger(options.maxSessions),
+    maxAgeDays: readOptionalNumber(options.maxAgeDays),
+    dryRun: options.dryRun
+  });
+  return removeUndefinedRetentionValues({ ...merged, ...cliPolicy });
+}
+
 function createBudgetPolicy(options: {
   maxSessionTokens?: string;
   maxSessionUsd?: string;
@@ -332,6 +373,21 @@ function readOptionalNumber(value: unknown): number | undefined {
     throw new Error("Budget values must be non-negative numbers.");
   }
   return parsed;
+}
+
+function readOptionalInteger(value: unknown): number | undefined {
+  const parsed = readOptionalNumber(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(parsed)) {
+    throw new Error("Retention integer values must be whole numbers.");
+  }
+  return parsed;
+}
+
+function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): SessionRetentionPolicy {
+  return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as SessionRetentionPolicy;
 }
 
 function formatBudgetLine(budget: BudgetSnapshot): string {

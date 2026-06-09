@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import type { AgentEvent, BudgetSnapshot, WorkspaceContext } from "./types.js";
 
 export type SessionStatus = "running" | "completed" | "errored";
@@ -49,6 +49,19 @@ export interface SessionSummary {
 
 export interface SessionEventRecorder {
   record(event: AgentEvent): Promise<SessionHistory>;
+}
+
+export interface SessionRetentionPolicy {
+  maxSessions?: number;
+  maxAgeDays?: number;
+  dryRun?: boolean;
+}
+
+export interface SessionRetentionResult {
+  scanned: number;
+  retained: number;
+  deleted: string[];
+  dryRun: boolean;
 }
 
 export class InvalidSessionIdError extends Error {
@@ -117,6 +130,65 @@ export async function listSessionHistories(workspace: WorkspaceContext): Promise
   return sessions
     .filter((session): session is SessionSummary => Boolean(session))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+export async function pruneSessionHistories(
+  workspace: WorkspaceContext,
+  policy: SessionRetentionPolicy = {}
+): Promise<SessionRetentionResult> {
+  const normalized = normalizeRetentionPolicy(policy);
+  const directory = sessionDirectory(workspace);
+  await mkdir(directory, { recursive: true });
+
+  const entries = await readdir(directory, { withFileTypes: true });
+  const sessions = (
+    await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => {
+          const sessionId = entry.name.slice(0, -".json".length);
+          try {
+            const session = await readSessionHistory(workspace, sessionId);
+            return {
+              sessionId,
+              filePath: sessionFilePath(workspace, sessionId),
+              updatedAtMs: sessionTimestampMs(session)
+            };
+          } catch {
+            return undefined;
+          }
+        })
+    )
+  ).filter((session): session is { sessionId: string; filePath: string; updatedAtMs: number } => Boolean(session));
+
+  const deleteIds = new Set<string>();
+  if (normalized.maxAgeDays !== undefined) {
+    const cutoff = Date.now() - normalized.maxAgeDays * 24 * 60 * 60 * 1000;
+    for (const session of sessions) {
+      if (session.updatedAtMs < cutoff) {
+        deleteIds.add(session.sessionId);
+      }
+    }
+  }
+
+  if (normalized.maxSessions !== undefined) {
+    const sorted = [...sessions].sort((left, right) => right.updatedAtMs - left.updatedAtMs);
+    for (const session of sorted.slice(normalized.maxSessions)) {
+      deleteIds.add(session.sessionId);
+    }
+  }
+
+  const deletions = sessions.filter((session) => deleteIds.has(session.sessionId));
+  if (!normalized.dryRun) {
+    await Promise.all(deletions.map((session) => unlink(session.filePath)));
+  }
+
+  return {
+    scanned: sessions.length,
+    retained: sessions.length - deletions.length,
+    deleted: deletions.map((session) => session.sessionId).sort(),
+    dryRun: normalized.dryRun
+  };
 }
 
 export async function readSessionHistory(workspace: WorkspaceContext, sessionId: string): Promise<SessionHistory> {
@@ -194,6 +266,22 @@ function assertValidSessionId(sessionId: string): void {
   if (!SESSION_ID_PATTERN.test(sessionId)) {
     throw new InvalidSessionIdError(sessionId);
   }
+}
+
+function normalizeRetentionPolicy(policy: SessionRetentionPolicy): Required<Pick<SessionRetentionPolicy, "dryRun">> &
+  Omit<SessionRetentionPolicy, "dryRun"> {
+  if (policy.maxSessions !== undefined && (!Number.isInteger(policy.maxSessions) || policy.maxSessions < 0)) {
+    throw new Error("maxSessions must be a non-negative integer.");
+  }
+  if (policy.maxAgeDays !== undefined && (!Number.isFinite(policy.maxAgeDays) || policy.maxAgeDays < 0)) {
+    throw new Error("maxAgeDays must be a non-negative number.");
+  }
+  return { ...policy, dryRun: policy.dryRun ?? false };
+}
+
+function sessionTimestampMs(session: SessionHistory): number {
+  const parsed = Date.parse(session.updatedAt || session.createdAt);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function applyEventMetadata(history: SessionHistory, event: AgentEvent): void {

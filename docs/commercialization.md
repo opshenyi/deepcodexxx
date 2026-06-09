@@ -21,7 +21,7 @@ Primary audiences:
 | Agent loop | DeepSeek-compatible chat completions loop with tool calls, bounded steps, token usage events, and run-level token/cost budgets when the provider returns usage metadata. | `packages/core` agent, DeepSeek client, budget controls, and tool registry. | Demo-ready. | Add retry policy and richer provider failure handling. |
 | Provider setup | Environment-driven DeepSeek API key, base URL, model, and optional budget variables. Missing key falls back to local demo mode. | `.env.example`, `DeepSeekClient`, CLI `doctor`. | Demo-ready. | Add provider registry, per-workspace model policy, and managed pricing profiles. |
 | Workspace tools | List, read, search, write, edit, shell command, read memory, append memory. Write and edit tools return unified diffs plus before/after SHA-256 audit metadata; `suggest` mode previews without applying. File tools enforce a configurable size cap and avoid binary-looking files for read/edit/search. | Default tool registry in `packages/core`. | Demo-ready for local repositories. | Add richer generated-asset handling and file-type policies. |
-| Execution transparency | Server sends event-stream updates for session, model usage, budget updates, budget stops, approval request, approval decision, tool start, tool result, final answer, and errors. Sessions are persisted locally, replayable in the Web client, and exportable as Markdown or JSON. | Local HTTP API, Web event timeline and replay view, CLI export, and session store. | Demo-ready. | Add audit retention controls, redaction policy, and structured observability. |
+| Execution transparency | Server sends event-stream updates for session, model usage, budget updates, budget stops, approval request, approval decision, tool start, tool result, final answer, and errors. Sessions are persisted locally, replayable in the Web client, exportable as Markdown or JSON, and prunable by count or age with dry-run support. | Local HTTP API, Web event timeline and replay view, CLI export/prune, and session store. | Demo-ready. | Add redaction policy and structured observability. |
 | Web client | Browser console for workspace path, execution mode, prompt, event stream, session replay, audit export, memory, and final output. | `apps/web`. | Demo-ready. | Add saved workspace profiles, diff viewer, and configurable server URL. |
 | Desktop client | Electron shell that hosts the Web experience after server and Web are available. | `apps/desktop`, `npm run dev:desktop`. | Demo-ready for local development. | Add packaged installers, signing, auto-update policy, and OS-specific QA. |
 | CLI client | `doctor`, `ask`, `memory`, and `sessions list/show/export` commands for terminal workflows. | `apps/cli`. | Demo-ready. | Add shell completion, config profiles, and broader non-interactive CI mode. |
@@ -35,7 +35,7 @@ Primary audiences:
 | Package | Purpose | Current state | Release requirement |
 | --- | --- | --- | --- |
 | Interview artifact | Demonstrate architecture, product surface, safety model, and roadmap. | Ready after checklist passes. | Keep docs current, run tests, and prepare a short demo path. |
-| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible for controlled local trials. | Add shell isolation, audit retention, and documented data handling. |
+| Local pilot | Let a small internal team run the agent against disposable or low-risk repositories. | Plausible for controlled local trials. | Add shell isolation, redaction policy, and documented data handling. |
 | Hosted product | Multi-user service with managed workspaces and auth. | Future work. | Add tenancy, RBAC, audit logs, secrets management, and infrastructure isolation. |
 
 ## Demo Narrative
@@ -58,6 +58,7 @@ An interview-ready build should satisfy these criteria:
 - Web, Desktop, and CLI clients can each run a basic prompt.
 - The Web client can load and replay a persisted session history.
 - A persisted session can be exported as Markdown or JSON.
+- Session history retention can be previewed and applied by count or age.
 - Write and edit approvals include file hash audit evidence in the run history.
 - Token and cost budgets can be configured from Web, CLI, or environment variables.
 - Missing DeepSeek key produces clear demo-mode behavior.

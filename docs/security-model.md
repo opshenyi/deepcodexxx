@@ -10,7 +10,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, and optional token/cost budgets can stop further work after a limit is reached. | Add secrets management, provider allowlists, and managed pricing policy. |
-| Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
+| Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions` and can be pruned by count or age. | Add review and redaction controls. |
 
 ## Approval Modes
 
@@ -87,7 +87,7 @@ Current limitations:
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
-| Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, and persisted locally under `.deepcodex/state/sessions`. | Add retention controls, export controls, and redaction. |
+| Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, and prunable by retention policy. | Add export review controls and redaction. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |
 
@@ -97,6 +97,7 @@ The next security work should prioritize:
 
 - Richer generated-asset handling and file-type policies.
 - Policy profile metadata.
+- Redaction policy for prompts, tool outputs, and audit exports.
 - Managed provider pricing profiles for budget policy.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.

@@ -48,6 +48,7 @@ Checklist:
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
+- Audit retention dry-run can preview sessions that would be pruned before deletion is applied.
 - A missing API key produces the documented local demo response.
 
 Suggested safe prompt:
@@ -101,6 +102,7 @@ Checklist:
 - The presenter can explain which files changed.
 - Tests or typecheck are run after any product-code change.
 - Session replay/export includes before/after file hash audit metadata for write/edit tools.
+- Retention prune is dry-run first if the workspace contains useful demo history.
 - Generated memory is reviewed before sharing the workspace.
 
 ## Go/No-Go Criteria

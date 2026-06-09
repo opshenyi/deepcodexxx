@@ -10,12 +10,13 @@ import {
   exportSessionHistory,
   listSessionHistories,
   parseSessionExportFormat,
+  pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
   runDeepCodexAgent
 } from "@deepcodex/core";
 import type { AgentEvent, ApprovalMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
-import type { BudgetPolicy } from "@deepcodex/core";
+import type { BudgetPolicy, SessionRetentionPolicy } from "@deepcodex/core";
 
 const app = express();
 const port = Number(process.env.DEEPCODEX_PORT ?? process.env.PORT ?? 17361);
@@ -66,6 +67,17 @@ app.get("/api/sessions", async (req, res, next) => {
     const workspacePath = readWorkspace(req.query.workspace);
     const workspace = await createWorkspaceContext(workspacePath);
     res.json({ sessions: await listSessionHistories(workspace) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/sessions/prune", async (req, res, next) => {
+  try {
+    const workspacePath = readWorkspace(req.body?.workspace ?? req.query.workspace);
+    const workspace = await createWorkspaceContext(workspacePath);
+    const result = await pruneSessionHistories(workspace, createRetentionPolicy(req.body));
+    res.json({ result });
   } catch (error) {
     next(error);
   }
@@ -254,6 +266,43 @@ function createRunPolicy(mode: ApprovalMode | undefined) {
     deniedPaths: readDeniedPathsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv()
   };
+}
+
+function createRetentionPolicy(input?: {
+  maxSessions?: unknown;
+  maxAgeDays?: unknown;
+  dryRun?: unknown;
+}): SessionRetentionPolicy {
+  return removeUndefinedRetentionValues({
+    ...readRetentionPolicyFromEnv(),
+    ...removeUndefinedRetentionValues({
+      maxSessions: readOptionalInteger(input?.maxSessions),
+      maxAgeDays: readOptionalNumber(input?.maxAgeDays),
+      dryRun: typeof input?.dryRun === "boolean" ? input.dryRun : undefined
+    })
+  });
+}
+
+function readRetentionPolicyFromEnv(): SessionRetentionPolicy {
+  return {
+    maxSessions: readOptionalInteger(process.env.DEEPCODEX_MAX_SESSIONS),
+    maxAgeDays: readOptionalNumber(process.env.DEEPCODEX_SESSION_RETENTION_DAYS)
+  };
+}
+
+function readOptionalInteger(value: unknown): number | undefined {
+  const parsed = readOptionalNumber(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(parsed)) {
+    throw new Error("Retention integer values must be whole numbers.");
+  }
+  return parsed;
+}
+
+function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): SessionRetentionPolicy {
+  return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as SessionRetentionPolicy;
 }
 
 function createBudgetPolicy(input?: BudgetPolicy): BudgetPolicy | undefined {

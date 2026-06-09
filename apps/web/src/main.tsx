@@ -123,6 +123,13 @@ type SessionHistory = SessionSummary & {
   events: SessionEventRecord[];
 };
 
+type SessionRetentionResult = {
+  scanned: number;
+  retained: number;
+  deleted: string[];
+  dryRun: boolean;
+};
+
 type PendingApproval = {
   approvalId: string;
   name: string;
@@ -138,6 +145,8 @@ const defaultMaxSessionTokens = localStorage.getItem("deepcodex.maxSessionTokens
 const defaultMaxSessionUsd = localStorage.getItem("deepcodex.maxSessionUsd") ?? "";
 const defaultInputUsdPerMillionTokens = localStorage.getItem("deepcodex.inputUsdPerMillionTokens") ?? "";
 const defaultOutputUsdPerMillionTokens = localStorage.getItem("deepcodex.outputUsdPerMillionTokens") ?? "";
+const defaultRetentionMaxSessions = localStorage.getItem("deepcodex.retentionMaxSessions") ?? "";
+const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxAgeDays") ?? "";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -199,6 +208,9 @@ function App() {
   const [inputUsdPerMillionTokens, setInputUsdPerMillionTokens] = useState(defaultInputUsdPerMillionTokens);
   const [outputUsdPerMillionTokens, setOutputUsdPerMillionTokens] = useState(defaultOutputUsdPerMillionTokens);
   const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
+  const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
+  const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
+  const [retentionState, setRetentionState] = useState<LoadState>("idle");
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -432,6 +444,40 @@ function App() {
       pushItem({ kind: "Error", tone: "bad", title: "Audit export failed", meta: sessionId.slice(0, 8), body: message });
     } finally {
       setExportingSessionId("");
+    }
+  }
+
+  async function pruneSessions(dryRun: boolean) {
+    setRetentionState("loading");
+    localStorage.setItem("deepcodex.retentionMaxSessions", retentionMaxSessions);
+    localStorage.setItem("deepcodex.retentionMaxAgeDays", retentionMaxAgeDays);
+    try {
+      const retention = createRetentionPayload({ retentionMaxSessions, retentionMaxAgeDays });
+      const response = await fetch(`${serverUrl}/api/sessions/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace, dryRun, ...retention })
+      });
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { result: SessionRetentionResult };
+      const mode = body.result.dryRun ? "Retention dry run" : "Retention prune complete";
+      pushItem({
+        kind: "Session",
+        tone: body.result.deleted.length > 0 ? "good" : "muted",
+        title: mode,
+        meta: `${body.result.deleted.length} sessions`,
+        body: formatRetentionResult(body.result)
+      });
+      setRetentionState("ready");
+      if (!body.result.dryRun) {
+        await loadSessions();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setRetentionState("error");
+      pushItem({ kind: "Error", tone: "bad", title: "Retention prune failed", meta: "Audit", body: message });
     }
   }
 
@@ -926,6 +972,46 @@ function App() {
             </div>
             <span className={`outputStatus ${sessionState}`}>{sessionState === "idle" ? "Idle" : sessionState}</span>
           </div>
+          <div className="retentionControls" aria-label="Session retention controls">
+            <label className="retentionField" htmlFor="retention-max-sessions">
+              <span>Max sessions</span>
+              <input
+                id="retention-max-sessions"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={retentionMaxSessions}
+                onChange={(event) => setRetentionMaxSessions(event.target.value)}
+                placeholder="100"
+              />
+            </label>
+            <label className="retentionField" htmlFor="retention-max-age-days">
+              <span>Max age days</span>
+              <input
+                id="retention-max-age-days"
+                type="number"
+                min="0"
+                step="0.25"
+                inputMode="decimal"
+                value={retentionMaxAgeDays}
+                onChange={(event) => setRetentionMaxAgeDays(event.target.value)}
+                placeholder="30"
+              />
+            </label>
+            <div className="retentionActions">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => pruneSessions(true)}
+                disabled={retentionState === "loading"}
+              >
+                Dry run
+              </button>
+              <button type="button" onClick={() => pruneSessions(false)} disabled={retentionState === "loading"}>
+                Prune
+              </button>
+            </div>
+          </div>
           <div className="sessionList">
             {sessions.length === 0 ? (
               <p className="sessionEmpty">No sessions loaded.</p>
@@ -999,6 +1085,16 @@ function createBudgetPayload(input: {
   return budget;
 }
 
+function createRetentionPayload(input: {
+  retentionMaxSessions: string;
+  retentionMaxAgeDays: string;
+}): { maxSessions?: number; maxAgeDays?: number } {
+  return {
+    maxSessions: readOptionalRetentionInteger(input.retentionMaxSessions, "Max sessions"),
+    maxAgeDays: readOptionalBudgetNumber(input.retentionMaxAgeDays, "Max age days")
+  };
+}
+
 function readOptionalBudgetNumber(value: string, label: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -1007,6 +1103,17 @@ function readOptionalBudgetNumber(value: string, label: string): number | undefi
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${label} must be a non-negative number.`);
+  }
+  return parsed;
+}
+
+function readOptionalRetentionInteger(value: string, label: string): number | undefined {
+  const parsed = readOptionalBudgetNumber(value, label);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${label} must be a whole number.`);
   }
   return parsed;
 }
@@ -1120,6 +1227,18 @@ function formatBudgetBody(budget: BudgetSnapshot): string {
     lines.push(`Remaining cost: ${formatUsd(budget.remainingUsd ?? 0)}`);
   }
   return lines.join("\n");
+}
+
+function formatRetentionResult(result: SessionRetentionResult) {
+  const action = result.dryRun ? "Would delete" : "Deleted";
+  const deleted = result.deleted.length > 0 ? result.deleted.join("\n") : "No sessions matched the retention policy.";
+  return [
+    `Scanned: ${result.scanned}`,
+    `Retained: ${result.retained}`,
+    `${action}: ${result.deleted.length}`,
+    "",
+    deleted
+  ].join("\n");
 }
 
 function formatUsd(value: number): string {
