@@ -52,8 +52,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 ## Next Steps
 
-1. Commit and push the event redaction work if it has not already been committed.
-2. Add OS-level shell sandboxing and richer media/artifact-type policies.
+1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env, not a full sandbox.
+2. Add richer media/artifact-type policies beyond path-based generated output denial.
 3. Add managed pricing profiles, reusable policy profiles, and project-specific DLP controls.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.
