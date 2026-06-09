@@ -87,7 +87,7 @@ Provider usage controls:
 - Token budgets can be set with `DEEPCODEX_MAX_SESSION_TOKENS`, CLI flags, or the Web Budget panel.
 - Estimated cost budgets can be set with `DEEPCODEX_MAX_SESSION_USD`, but require caller-provided input and output token prices.
 - Pricing profiles can be configured with `DEEPCODEX_PRICING_PROFILES` and selected through CLI, server, or Web budget controls.
-- `.deepcodex/config.json` can provide workspace defaults for model, policy profile, pricing profile, max steps, token/cost budget, shell environment, and retention.
+- `.deepcodex/config.json` can provide workspace defaults for model, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, and retention.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
 - Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.
 
@@ -126,7 +126,7 @@ Current limitations:
 The next security work should prioritize:
 
 - Richer generated-asset handling and file-type policies.
-- Policy profile metadata.
+- Signed policy bundles and policy provenance metadata.
 - Broader DLP/redaction policy for project-specific secrets and binary artifacts.
 - Provider allowlists and signed team policy bundles.
 - Isolated shell execution with filesystem and network controls.

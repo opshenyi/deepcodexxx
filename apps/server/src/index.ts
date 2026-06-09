@@ -65,8 +65,16 @@ app.get("/api/memory", async (req, res, next) => {
   }
 });
 
-app.get("/api/policy-profiles", (_req, res) => {
-  res.json({ profiles: listPolicyProfiles(), defaultProfileId: process.env.DEEPCODEX_POLICY_PROFILE ?? "custom" });
+app.get("/api/policy-profiles", async (req, res, next) => {
+  try {
+    const workspaceConfig = await readWorkspaceConfig(readWorkspace(req.query.workspace));
+    res.json({
+      profiles: listPolicyProfiles(workspaceConfig.config.policyProfiles),
+      defaultProfileId: process.env.DEEPCODEX_POLICY_PROFILE ?? workspaceConfig.config.policyProfileId ?? "custom"
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/pricing-profiles", (_req, res) => {
@@ -299,7 +307,10 @@ function readWorkspace(value: unknown): string {
 type RunApprovalMode = "auto" | "manual" | "deny";
 
 function readPolicyProfile(profileId?: string, config?: WorkspaceConfig) {
-  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId);
+  return resolvePolicyProfile(
+    profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId,
+    config?.policyProfiles
+  );
 }
 
 function createRunPolicy(

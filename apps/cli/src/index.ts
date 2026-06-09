@@ -204,9 +204,11 @@ config
 
 profiles
   .command("list")
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--json", "Print JSON output", false)
-  .action((options: { json: boolean }) => {
-    const entries = listPolicyProfiles();
+  .action(async (options: { workspace: string; json: boolean }) => {
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    const entries = listPolicyProfiles(workspaceConfig.config.policyProfiles);
     if (options.json) {
       console.log(JSON.stringify(entries, null, 2));
       return;
@@ -220,8 +222,10 @@ profiles
 profiles
   .command("show")
   .argument("<profile>", "Profile id")
-  .action((profileId: string) => {
-    console.log(JSON.stringify(resolvePolicyProfile(profileId), null, 2));
+  .option("-w, --workspace <path>", "Workspace path", process.cwd())
+  .action(async (profileId: string, options: { workspace: string }) => {
+    const workspaceConfig = await readWorkspaceConfig(options.workspace);
+    console.log(JSON.stringify(resolvePolicyProfile(profileId, workspaceConfig.config.policyProfiles), null, 2));
   });
 
 pricing
@@ -355,6 +359,7 @@ program
       `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
     );
     console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? workspaceConfig.config.policyProfileId ?? "custom"}`);
+    console.log(`Workspace policy profiles: ${workspaceConfig.config.policyProfiles?.length ?? 0}`);
     console.log(`Approval mode: ${workspaceConfig.config.approvalMode ?? "profile/default"}`);
     console.log(`Pricing profile: ${process.env.DEEPCODEX_PRICING_PROFILE ?? workspaceConfig.config.pricingProfileId ?? "custom"}`);
     console.log(`Configured pricing profiles: ${readPricingProfilesFromEnv().length}`);
@@ -431,7 +436,10 @@ function parseMode(value: string): "suggest" | "workspace-write" | "full-access"
 }
 
 function resolveCliProfile(profileId?: string, config?: WorkspaceConfig): PolicyProfile | undefined {
-  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId);
+  return resolvePolicyProfile(
+    profileId ?? process.env.DEEPCODEX_POLICY_PROFILE ?? config?.policyProfileId,
+    config?.policyProfiles
+  );
 }
 
 function createPolicy(

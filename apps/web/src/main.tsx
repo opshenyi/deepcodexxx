@@ -68,6 +68,27 @@ type BudgetPolicy = {
   outputUsdPerMillionTokens?: number;
 };
 
+type ServerPolicyProfile = {
+  id: string;
+  label: string;
+  description: string;
+  approvalMode: ToolApprovalMode;
+  maxSteps?: number;
+  policy: {
+    mode: ApprovalMode;
+    allowShell?: boolean;
+    allowNetwork?: boolean;
+    allowFileWrite?: boolean;
+    allowStateWrite?: boolean;
+    deniedPaths?: string[];
+    deniedFileExtensions?: string[];
+    redactionPatterns?: string[];
+    maxFileBytes?: number;
+    shellEnvironment?: "minimal" | "inherit";
+  };
+  budget?: BudgetPolicy;
+};
+
 type WorkspaceConfig = {
   version?: number;
   model?: string;
@@ -75,6 +96,7 @@ type WorkspaceConfig = {
   pricingProfileId?: string;
   approvalMode?: ToolApprovalMode;
   maxSteps?: number;
+  policyProfiles?: ServerPolicyProfile[];
   budget?: BudgetPolicy;
   policy?: {
     mode?: ApprovalMode;
@@ -171,7 +193,7 @@ type SessionRetentionResult = {
 };
 
 type PolicyProfileOption = {
-  id: "custom" | "inspection" | "guarded-write" | "full-access-review";
+  id: string;
   label: string;
   detail: string;
   mode?: ApprovalMode;
@@ -198,7 +220,7 @@ const defaultMaxSteps = localStorage.getItem("deepcodex.maxSteps") ?? "12";
 const defaultRetentionMaxSessions = localStorage.getItem("deepcodex.retentionMaxSessions") ?? "";
 const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxAgeDays") ?? "";
 const defaultPolicyProfile =
-  (localStorage.getItem("deepcodex.policyProfile") as PolicyProfileOption["id"] | null) ?? "custom";
+  localStorage.getItem("deepcodex.policyProfile") ?? "custom";
 const defaultPricingProfile = localStorage.getItem("deepcodex.pricingProfile") ?? "custom";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -226,7 +248,7 @@ const approvalOptions: Array<{ value: ToolApprovalMode; label: string; detail: s
   { value: "deny", label: "Deny", detail: "Reject mutating tool calls for dry runs" }
 ];
 
-const policyProfileOptions: PolicyProfileOption[] = [
+const basePolicyProfileOptions: PolicyProfileOption[] = [
   {
     id: "custom",
     label: "Custom controls",
@@ -297,6 +319,7 @@ function App() {
   const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
   const [pricingProfileId, setPricingProfileId] = useState(defaultPricingProfile);
   const [pricingProfiles, setPricingProfiles] = useState<PricingProfile[]>([]);
+  const [policyProfileOptions, setPolicyProfileOptions] = useState<PolicyProfileOption[]>(basePolicyProfileOptions);
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
   const [retentionState, setRetentionState] = useState<LoadState>("idle");
@@ -355,6 +378,7 @@ function App() {
 
   useEffect(() => {
     void loadPricingProfiles();
+    void loadPolicyProfiles();
   }, []);
 
   async function runAgent() {
@@ -474,6 +498,27 @@ function App() {
     }
   }
 
+  async function loadPolicyProfiles(workspaceOverride = workspace) {
+    const params = new URLSearchParams();
+    if (workspaceOverride) {
+      params.set("workspace", workspaceOverride);
+    }
+    try {
+      const response = await fetch(`${serverUrl}/api/policy-profiles?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as { profiles: ServerPolicyProfile[]; defaultProfileId?: string };
+      const nextProfiles = toPolicyProfileOptions(body.profiles);
+      setPolicyProfileOptions(nextProfiles);
+      if (body.defaultProfileId && body.defaultProfileId !== "custom" && !localStorage.getItem("deepcodex.policyProfile")) {
+        applyPolicyProfile(body.defaultProfileId, nextProfiles);
+      }
+    } catch {
+      setPolicyProfileOptions(basePolicyProfileOptions);
+    }
+  }
+
   async function loadWorkspaceConfig() {
     const params = new URLSearchParams();
     if (workspace) {
@@ -488,7 +533,9 @@ function App() {
       }
       const result = (await response.json()) as WorkspaceConfigResult;
       if (result.exists) {
-        applyWorkspaceConfig(result.config);
+        const nextProfiles = mergePolicyProfileOptions(result.config.policyProfiles);
+        setPolicyProfileOptions(nextProfiles);
+        applyWorkspaceConfig(result.config, nextProfiles);
         setConfigMessage(`Loaded ${result.path}`);
       } else {
         setConfigMessage(`No config at ${result.path}`);
@@ -703,9 +750,9 @@ function App() {
     pushLogItem({ ...item, id: crypto.randomUUID(), timestamp: formatTimestamp() });
   }
 
-  function applyPolicyProfile(profileId: PolicyProfileOption["id"]) {
+  function applyPolicyProfile(profileId: string, options = policyProfileOptions) {
     setPolicyProfileId(profileId);
-    const profile = policyProfileOptions.find((entry) => entry.id === profileId);
+    const profile = options.find((entry) => entry.id === profileId);
     if (profile?.mode) {
       setMode(profile.mode);
     }
@@ -721,10 +768,10 @@ function App() {
     return policyProfileOptions.find((entry) => entry.id === policyProfileId);
   }
 
-  function applyWorkspaceConfig(config: WorkspaceConfig) {
-    const configuredProfileId = toPolicyProfileOptionId(config.policyProfileId);
+  function applyWorkspaceConfig(config: WorkspaceConfig, options = policyProfileOptions) {
+    const configuredProfileId = toPolicyProfileOptionId(config.policyProfileId, options);
     if (configuredProfileId) {
-      applyPolicyProfile(configuredProfileId);
+      applyPolicyProfile(configuredProfileId, options);
     }
     if (config.policy?.mode) {
       setMode(config.policy.mode);
@@ -765,13 +812,11 @@ function App() {
     }
   }
 
-  function toPolicyProfileOptionId(value?: string): PolicyProfileOption["id"] | undefined {
+  function toPolicyProfileOptionId(value?: string, options = policyProfileOptions): string | undefined {
     if (!value) {
       return undefined;
     }
-    return policyProfileOptions.some((profile) => profile.id === value)
-      ? (value as PolicyProfileOption["id"])
-      : "custom";
+    return options.some((profile) => profile.id === value) ? value : "custom";
   }
 
   return (
@@ -813,7 +858,7 @@ function App() {
           <select
             id="policy-profile"
             value={policyProfileId}
-            onChange={(event) => applyPolicyProfile(event.target.value as PolicyProfileOption["id"])}
+            onChange={(event) => applyPolicyProfile(event.target.value)}
           >
             {policyProfileOptions.map((profile) => (
               <option key={profile.id} value={profile.id}>
@@ -1360,6 +1405,43 @@ function createBudgetPayload(input: {
     throw new Error("USD cap requires both input and output token prices.");
   }
   return budget;
+}
+
+function toPolicyProfileOptions(profiles: ServerPolicyProfile[]): PolicyProfileOption[] {
+  const customControl = basePolicyProfileOptions[0]!;
+  return [
+    customControl,
+    ...profiles.map((profile) => ({
+      id: profile.id,
+      label: profile.label,
+      detail: profile.description,
+      mode: profile.policy.mode,
+      approvalMode: profile.approvalMode,
+      maxSteps: profile.maxSteps
+    }))
+  ];
+}
+
+function mergePolicyProfileOptions(customProfiles: ServerPolicyProfile[] | undefined): PolicyProfileOption[] {
+  if (!customProfiles || customProfiles.length === 0) {
+    return basePolicyProfileOptions;
+  }
+  const customOptions = customProfiles.map((profile) => ({
+    id: profile.id,
+    label: profile.label,
+    detail: profile.description,
+    mode: profile.policy.mode,
+    approvalMode: profile.approvalMode,
+    maxSteps: profile.maxSteps
+  }));
+  const seen = new Set<string>();
+  return [...basePolicyProfileOptions, ...customOptions].filter((profile) => {
+    if (seen.has(profile.id)) {
+      return false;
+    }
+    seen.add(profile.id);
+    return true;
+  });
 }
 
 function createRetentionPayload(input: {

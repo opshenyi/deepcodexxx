@@ -1,7 +1,15 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { listPolicyProfiles } from "./policy-profile.js";
 import type { SessionRetentionPolicy } from "./session-store.js";
-import type { ApprovalMode, ApprovalPolicy, BudgetPolicy, ProfileApprovalMode, ShellEnvironmentMode } from "./types.js";
+import type {
+  ApprovalMode,
+  ApprovalPolicy,
+  BudgetPolicy,
+  PolicyProfile,
+  ProfileApprovalMode,
+  ShellEnvironmentMode
+} from "./types.js";
 
 export const WORKSPACE_CONFIG_RELATIVE_PATH = ".deepcodex/config.json";
 
@@ -12,6 +20,7 @@ export interface WorkspaceConfig {
   pricingProfileId?: string;
   approvalMode?: ProfileApprovalMode;
   maxSteps?: number;
+  policyProfiles?: PolicyProfile[];
   budget?: BudgetPolicy;
   policy?: Partial<ApprovalPolicy>;
   retention?: SessionRetentionPolicy;
@@ -83,6 +92,26 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
     approvalMode: "manual",
     maxSteps: 12,
     pricingProfileId: "custom",
+    policyProfiles: [
+      {
+        id: "team-review",
+        label: "Team review",
+        description: "Team-managed workspace-write profile with manual approvals and a tighter run budget.",
+        approvalMode: "manual",
+        maxSteps: 10,
+        policy: {
+          mode: "workspace-write",
+          allowShell: true,
+          allowFileWrite: true,
+          allowNetwork: false,
+          allowStateWrite: true,
+          shellEnvironment: "minimal"
+        },
+        budget: {
+          maxTokens: 80000
+        }
+      }
+    ],
     budget: {
       maxTokens: 120000
     },
@@ -122,10 +151,54 @@ function normalizeWorkspaceConfig(value: unknown): WorkspaceConfig {
     pricingProfileId: readOptionalString(entry.pricingProfileId, "pricingProfileId"),
     approvalMode: readOptionalApprovalMode(entry.approvalMode),
     maxSteps: readOptionalInteger(entry.maxSteps, "maxSteps"),
+    policyProfiles: normalizePolicyProfilesConfig(entry.policyProfiles),
     budget: normalizeBudgetConfig(entry.budget),
     policy: normalizePolicyConfig(entry.policy),
     retention: normalizeRetentionConfig(entry.retention)
   });
+}
+
+function normalizePolicyProfilesConfig(value: unknown): PolicyProfile[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error("policyProfiles must be an array.");
+  }
+
+  const profiles = value.map((entry, index) => normalizePolicyProfileConfig(entry, `policyProfiles[${index}]`));
+  const seen = new Set<string>();
+  for (const profile of profiles) {
+    if (profile.id === "custom") {
+      throw new Error("policyProfiles cannot use reserved id: custom");
+    }
+    if (seen.has(profile.id)) {
+      throw new Error(`Duplicate policyProfiles id: ${profile.id}`);
+    }
+    seen.add(profile.id);
+  }
+  listPolicyProfiles(profiles);
+  return profiles;
+}
+
+function normalizePolicyProfileConfig(value: unknown, field: string): PolicyProfile {
+  const entry = readObject(value, field);
+  const policy = normalizePolicyConfig(entry.policy);
+  if (!policy?.mode) {
+    throw new Error(`${field}.policy.mode is required.`);
+  }
+  return {
+    id: readRequiredString(entry.id, `${field}.id`),
+    label: readRequiredString(entry.label, `${field}.label`),
+    description: readRequiredString(entry.description, `${field}.description`),
+    approvalMode: readOptionalApprovalMode(entry.approvalMode) ?? "manual",
+    maxSteps: readOptionalInteger(entry.maxSteps, `${field}.maxSteps`),
+    policy: {
+      ...policy,
+      mode: policy.mode
+    },
+    budget: normalizeBudgetConfig(entry.budget)
+  };
 }
 
 function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefined {
@@ -183,6 +256,14 @@ function readObject(value: unknown, field: string): Record<string, unknown> {
     throw new Error(`${field} must be an object.`);
   }
   return value as Record<string, unknown>;
+}
+
+function readRequiredString(value: unknown, field: string): string {
+  const parsed = readOptionalString(value, field);
+  if (!parsed) {
+    throw new Error(`${field} must be a non-empty string.`);
+  }
+  return parsed;
 }
 
 function readOptionalString(value: unknown, field: string): string | undefined {

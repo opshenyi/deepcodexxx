@@ -16,6 +16,62 @@ describe("policy profiles", () => {
     ]);
   });
 
+  it("lists and resolves custom workspace policy profiles", () => {
+    const custom = [
+      {
+        id: "team-review",
+        label: "Team review",
+        description: "Team-managed review profile.",
+        approvalMode: "manual" as const,
+        maxSteps: 5,
+        policy: {
+          mode: "workspace-write" as const,
+          allowShell: false,
+          allowFileWrite: true,
+          shellEnvironment: "minimal" as const
+        },
+        budget: {
+          maxTokens: 1000
+        }
+      }
+    ];
+
+    expect(listPolicyProfiles(custom).map((profile) => profile.id)).toEqual([
+      "inspection",
+      "guarded-write",
+      "full-access-review",
+      "team-review"
+    ]);
+    expect(resolvePolicyProfile("team-review", custom)).toMatchObject({
+      id: "team-review",
+      approvalMode: "manual",
+      maxSteps: 5,
+      policy: {
+        mode: "workspace-write",
+        allowShell: false
+      },
+      budget: {
+        maxTokens: 1000
+      }
+    });
+  });
+
+  it("rejects custom profiles that replace built-ins", () => {
+    expect(() =>
+      listPolicyProfiles([
+        {
+          id: "inspection",
+          label: "Override",
+          description: "Invalid override.",
+          approvalMode: "deny",
+          policy: {
+            mode: "suggest"
+          }
+        }
+      ])
+    ).toThrow(/cannot replace built-in/);
+  });
+
   it("resolves the default guarded-write profile", () => {
     const profile = resolvePolicyProfileOrDefault(undefined);
 

@@ -37,6 +37,24 @@ describe("workspace config", () => {
         version: 1,
         model: "deepseek-coder",
         policyProfileId: "inspection",
+        policyProfiles: [
+          {
+            id: "repo-guarded",
+            label: "Repo guarded",
+            description: "Repository-specific guarded profile.",
+            approvalMode: "manual",
+            maxSteps: 4,
+            policy: {
+              mode: "workspace-write",
+              allowShell: false,
+              allowFileWrite: true,
+              shellEnvironment: "minimal"
+            },
+            budget: {
+              maxTokens: "1000"
+            }
+          }
+        ],
         approvalMode: "deny",
         maxSteps: "6",
         pricingProfileId: "pilot",
@@ -61,6 +79,24 @@ describe("workspace config", () => {
     expect(result.config).toMatchObject({
       model: "deepseek-coder",
       policyProfileId: "inspection",
+      policyProfiles: [
+        {
+          id: "repo-guarded",
+          label: "Repo guarded",
+          description: "Repository-specific guarded profile.",
+          approvalMode: "manual",
+          maxSteps: 4,
+          policy: {
+            mode: "workspace-write",
+            allowShell: false,
+            allowFileWrite: true,
+            shellEnvironment: "minimal"
+          },
+          budget: {
+            maxTokens: 1000
+          }
+        }
+      ],
       approvalMode: "deny",
       maxSteps: 6,
       pricingProfileId: "pilot",
@@ -97,6 +133,27 @@ describe("workspace config", () => {
     );
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/redactionPatterns/);
+  });
+
+  it("rejects custom policy profiles without a mode", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({
+        policyProfiles: [
+          {
+            id: "repo-guarded",
+            label: "Repo guarded",
+            description: "Missing mode.",
+            policy: {}
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/policyProfiles\[0\]\.policy\.mode/);
   });
 
   it("writes a template without overwriting an existing config", async () => {

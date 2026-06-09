@@ -24,7 +24,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Paths cannot escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, env files, and session audit state are denied by default.
 - File read, write, edit, and search tools enforce a configurable 512 KiB default size limit.
-- `.deepcodex/config.json` can define repository defaults for model, policy profile, approval mode, max steps, budget, file policy additions, custom redaction patterns, shell environment, pricing profile, and retention.
+- `.deepcodex/config.json` can define repository defaults for model, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction patterns, shell environment, pricing profile, and retention.
 - Dangerous shell commands are blocked unless `full-access` is selected.
 - Missing API keys trigger demo mode instead of crashing the product.
 

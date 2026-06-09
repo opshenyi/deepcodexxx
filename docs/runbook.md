@@ -43,7 +43,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction patterns, shell environment mode, and session retention defaults.
 
 Create a template:
 
@@ -67,6 +67,26 @@ Example:
   "approvalMode": "manual",
   "maxSteps": 12,
   "pricingProfileId": "custom",
+  "policyProfiles": [
+    {
+      "id": "team-review",
+      "label": "Team review",
+      "description": "Team-managed workspace-write profile with manual approvals and a tighter run budget.",
+      "approvalMode": "manual",
+      "maxSteps": 10,
+      "policy": {
+        "mode": "workspace-write",
+        "allowShell": true,
+        "allowFileWrite": true,
+        "allowNetwork": false,
+        "allowStateWrite": true,
+        "shellEnvironment": "minimal"
+      },
+      "budget": {
+        "maxTokens": 80000
+      }
+    }
+  ],
   "budget": {
     "maxTokens": 120000
   },
@@ -84,7 +104,7 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -161,7 +181,13 @@ node apps/cli/dist/index.js doctor
 List reusable policy profiles:
 
 ```powershell
-node apps/cli/dist/index.js profiles list
+node apps/cli/dist/index.js profiles list --workspace D:\Coding\DeepCodex
+```
+
+If the workspace config defines a `team-review` profile, inspect it:
+
+```powershell
+node apps/cli/dist/index.js profiles show team-review --workspace D:\Coding\DeepCodex
 ```
 
 List configured pricing profiles:

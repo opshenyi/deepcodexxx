@@ -45,6 +45,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added media/artifact extension policy: default file tools deny common image, video, audio, archive, Office/PDF, executable, library, and WebAssembly extensions; `DEEPCODEX_DENIED_EXTENSIONS` can extend the list.
 - Added workspace-level `.deepcodex/config.json` support across core/server/Web/Desktop/CLI. The config can set non-secret repository defaults for model, policy profile, approval mode, max steps, budget, pricing profile, shell environment, file policy additions, custom redaction patterns, and session retention. CLI now has `config show/init`, `doctor --workspace` reports config status, server exposes `/api/workspace-config`, and Web has `Load config` plus a max-steps control.
 - Added workspace-specific custom redaction patterns through `.deepcodex/config.json` `policy.redactionPatterns`. Matches are replaced with `[redacted-custom]` before event streaming, session persistence, and model-loop reuse.
+- Added custom team policy profile storage through `.deepcodex/config.json` `policyProfiles`. CLI `profiles list/show --workspace`, server `/api/policy-profiles?workspace=...`, Web/Desktop `Load config`, and agent runs now resolve workspace-defined profiles alongside built-ins while rejecting reserved or duplicate ids.
 
 ## Architecture Decisions
 
@@ -59,6 +60,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env, not a full sandbox.
 2. Add purpose-built media/artifact preview tools for safe non-text summaries when needed.
-3. Add custom team policy profile storage, signed policy bundles, provider allowlists, and project-specific DLP controls.
+3. Add signed policy bundles, provider allowlists, richer DLP classification, and OS-level shell isolation.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.
