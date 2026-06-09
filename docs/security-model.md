@@ -124,7 +124,7 @@ Current limitations:
 | Data | Storage | Notes |
 | --- | --- | --- |
 | DeepSeek API key | Environment or `.env` file. | Do not commit `.env`; `.env.example` contains only placeholders. |
-| Workspace configuration | `.deepcodex/config.json` in the selected workspace. | Non-secret team defaults only; explicit CLI/Web values and environment variables can override it. |
+| Workspace configuration | `.deepcodex/config.json` in the selected workspace. | Non-secret team defaults only; explicit CLI/Web values and environment variables can override it. Config reads include a raw-file SHA-256 fingerprint for provenance, but this is not signed policy enforcement. |
 | Prompts and tool outputs | In memory during the local run, visible in client event streams, replayable in the Web client, persisted locally under `.deepcodex/state/sessions`, redacted for common secret patterns before event persistence, and prunable by retention policy. | Add export review controls and broader DLP coverage. |
 | Workspace memory | `.deepcodex/memory.md` in the selected workspace. | Treat it as project data and review before sharing the workspace. |
 | Reference repositories | `references/agents`, ignored by git. | Used for architecture study only; avoid copying source into product code. |

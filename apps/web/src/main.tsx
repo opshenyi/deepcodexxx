@@ -130,6 +130,7 @@ type WorkspaceConfigResult = {
   path: string;
   exists: boolean;
   config: WorkspaceConfig;
+  sha256?: string;
 };
 
 type PricingProfile = {
@@ -546,7 +547,7 @@ function App() {
         const nextProfiles = mergePolicyProfileOptions(result.config.policyProfiles);
         setPolicyProfileOptions(nextProfiles);
         applyWorkspaceConfig(result.config, nextProfiles);
-        setConfigMessage(`Loaded ${result.path}`);
+        setConfigMessage(`Loaded ${result.path}${result.sha256 ? ` sha256:${result.sha256.slice(0, 12)}` : ""}`);
       } else {
         setConfigMessage(`No config at ${result.path}`);
       }

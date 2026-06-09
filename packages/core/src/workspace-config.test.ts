@@ -26,6 +26,7 @@ describe("workspace config", () => {
     expect(result.exists).toBe(false);
     expect(result.path).toBe(path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH));
     expect(result.config).toEqual({});
+    expect(result.sha256).toBeUndefined();
   });
 
   it("parses team defaults from .deepcodex/config.json", async () => {
@@ -84,6 +85,7 @@ describe("workspace config", () => {
     const result = await readWorkspaceConfig(tempDir);
 
     expect(result.exists).toBe(true);
+    expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(result.config).toMatchObject({
       model: "deepseek-coder",
       provider: {
@@ -203,6 +205,7 @@ describe("workspace config", () => {
 
     expect(created.exists).toBe(true);
     expect(created.config.policyProfileId).toBe("guarded-write");
+    expect(created.sha256).toMatch(/^[a-f0-9]{64}$/);
     await expect(writeWorkspaceConfigTemplate(tempDir)).rejects.toThrow(/already exists/);
   });
 });

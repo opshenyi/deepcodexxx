@@ -9,6 +9,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
 - Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, shell environment, shell network access, and retention.
+- Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
 - Provider/model allowlists that block unapproved base URLs or model selections before an agent run.
 - Local event stream for transparent tool execution.

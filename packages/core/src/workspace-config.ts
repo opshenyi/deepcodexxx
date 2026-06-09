@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listPolicyProfiles } from "./policy-profile.js";
@@ -33,6 +34,7 @@ export interface WorkspaceConfigReadResult {
   path: string;
   exists: boolean;
   config: WorkspaceConfig;
+  sha256?: string;
 }
 
 export interface WriteWorkspaceConfigOptions {
@@ -57,7 +59,8 @@ export async function readWorkspaceConfig(workspaceInput: string): Promise<Works
     return {
       path: filePath,
       exists: true,
-      config: normalizeWorkspaceConfig(JSON.parse(raw))
+      config: normalizeWorkspaceConfig(JSON.parse(raw)),
+      sha256: createSha256(raw)
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -82,9 +85,10 @@ export async function writeWorkspaceConfigTemplate(
   }
 
   const config = createWorkspaceConfigTemplate();
+  const raw = `${JSON.stringify(config, null, 2)}\n`;
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-  return { path: filePath, exists: true, config };
+  await writeFile(filePath, raw, "utf8");
+  return { path: filePath, exists: true, config, sha256: createSha256(raw) };
 }
 
 export function createWorkspaceConfigTemplate(): WorkspaceConfig {
@@ -441,4 +445,8 @@ function removeUndefinedRetentionValues(policy: SessionRetentionPolicy): Session
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function createSha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }

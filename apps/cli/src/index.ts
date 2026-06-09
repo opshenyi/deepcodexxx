@@ -200,6 +200,7 @@ config
     }
     console.log(`Config path: ${result.path}`);
     console.log(`Config status: ${result.exists ? "present" : "missing"}`);
+    console.log(`Config SHA-256: ${result.sha256 ? result.sha256.slice(0, 12) : "not available"}`);
     if (result.exists) {
       console.log(JSON.stringify(result.config, null, 2));
     }
@@ -383,6 +384,7 @@ program
     console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? basePolicy.shellEnvironment ?? "minimal"}`);
     console.log(`Shell network access: ${resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked"}`);
     console.log(`Workspace config: ${workspaceConfig.exists ? workspaceConfig.path : "missing"}`);
+    console.log(`Workspace config SHA-256: ${workspaceConfig.sha256 ? workspaceConfig.sha256.slice(0, 12) : "not available"}`);
     console.log(`Workspace max steps: ${workspaceConfig.config.maxSteps ?? "profile/default"}`);
     console.log(`Node: ${process.version}`);
   });

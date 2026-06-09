@@ -120,6 +120,8 @@ The current DeepSeek client sends non-streaming chat completion requests with to
 
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
+Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records. This is a provenance check, not signed policy enforcement.
+
 Agent events are redacted for common secret patterns before they are streamed to clients or persisted in session history. The default redaction covers common `*_API_KEY`, `*_TOKEN`, `*_SECRET`, password/private-key assignments, bearer authorization headers, and common token literals. Workspaces can add project-specific regex redaction patterns in `.deepcodex/config.json`.
 
 Write and edit tools also apply sensitive-text checks before producing diffs or writing files. Probable secrets and workspace `dlpPatterns` matches are blocked by default and reported by finding type without returning raw secret values. Set `policy.allowSecretWrites: true` only in a trusted workspace policy when a fixture or migration intentionally needs secret-like text.
@@ -138,6 +140,7 @@ Expected checks:
 - Base URL and model reflect the shell or `.env` values.
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
+- Workspace config SHA-256 prints when a config file exists.
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
