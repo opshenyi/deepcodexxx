@@ -621,6 +621,28 @@ describe("workspace tools", () => {
     await expect(runTool!.run({ command: "npm install" }, { workspace })).rejects.toThrow(/network-enabled/);
   });
 
+  it("enforces workspace shell command allow and deny patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowShell: true,
+      allowedShellCommands: [`^${escapeRegex(quoteCommandPath(process.execPath))}\\s+-e\\s+`],
+      deniedShellCommands: ["blocked-command"]
+    });
+    const runTool = createDefaultTools().find((tool) => tool.definition.function.name === "run_command");
+    expect(runTool).toBeDefined();
+
+    const allowed = await runTool!.run(
+      { command: `${quoteCommandPath(process.execPath)} -e "console.log('allowed')"` },
+      { workspace }
+    );
+
+    expect(allowed.ok).toBe(true);
+    expect(allowed.content.trim()).toBe("allowed");
+    await expect(runTool!.run({ command: "npm test" }, { workspace })).rejects.toThrow(/allowlist/);
+    await expect(runTool!.run({ command: "blocked-command" }, { workspace })).rejects.toThrow(/workspace shell policy/);
+  });
+
   it("marks non-zero shell exits as failed tool results", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const workspace = await createWorkspaceContext(tempDir, {
@@ -690,6 +712,10 @@ describe("workspace tools", () => {
 
 function quoteCommandPath(value: string): string {
   return `"${value.replaceAll('"', '\\"')}"`;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
 }
 
 function createPdf(text: string): Buffer {

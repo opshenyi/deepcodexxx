@@ -12,7 +12,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Desktop production-like startup can bootstrap the built local server and load the built Web client.
 - Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, a saved runtime Server URL from the sidebar, or saved local workspace profiles for repeated workspace/server/policy setup.
 - Server CORS can remain permissive for local development or be restricted by `DEEPCODEX_CORS_ORIGINS` for controlled demos.
-- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, and retention.
+- Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, and retention.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
 - CLI policy-bundle key generation and signing workflow for creating an Ed25519 keypair and signing `.deepcodex/policy-bundle.json` from the active workspace config with an external private key.
@@ -56,6 +56,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Minimal shell environment mode by default, with explicit `inherit` opt-in for trusted workspaces.
 - Optional audited `workspace-copy` shell execution mode that runs commands from a bounded temporary workspace snapshot and removes it after execution.
 - Network-aware shell command policy blocks common package install, git network, and network utility commands by default unless network access is explicitly enabled.
+- Workspace-configurable shell command allow/deny regex patterns for team-specific command boundaries, while preserving built-in dangerous and network command gates.
 - Shell command non-zero exits, timeouts, termination signals, and output overflows are surfaced as failed tool results instead of successful output text.
 - Reference repositories documented for architecture study.
 - Commercialization, runbook, security model, release checklist, and roadmap docs.
@@ -79,7 +80,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Level | Status | Notes |
 | --- | --- | --- |
 | Interview demo | Ready when checklist passes. | Shows a coherent local coding-agent product with honest limitations. |
-| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, release evidence reports, distribution preflight reports, eval evidence reports, retention pruning, diff-producing tools, Web unified/split diff review, existing-secret preflight scan, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
+| Local pilot | Close, but still controlled. | Has local audit history, workspace config defaults, release evidence reports, distribution preflight reports, eval evidence reports, retention pruning, diff-producing tools, Web unified/split diff review, existing-secret preflight scan, write-time secret blocking, file hash audit metadata, manual approvals, strict read-only inspection, minimal shell env, audited workspace-copy shell execution, configurable shell command boundaries, and default shell network blocking; still needs kernel-level shell sandboxing for high-trust pilots. |
 | Desktop release | Closer, but not installer-ready. | Has production-like local server bootstrap; still needs packaged installers, signing, and OS smoke tests. |
 | Hosted deployment | Future work. | Needs auth, tenancy, isolated execution, audit retention, and secrets controls. |
 

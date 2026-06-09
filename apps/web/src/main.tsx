@@ -106,6 +106,8 @@ type ServerPolicyProfile = {
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
     shellExecutionMode?: "direct" | "workspace-copy";
+    allowedShellCommands?: string[];
+    deniedShellCommands?: string[];
   };
   budget?: BudgetPolicy;
 };
@@ -140,6 +142,8 @@ type WorkspaceConfig = {
     maxFileBytes?: number;
     shellEnvironment?: "minimal" | "inherit";
     shellExecutionMode?: "direct" | "workspace-copy";
+    allowedShellCommands?: string[];
+    deniedShellCommands?: string[];
   };
   retention?: {
     maxSessions?: number;

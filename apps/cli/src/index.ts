@@ -979,6 +979,8 @@ program
         process.env.DEEPCODEX_SHELL_EXECUTION_MODE ?? basePolicy.shellExecutionMode ?? "direct"
       ),
       shellNetworkAccess: resolveAllowNetworkPolicy(false, basePolicy.allowNetwork) ? "allowed" : "blocked",
+      allowedShellCommandPatterns: basePolicy.allowedShellCommands?.length ?? 0,
+      deniedShellCommandPatterns: basePolicy.deniedShellCommands?.length ?? 0,
       archiveListing: resolveAllowArchiveListingPolicy(false, basePolicy.allowArchiveListing) ? "allowed" : "blocked",
       pdfTextExtraction: resolveAllowPdfTextExtractionPolicy(false, basePolicy.allowPdfTextExtraction)
         ? "allowed"
@@ -1020,6 +1022,8 @@ program
     console.log(`Shell environment: ${diagnostics.shellEnvironment}`);
     console.log(`Shell execution mode: ${diagnostics.shellExecutionMode}`);
     console.log(`Shell network access: ${diagnostics.shellNetworkAccess}`);
+    console.log(`Allowed shell command patterns: ${diagnostics.allowedShellCommandPatterns}`);
+    console.log(`Denied shell command patterns: ${diagnostics.deniedShellCommandPatterns}`);
     console.log(`Archive listing: ${diagnostics.archiveListing}`);
     console.log(`PDF text extraction: ${diagnostics.pdfTextExtraction}`);
     console.log(`Workspace config: ${diagnostics.workspaceConfig.status === "present" ? diagnostics.workspaceConfig.path : "missing"}`);

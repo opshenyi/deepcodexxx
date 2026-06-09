@@ -28,7 +28,9 @@ describe("policy profiles", () => {
           mode: "workspace-write" as const,
           allowShell: false,
           allowFileWrite: true,
-          shellEnvironment: "minimal" as const
+          shellEnvironment: "minimal" as const,
+          allowedShellCommands: ["^npm\\s+test$"],
+          deniedShellCommands: ["\\bterraform\\s+apply\\b"]
         },
         budget: {
           maxTokens: 1000
@@ -48,12 +50,18 @@ describe("policy profiles", () => {
       maxSteps: 5,
       policy: {
         mode: "workspace-write",
-        allowShell: false
+        allowShell: false,
+        allowedShellCommands: ["^npm\\s+test$"],
+        deniedShellCommands: ["\\bterraform\\s+apply\\b"]
       },
       budget: {
         maxTokens: 1000
       }
     });
+    const resolved = resolvePolicyProfile("team-review", custom)!;
+    resolved.policy.allowedShellCommands?.push("^local-only$");
+    expect(custom[0]!.policy.allowedShellCommands).not.toContain("^local-only$");
+    expect(resolvePolicyProfile("team-review", custom)?.policy.allowedShellCommands).not.toContain("^local-only$");
   });
 
   it("rejects custom profiles that replace built-ins", () => {

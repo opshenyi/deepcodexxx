@@ -149,7 +149,8 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
           allowArchiveListing: false,
           allowPdfTextExtraction: false,
           shellEnvironment: "minimal",
-          shellExecutionMode: "direct"
+          shellExecutionMode: "direct",
+          deniedShellCommands: ["\\bterraform\\s+apply\\b", "\\bkubectl\\s+delete\\b"]
         },
         budget: {
           maxTokens: 80000
@@ -169,7 +170,8 @@ export function createWorkspaceConfigTemplate(): WorkspaceConfig {
       deniedPaths: ["secrets"],
       deniedFileExtensions: [".pem", ".sqlite"],
       redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
-      dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"]
+      dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
+      deniedShellCommands: ["\\bterraform\\s+apply\\b", "\\bkubectl\\s+delete\\b"]
     },
     retention: {
       maxSessions: 100,
@@ -317,7 +319,9 @@ function normalizePolicyConfig(value: unknown): Partial<ApprovalPolicy> | undefi
     dlpPatterns: readOptionalRegexArray(entry.dlpPatterns, "policy.dlpPatterns"),
     maxFileBytes: readOptionalNumber(entry.maxFileBytes, "policy.maxFileBytes"),
     shellEnvironment: readOptionalShellEnvironment(entry.shellEnvironment),
-    shellExecutionMode: readOptionalShellExecutionMode(entry.shellExecutionMode)
+    shellExecutionMode: readOptionalShellExecutionMode(entry.shellExecutionMode),
+    allowedShellCommands: readOptionalRegexArray(entry.allowedShellCommands, "policy.allowedShellCommands"),
+    deniedShellCommands: readOptionalRegexArray(entry.deniedShellCommands, "policy.deniedShellCommands")
   });
 }
 

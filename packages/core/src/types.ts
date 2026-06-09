@@ -177,6 +177,8 @@ export interface ApprovalPolicy {
   maxFileBytes?: number;
   shellEnvironment?: ShellEnvironmentMode;
   shellExecutionMode?: ShellExecutionMode;
+  allowedShellCommands?: string[];
+  deniedShellCommands?: string[];
 }
 
 export interface PolicyProfile {

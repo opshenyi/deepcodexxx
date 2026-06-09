@@ -37,6 +37,7 @@ Expected result:
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
 - CLI `doctor` reports shell execution mode, defaulting to `direct`.
 - CLI `doctor` reports shell network access, defaulting to `blocked`.
+- CLI `doctor` reports shell command allow/deny pattern counts when workspace policy defines them.
 - CLI `doctor` reports archive listing, defaulting to `blocked`.
 - CLI `doctor` reports PDF text extraction, defaulting to `blocked`.
 - CLI `doctor` reports a workspace config SHA-256 when a config file exists.
@@ -96,6 +97,7 @@ Checklist:
 - Archive listing remains blocked by default; when enabled for a trusted ZIP fixture, entry manifests omit denied entries and do not expose member contents.
 - PDF text extraction remains blocked by default; when enabled for a trusted PDF fixture, returned text is page/character bounded and raw bytes, images, attachments, and embedded files are not exposed.
 - Shell network commands such as package install or remote git are blocked unless network access is explicitly enabled for a trusted run.
+- Workspace-configured shell command deny patterns block matching commands, and allow patterns restrict commands when a profile defines a non-empty allowlist.
 - A deliberately failing verification command appears as a failed tool result, not a successful tool event with stderr text.
 - With `shellExecutionMode` set to `workspace-copy` for a trusted fixture, shell commands run from a temporary snapshot, leave the real workspace unchanged for relative-path writes, and show `Shell audit` metadata.
 - `Load memory` returns either existing memory or the empty-memory state.
@@ -165,6 +167,7 @@ Checklist:
 - Shell-capable demos use `--shell-env minimal` unless a trusted task explicitly needs inherited environment variables.
 - Safer verification demos can use `--shell-execution-mode workspace-copy` when command side effects should stay out of the selected workspace.
 - Network-capable shell demos use `--allow-network` only after the command has been reviewed.
+- Team shell-policy demos use a signed or reviewed workspace config with `allowedShellCommands` or `deniedShellCommands` and explain that these are regex gates, not an OS sandbox.
 - Archive manifest demos use `--allow-archive-listing` only for trusted ZIP-compatible fixtures.
 - PDF text extraction demos use `--allow-pdf-text-extraction` only for trusted local PDF fixtures.
 

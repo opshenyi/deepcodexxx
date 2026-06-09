@@ -46,12 +46,28 @@ export function assertShellCommandAllowed(command: string, policy: ApprovalPolic
   if (!canRunShell(policy)) {
     throw new Error("Shell execution is disabled by the current approval policy.");
   }
+  if (matchesShellPolicy(command, policy.deniedShellCommands)) {
+    throw new Error("Shell command is denied by workspace shell policy.");
+  }
+  if ((policy.allowedShellCommands?.length ?? 0) > 0 && !matchesShellPolicy(command, policy.allowedShellCommands)) {
+    throw new Error("Shell command is not in the workspace shell allowlist.");
+  }
   if (policy.mode !== "full-access" && DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(command))) {
     throw new Error("Shell command requires full-access mode.");
   }
   if (!canUseNetwork(policy) && NETWORK_COMMAND_PATTERNS.some((pattern) => pattern.test(command))) {
     throw new Error("Shell command requires network-enabled policy.");
   }
+}
+
+function matchesShellPolicy(command: string, patterns: string[] | undefined): boolean {
+  return (patterns ?? []).some((pattern) => {
+    try {
+      return new RegExp(pattern).test(command);
+    } catch {
+      throw new Error("Shell command policy contains an invalid regular expression.");
+    }
+  });
 }
 
 export function createShellEnvironment(policy: ApprovalPolicy): NodeJS.ProcessEnv {

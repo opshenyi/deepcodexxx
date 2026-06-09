@@ -58,4 +58,49 @@ describe("safety policy", () => {
     expect(canUseNetwork(policy)).toBe(true);
     expect(() => assertShellCommandAllowed("npm install", policy)).not.toThrow();
   });
+
+  it("blocks workspace-denied shell commands", () => {
+    expect(() =>
+      assertShellCommandAllowed("terraform apply -auto-approve", {
+        mode: "full-access",
+        allowShell: true,
+        allowFileWrite: true,
+        allowNetwork: true,
+        deniedShellCommands: ["\\bterraform\\s+apply\\b"]
+      })
+    ).toThrow(/denied by workspace shell policy/);
+  });
+
+  it("requires an allowlist match when workspace shell allowlist is configured", () => {
+    const policy = {
+      mode: "workspace-write" as const,
+      allowShell: true,
+      allowFileWrite: true,
+      allowedShellCommands: ["^npm\\s+test$"]
+    };
+
+    expect(() => assertShellCommandAllowed("npm test", policy)).not.toThrow();
+    expect(() => assertShellCommandAllowed("npm run build", policy)).toThrow(/allowlist/);
+  });
+
+  it("does not let shell allowlists bypass built-in dangerous or network gates", () => {
+    expect(() =>
+      assertShellCommandAllowed("git reset --hard HEAD", {
+        mode: "workspace-write",
+        allowShell: true,
+        allowFileWrite: true,
+        allowedShellCommands: [".*"]
+      })
+    ).toThrow(/full-access/);
+
+    expect(() =>
+      assertShellCommandAllowed("npm install", {
+        mode: "workspace-write",
+        allowShell: true,
+        allowFileWrite: true,
+        allowNetwork: false,
+        allowedShellCommands: [".*"]
+      })
+    ).toThrow(/network-enabled/);
+  });
 });

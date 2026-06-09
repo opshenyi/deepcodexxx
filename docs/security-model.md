@@ -8,7 +8,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | --- | --- | --- |
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, block probable secret writes by default, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata and file hashes when available. | Add shell isolation and broader file-type policy. |
-| DeepCodex to shell | Shell runs with the user's OS privileges, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. Common network commands are blocked unless network access is explicitly enabled. Shell commands can optionally run in a temporary workspace copy that is removed after execution. | Add kernel-level sandboxing or remote isolated execution workers. |
+| DeepCodex to shell | Shell runs with the user's OS privileges, but defaults to a minimal child-process environment that does not inherit provider keys or arbitrary parent variables. Common network commands are blocked unless network access is explicitly enabled. Workspace policy can add shell command allow/deny regex gates, and shell commands can optionally run in a temporary workspace copy that is removed after execution. | Add kernel-level sandboxing or remote isolated execution workers. |
 | DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, optional token/cost budgets can stop further work after a limit is reached, pricing profiles are caller-managed configuration, and `.deepcodex/config.json` can set workspace model, provider base URL, provider/model allowlists, and budget defaults. Signed policy bundles can verify the active workspace config before CLI/server runs when enforcement is enabled. | Add secrets management, key rotation, and richer provider fallback policy. |
 | Workspace memory and audit state | Memory is stored in `.deepcodex/memory.md`; session audit files are stored in `.deepcodex/state/sessions`, are redacted before persistence, and can be pruned by count or age. | Add review controls and broader DLP policy. |
 
@@ -25,8 +25,8 @@ Reusable profiles:
 | Mode | Current enforcement | Recommended demo use |
 | --- | --- | --- |
 | `suggest` | Shell commands are disabled. File write/edit tools return previews and do not apply changes. Read/search tools remain available. Agent runs do not create `.deepcodex` memory or session state. | Repository inspection, planning, and first-pass interview demo. |
-| `workspace-write` | Enables file writes/edits inside workspace path controls and enables shell commands. Dangerous command patterns are blocked unless `full-access` is selected. Common network commands are blocked unless `allowNetwork` is enabled. | Small tasks on a disposable branch or sample repository. |
-| `full-access` | Enables file writes/edits inside workspace path controls and allows shell commands with fewer command-pattern restrictions. Common network commands are still blocked unless `allowNetwork` is enabled. | Only for controlled demonstrations where the workspace can be reset. |
+| `workspace-write` | Enables file writes/edits inside workspace path controls and enables shell commands. Dangerous command patterns are blocked unless `full-access` is selected. Common network commands are blocked unless `allowNetwork` is enabled. Workspace allow/deny shell patterns can further narrow command use. | Small tasks on a disposable branch or sample repository. |
+| `full-access` | Enables file writes/edits inside workspace path controls and allows shell commands with fewer command-pattern restrictions. Common network commands are still blocked unless `allowNetwork` is enabled, and workspace deny/allow shell patterns still apply. | Only for controlled demonstrations where the workspace can be reset. |
 
 ## Tool Approval Modes
 
@@ -75,17 +75,20 @@ Implemented controls:
 - Shell execution defaults to `direct`. `DEEPCODEX_SHELL_EXECUTION_MODE=workspace-copy`, CLI `--shell-execution-mode workspace-copy`, server request policy, or workspace policy `shellExecutionMode: "workspace-copy"` can run shell commands from a temporary workspace snapshot that is removed after execution.
 - Workspace-copy shell execution skips denied paths, denied file extensions, symlinks, and files above `maxFileBytes`, with bounded file-count and total-byte caps. Tool events include shell audit metadata with copy statistics.
 - Shell network access defaults to blocked. CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` can enable common network command patterns for trusted runs.
+- Workspace policy `deniedShellCommands` can block repository-specific raw shell command regex matches before execution, and `allowedShellCommands` can restrict shell execution to matching commands when the allowlist is non-empty.
 - Shell timeout is capped at 180 seconds.
 - Shell output collection is bounded, and timeout or output-overflow termination attempts to stop the spawned process tree.
 - Non-zero exits, timeout termination, signals, and output overflow are reported as failed tool results.
 - A small dangerous-command pattern list requires `full-access`, including destructive delete and hard reset patterns.
 - A network-command pattern list blocks common package installs, git fetch/pull/push/clone, network utilities, and container pull/push/run commands while `allowNetwork` is false.
+- Workspace allowlists do not bypass built-in dangerous-command or network-command gates.
 
 Current limitations:
 
 - Direct shell execution is command filtering, not an OS sandbox.
 - Workspace-copy shell execution protects the selected workspace from relative-path writes, but it is still not a kernel sandbox and cannot block a command that explicitly accesses absolute paths with the user's OS permissions.
 - Network command blocking is pattern-based and is not a kernel-level network sandbox.
+- Workspace shell allow/deny lists are pattern-based and can miss obfuscated or indirect commands.
 - Shell review can be per-command in manual approval mode, but shell execution is still not fully OS-sandboxed after approval.
 - Minimal shell environment reduces accidental secret exposure but does not prevent a command from reading files it is otherwise allowed to access.
 - The pattern list cannot prove a command is safe.
@@ -99,7 +102,7 @@ Provider usage controls:
 - Token budgets can be set with `DEEPCODEX_MAX_SESSION_TOKENS`, CLI flags, or the Web Budget panel.
 - Estimated cost budgets can be set with `DEEPCODEX_MAX_SESSION_USD`, but require caller-provided input and output token prices.
 - Pricing profiles can be configured with `DEEPCODEX_PRICING_PROFILES` and selected through CLI, server, or Web budget controls.
-- `.deepcodex/config.json` can provide workspace defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, shell network access, and retention.
+- `.deepcodex/config.json` can provide workspace defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, shell network access, shell command allow/deny patterns, and retention.
 - Provider allowlists block agent runs when the resolved base URL or model is not approved by the workspace policy.
 - Provider calls retry 429, 500, 502, 503, 504, and network failures with bounded exponential backoff; request errors and invalid JSON are not retried.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.

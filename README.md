@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, and CLI CI diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists, saved Web workspace profiles, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, and CLI CI diagnostics.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-to
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
-Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, pricing profile, and session retention defaults:
+Workspace defaults can be stored in `.deepcodex/config.json` so a repository can pin its model and provider base URL, define provider/model allowlists, team policy profiles, workspace eval tasks, choose a default policy profile, set approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and session retention defaults:
 
 ```powershell
 node apps/cli/dist/index.js config init --workspace D:\Coding\DeepCodex

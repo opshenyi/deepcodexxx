@@ -121,4 +121,16 @@ describe("workspace boundaries", () => {
 
     expect(workspace.policy.dlpPatterns).toContain("ACME_SECRET_[A-Z]{16}");
   });
+
+  it("supports workspace shell command policy patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const workspace = await createWorkspaceContext(tempDir, {
+      mode: "workspace-write",
+      allowedShellCommands: ["^npm\\s+test$"],
+      deniedShellCommands: ["\\bterraform\\s+apply\\b"]
+    });
+
+    expect(workspace.policy.allowedShellCommands).toContain("^npm\\s+test$");
+    expect(workspace.policy.deniedShellCommands).toContain("\\bterraform\\s+apply\\b");
+  });
 });

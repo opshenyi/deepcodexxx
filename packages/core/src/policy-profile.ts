@@ -125,7 +125,9 @@ function cloneProfile(profile: PolicyProfile): PolicyProfile {
       deniedPaths: profile.policy.deniedPaths ? [...profile.policy.deniedPaths] : undefined,
       deniedFileExtensions: profile.policy.deniedFileExtensions ? [...profile.policy.deniedFileExtensions] : undefined,
       redactionPatterns: profile.policy.redactionPatterns ? [...profile.policy.redactionPatterns] : undefined,
-      dlpPatterns: profile.policy.dlpPatterns ? [...profile.policy.dlpPatterns] : undefined
+      dlpPatterns: profile.policy.dlpPatterns ? [...profile.policy.dlpPatterns] : undefined,
+      allowedShellCommands: profile.policy.allowedShellCommands ? [...profile.policy.allowedShellCommands] : undefined,
+      deniedShellCommands: profile.policy.deniedShellCommands ? [...profile.policy.deniedShellCommands] : undefined
     },
     budget: profile.budget ? { ...profile.budget } : undefined
   };

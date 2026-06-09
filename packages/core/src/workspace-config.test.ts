@@ -57,6 +57,8 @@ describe("workspace config", () => {
               allowSecretWrites: false,
               allowArchiveListing: false,
               allowPdfTextExtraction: false,
+              allowedShellCommands: ["^npm\\s+(test|run\\s+build)$"],
+              deniedShellCommands: ["\\bterraform\\s+apply\\b"],
               shellEnvironment: "minimal",
               shellExecutionMode: "workspace-copy"
             },
@@ -91,6 +93,8 @@ describe("workspace config", () => {
           deniedFileExtensions: ["sqlite"],
           redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
           dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
+          allowedShellCommands: ["^npm\\s+(test|run\\s+build)$"],
+          deniedShellCommands: ["\\bterraform\\s+apply\\b"],
           maxFileBytes: 2048,
           shellEnvironment: "minimal",
           shellExecutionMode: "workspace-copy"
@@ -126,6 +130,8 @@ describe("workspace config", () => {
             allowSecretWrites: false,
             allowArchiveListing: false,
             allowPdfTextExtraction: false,
+            allowedShellCommands: ["^npm\\s+(test|run\\s+build)$"],
+            deniedShellCommands: ["\\bterraform\\s+apply\\b"],
             shellEnvironment: "minimal",
             shellExecutionMode: "workspace-copy"
           },
@@ -160,6 +166,8 @@ describe("workspace config", () => {
         deniedFileExtensions: ["sqlite"],
         redactionPatterns: ["ACME_[A-Z0-9]{16,}"],
         dlpPatterns: ["ACME_SECRET_[A-Z0-9]{16,}"],
+        allowedShellCommands: ["^npm\\s+(test|run\\s+build)$"],
+        deniedShellCommands: ["\\bterraform\\s+apply\\b"],
         maxFileBytes: 2048,
         shellEnvironment: "minimal",
         shellExecutionMode: "workspace-copy"
@@ -215,6 +223,18 @@ describe("workspace config", () => {
     );
 
     await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/dlpPatterns/);
+  });
+
+  it("rejects invalid shell command policy patterns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    await mkdir(path.join(tempDir, ".deepcodex"));
+    await writeFile(
+      path.join(tempDir, WORKSPACE_CONFIG_RELATIVE_PATH),
+      JSON.stringify({ policy: { allowedShellCommands: ["["] } }),
+      "utf8"
+    );
+
+    await expect(readWorkspaceConfig(tempDir)).rejects.toThrow(/allowedShellCommands/);
   });
 
   it("rejects invalid shell execution modes", async () => {
@@ -375,6 +395,8 @@ describe("workspace config", () => {
     expect(created.exists).toBe(true);
     expect(created.config.policyProfileId).toBe("guarded-write");
     expect(created.config.evals?.[0]?.id).toBe("workspace-release-smoke");
+    expect(created.config.policy?.deniedShellCommands).toContain("\\bterraform\\s+apply\\b");
+    expect(created.config.policyProfiles?.[0]?.policy.deniedShellCommands).toContain("\\bkubectl\\s+delete\\b");
     expect(created.sha256).toMatch(/^[a-f0-9]{64}$/);
     await expect(writeWorkspaceConfigTemplate(tempDir)).rejects.toThrow(/already exists/);
   });

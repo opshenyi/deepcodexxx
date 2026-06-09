@@ -58,7 +58,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 
 ## Workspace Configuration
 
-Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment mode, shell execution mode, shell network access, and session retention defaults.
+Repository defaults can live in `.deepcodex/config.json`. This file is intended for non-secret team policy: model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget defaults, pricing profile id, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment mode, shell execution mode, shell network access, shell command allow/deny regex patterns, and session retention defaults.
 
 Create a template:
 
@@ -118,7 +118,8 @@ Example:
         "allowArchiveListing": false,
         "allowPdfTextExtraction": false,
         "shellEnvironment": "minimal",
-        "shellExecutionMode": "direct"
+        "shellExecutionMode": "direct",
+        "deniedShellCommands": ["\\bterraform\\s+apply\\b", "\\bkubectl\\s+delete\\b"]
       },
       "budget": {
         "maxTokens": 80000
@@ -139,7 +140,8 @@ Example:
     "deniedPaths": ["secrets"],
     "deniedFileExtensions": [".pem", ".sqlite"],
     "redactionPatterns": ["ACME_[A-Z0-9]{16,}"],
-    "dlpPatterns": ["ACME_SECRET_[A-Z0-9]{16,}"]
+    "dlpPatterns": ["ACME_SECRET_[A-Z0-9]{16,}"],
+    "deniedShellCommands": ["\\bterraform\\s+apply\\b", "\\bkubectl\\s+delete\\b"]
   },
   "retention": {
     "maxSessions": 100,
@@ -148,7 +150,7 @@ Example:
 }
 ```
 
-Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. Do not put provider keys or secrets in workspace config.
+Precedence is explicit request or CLI flag first, then environment variable, then workspace config, then built-in defaults. Provider allowlists are enforced after the effective base URL and model are resolved, so an environment override can still be blocked by workspace policy. Custom `policyProfiles` cannot use the reserved `custom` id or replace built-in profile ids. Workspace `evals` entries add repository-specific read-only smoke tasks; their ids must be unique, file-name safe, and cannot replace built-in eval ids. `redactionPatterns` entries are JavaScript regular expression sources applied globally and replaced with `[redacted-custom]`; `dlpPatterns` entries are JavaScript regular expression sources used for write-time DLP blocking. `allowedShellCommands` and `deniedShellCommands` entries are JavaScript regular expression sources applied to the raw shell command before execution; deny matches block immediately, allowlists restrict commands when non-empty, and built-in dangerous/network gates still apply after allowlist matching. Do not put provider keys or secrets in workspace config.
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed. Provider calls retry 429, 500, 502, 503, 504, and network failures with exponential backoff; 400-class request errors and invalid JSON are surfaced without retry.
 
@@ -198,6 +200,8 @@ PDF text extraction is disabled by default. When `policy.allowPdfTextExtraction:
 
 Shell execution defaults to `direct` for compatibility. Set `policy.shellExecutionMode: "workspace-copy"`, `DEEPCODEX_SHELL_EXECUTION_MODE=workspace-copy`, or CLI `--shell-execution-mode workspace-copy` to run shell commands from a temporary workspace snapshot. The snapshot skips denied paths, denied file extensions, symlinks, files above `maxFileBytes`, and stops at bounded file-count and total-byte caps. It is removed after the command, and shell tool events include a `Shell audit` block with copy statistics. This protects the real workspace from relative-path writes, but it is not a kernel sandbox; a command that explicitly reaches an absolute path can still use the user's OS permissions.
 
+Use workspace policy `deniedShellCommands` to block repository-specific risky commands such as production deployment or destructive infrastructure commands. Use `allowedShellCommands` only when a team wants a narrow command menu for a profile, such as `^npm\\s+test$` or `^npm\\s+run\\s+build$`. These patterns are allow/deny gates on the raw command string; built-in dangerous command and network command checks still run afterward.
+
 ## Verify Configuration
 
 ```powershell
@@ -219,6 +223,7 @@ Expected checks:
 - Provider allowlist counts print when workspace config defines them.
 - Shell network policy prints as blocked unless explicitly enabled.
 - Shell execution mode prints as `direct` unless a workspace copy is explicitly enabled.
+- Shell command allow/deny pattern counts print when workspace config or the selected profile defines them.
 - Archive listing policy prints as blocked unless explicitly enabled.
 - PDF text extraction policy prints as blocked unless explicitly enabled.
 - Node version prints without crashing.
@@ -504,6 +509,8 @@ The Security scan panel and CLI `security scan` command use the same detector as
 | Shell command cannot find a custom environment variable. | Shell environment mode is `minimal`. | Use `--shell-env inherit` or `DEEPCODEX_SHELL_ENV=inherit` only for trusted workspaces that need parent environment variables. |
 | Shell command changes are missing from the workspace. | Shell execution mode is `workspace-copy`, so relative-path writes happened in the temporary snapshot. | Use direct mode only when the command is intentionally allowed to update the selected workspace, or keep workspace-copy for verification commands. |
 | Shell network command is blocked. | `allowNetwork` is false and the command looks like package install, remote git, or a network utility. | Use CLI `--allow-network`, `DEEPCODEX_ALLOW_NETWORK=true`, or workspace policy `allowNetwork: true` only for trusted tasks. |
+| Shell command is denied by workspace shell policy. | The command matched `policy.deniedShellCommands`. | Change the task command, use a different approved profile, or update the signed workspace policy after review. |
+| Shell command is not in the workspace shell allowlist. | `policy.allowedShellCommands` is non-empty and none of the patterns matched the raw command. | Use one of the documented allowed commands or update the team policy after review. |
 | Write or edit is blocked by DLP policy. | The proposed content looks like a secret assignment, bearer token, token literal, or workspace custom DLP match. | Move the value to an environment variable or set `policy.allowSecretWrites: true` only for a trusted fixture/migration workspace. |
 | Security scan reports findings. | Existing allowed text files match built-in sensitive patterns or workspace `dlpPatterns`. | Review the reported path and line locally, move real secrets out of the workspace, or tune project-specific patterns for false positives. |
 | A project-specific secret still appears in output. | Redaction is pattern-based. | Add the pattern to a future project DLP policy and rotate the exposed secret if necessary. |

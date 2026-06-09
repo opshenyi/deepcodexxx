@@ -108,6 +108,14 @@ export async function createWorkspaceContext(
     ]),
     redactionPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.redactionPatterns ?? []), ...(policy.redactionPatterns ?? [])]),
     dlpPatterns: uniqueDeniedPaths([...(DEFAULT_POLICY.dlpPatterns ?? []), ...(policy.dlpPatterns ?? [])]),
+    allowedShellCommands: uniqueDeniedPaths([
+      ...(DEFAULT_POLICY.allowedShellCommands ?? []),
+      ...(policy.allowedShellCommands ?? [])
+    ]),
+    deniedShellCommands: uniqueDeniedPaths([
+      ...(DEFAULT_POLICY.deniedShellCommands ?? []),
+      ...(policy.deniedShellCommands ?? [])
+    ]),
     maxFileBytes: policy.maxFileBytes ?? DEFAULT_POLICY.maxFileBytes,
     shellEnvironment: policy.shellEnvironment ?? DEFAULT_POLICY.shellEnvironment,
     shellExecutionMode: policy.shellExecutionMode ?? DEFAULT_POLICY.shellExecutionMode

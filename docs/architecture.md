@@ -24,7 +24,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Paths cannot escape the workspace root.
 - `.git`, `node_modules`, `references/agents`, env files, and session audit state are denied by default.
 - File read, write, edit, and search tools enforce a configurable 512 KiB default size limit.
-- `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, pricing profile, and retention.
+- `.deepcodex/config.json` can define repository defaults for model, provider base URL, provider/model allowlists, custom team policy profiles, default policy profile, approval mode, max steps, budget, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, pricing profile, and retention.
 - Workspace config responses include a SHA-256 fingerprint of the raw config file for policy provenance.
 - `.deepcodex/state/evals` stores optional recorded eval runs; shared core helpers score exact expected signals, compare runs, aggregate reports, and expose the same evidence through CLI, server API, and Web/Desktop.
 - Release evidence reports compose workspace config provenance, policy-bundle verification, eval summaries, security-scan metadata, provider-key status, and recent session summaries through shared core helpers, CLI, server API, and Web/Desktop.
@@ -35,6 +35,7 @@ DeepCodex is a TypeScript monorepo with five production packages:
 - Desktop production-like launches start the built server automatically when `DEEPCODEX_WEB_URL` is not set, wait for local health, then load the built Web client.
 - Dangerous shell commands are blocked unless `full-access` is selected.
 - Common shell network commands are blocked unless network access is explicitly enabled.
+- Workspace policy can add raw shell command allow/deny regex gates; allowlists cannot bypass the built-in dangerous or network command gates.
 - Shell commands can run in `workspace-copy` mode, which snapshots allowed workspace files into a temporary directory, runs the command there, records shell audit metadata, and removes the snapshot afterward.
 - Shell command failures, timeouts, signals, and output overflows are reported as failed tool results so verification failures remain visible to the agent and user.
 - Probable secret writes are blocked before file diffs or writes are returned unless `allowSecretWrites` is explicitly enabled.
