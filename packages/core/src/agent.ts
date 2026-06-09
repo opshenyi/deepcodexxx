@@ -109,10 +109,10 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
       throw new Error("DeepSeek returned no assistant message.");
     }
 
-    messages.push(assistant);
-    const toolCalls = assistant.tool_calls ?? [];
     const text = redactSensitiveText(assistant.content ?? "", redactionOptions);
-    messages[messages.length - 1] = { ...assistant, content: text };
+    const replayAssistant: ChatMessage = { ...assistant, content: text };
+    messages.push(replayAssistant);
+    const toolCalls = replayAssistant.tool_calls ?? [];
 
     if (text.trim()) {
       await emit({ type: "assistant_message", content: text });

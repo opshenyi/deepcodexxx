@@ -78,13 +78,27 @@ describe("DeepSeekClient", () => {
       maxRetries: 0
     });
 
-    await client.chat([{ role: "user", content: "hello" }]);
+    await client.chat(
+      [
+        { role: "user", content: "hello" },
+        { role: "assistant", content: "", reasoning_content: "provider reasoning replay" }
+      ],
+      [sampleTool()]
+    );
 
     expect(requestedPayloads(fetchMock)[0]).toMatchObject({
       thinking: { type: "enabled" },
-      reasoning_effort: "max"
+      reasoning_effort: "max",
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          role: "assistant",
+          content: "",
+          reasoning_content: "provider reasoning replay"
+        })
+      ])
     });
     expect(requestedPayloads(fetchMock)[0]).not.toHaveProperty("temperature");
+    expect(requestedPayloads(fetchMock)[0]).not.toHaveProperty("tool_choice");
   });
 
   it("retries network errors", async () => {
@@ -194,6 +208,23 @@ function requestedModels(fetchMock: ReturnType<typeof vi.fn>): string[] {
 
 function requestedPayloads(fetchMock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
   return fetchMock.mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+}
+
+function sampleTool() {
+  return {
+    type: "function" as const,
+    function: {
+      name: "read_file",
+      description: "Read a file.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" }
+        },
+        required: ["path"]
+      }
+    }
+  };
 }
 
 function restoreEnvValue(name: string, value: string | undefined): void {

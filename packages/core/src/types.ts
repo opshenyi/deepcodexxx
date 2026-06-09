@@ -15,6 +15,7 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
+  reasoning_content?: string | null;
 }
 
 export interface ToolDefinition {

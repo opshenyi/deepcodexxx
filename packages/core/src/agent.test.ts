@@ -201,6 +201,40 @@ describe("agent approval risk", () => {
     );
   });
 
+  it("replays assistant reasoning content across tool-call turns", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const observedMessages: ChatMessage[][] = [];
+
+    const result = await runDeepCodexAgent({
+      prompt: "use a tool with thinking metadata",
+      workspace: tempDir,
+      chatClient: reasoningReplayClient(observedMessages)
+    });
+
+    expect(result.finalText).toBe("done");
+    expect(observedMessages).toHaveLength(2);
+    expect(observedMessages[1]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "assistant",
+          content: "",
+          reasoning_content: "reasoning text that DeepSeek requires on the next tool turn",
+          tool_calls: [
+            expect.objectContaining({
+              id: "tool-call-reasoning",
+              function: expect.objectContaining({ name: "unknown_tool" })
+            })
+          ]
+        }),
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "tool-call-reasoning",
+          content: "Unknown tool: unknown_tool"
+        })
+      ])
+    );
+  });
+
   it("redacts sensitive assistant content before emitting or returning it", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
     const events: AgentEvent[] = [];
@@ -365,6 +399,55 @@ function fallbackUsageClient(): AgentChatClient {
           completion_tokens: 2,
           total_tokens: 5
         }
+      };
+    }
+  };
+}
+
+function reasoningReplayClient(observedMessages: ChatMessage[][]): AgentChatClient {
+  let callCount = 0;
+  return {
+    model: "test-model",
+    async chat(messages: ChatMessage[]): Promise<DeepSeekChatResponse> {
+      observedMessages.push(JSON.parse(JSON.stringify(messages)) as ChatMessage[]);
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          id: "test-reasoning-tool-call",
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: null,
+                reasoning_content: "reasoning text that DeepSeek requires on the next tool turn",
+                tool_calls: [
+                  {
+                    id: "tool-call-reasoning",
+                    type: "function",
+                    function: {
+                      name: "unknown_tool",
+                      arguments: "{}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        };
+      }
+
+      return {
+        id: "test-reasoning-final",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "done"
+            }
+          }
+        ]
       };
     }
   };

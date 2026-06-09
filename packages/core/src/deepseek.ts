@@ -88,11 +88,10 @@ export class DeepSeekClient {
         model,
         messages,
         tools,
-        tool_choice: tools.length > 0 ? "auto" : "none",
         max_tokens: 4096,
         stream: false,
         thinking: { type: this.thinking },
-        ...(this.thinking === "disabled" ? { temperature: 0.2 } : {}),
+        ...(this.thinking === "disabled" ? { tool_choice: tools.length > 0 ? "auto" : "none", temperature: 0.2 } : {}),
         ...(this.thinking === "enabled" && this.reasoningEffort
           ? { reasoning_effort: this.reasoningEffort }
           : {})

@@ -95,7 +95,7 @@ Checklist:
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
 - A workspace provider allowlist rejects unapproved base URLs, primary models, or fallback models before a run starts.
-- DeepSeek V4 thinking mode stays disabled for normal coding-agent demos unless the presenter is intentionally testing reasoning-content behavior.
+- DeepSeek V4 thinking mode stays disabled for normal coding-agent demos unless the presenter is intentionally testing opt-in thinking runs with internal reasoning replay.
 - Pricing profile selector appears in the Budget panel when pricing profiles are configured.
 - Event stream and exports redact common secret patterns in tool output and assistant text.
 - Workspace-specific redaction patterns from `.deepcodex/config.json` redact configured matches before streaming or persistence.
