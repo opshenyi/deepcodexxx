@@ -42,6 +42,16 @@ describe("session store", () => {
       completionTokens: 8,
       totalTokens: 20
     });
+    await recorder.record({
+      type: "budget_updated",
+      budget: {
+        promptTokens: 12,
+        completionTokens: 8,
+        totalTokens: 20,
+        maxTokens: 50,
+        remainingTokens: 30
+      }
+    });
     await recorder.record({ type: "final", content: "done" });
 
     const filePath = path.join(sessionDirectory(workspace), "session-1.json");
@@ -49,7 +59,7 @@ describe("session store", () => {
       eventCount: number;
       events: Array<{ sequence: number; timestamp: string }>;
     };
-    expect(raw.eventCount).toBe(4);
+    expect(raw.eventCount).toBe(5);
     expect(raw.events[0]?.sequence).toBe(1);
     expect(raw.events[0]?.timestamp).toEqual(expect.any(String));
 
@@ -57,14 +67,16 @@ describe("session store", () => {
     expect(session.status).toBe("completed");
     expect(session.finalContent).toBe("done");
     expect(session.tokenUsage).toEqual({ promptTokens: 12, completionTokens: 8, totalTokens: 20 });
+    expect(session.budget).toMatchObject({ totalTokens: 20, maxTokens: 50, remainingTokens: 30 });
 
     const summaries = await listSessionHistories(workspace);
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
       sessionId: "session-1",
       status: "completed",
-      eventCount: 4,
+      eventCount: 5,
       tokenUsage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
+      budget: { promptTokens: 12, completionTokens: 8, totalTokens: 20, maxTokens: 50, remainingTokens: 30 },
       lastEventType: "final"
     });
   });
@@ -107,6 +119,7 @@ describe("session store", () => {
     expect(markdown).toContain("# DeepCodex Session Export");
     expect(markdown).toContain("session-export");
     expect(markdown).toContain("Approval approved for write_file by test-suite in 1250ms.");
+    expect(markdown).toContain("- Token Budget: none");
     expect(markdown).toContain("## Final Response");
 
     const json = JSON.parse(exportSessionHistory(session, "json")) as { sessionId: string; eventCount: number };

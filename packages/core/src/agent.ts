@@ -1,4 +1,12 @@
 import { randomUUID } from "node:crypto";
+import {
+  addModelUsageToBudget,
+  createInitialBudgetSnapshot,
+  evaluateBudgetLimit,
+  formatBudgetSnapshot,
+  isBudgetPolicyEnabled,
+  normalizeBudgetPolicy
+} from "./budget.js";
 import { DeepSeekClient } from "./deepseek.js";
 import { readWorkspaceMemory } from "./memory.js";
 import { createDefaultTools } from "./tools.js";
@@ -21,6 +29,9 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   const sessionId = options.sessionId ?? randomUUID();
   const workspace = await createWorkspaceContext(options.workspace, options.policy);
   const client = options.chatClient ?? new DeepSeekClient({ model: options.model });
+  const budgetPolicy = normalizeBudgetPolicy(options.budget);
+  const budgetEnabled = isBudgetPolicyEnabled(budgetPolicy);
+  let budgetSnapshot = createInitialBudgetSnapshot(budgetPolicy);
   const tools = createDefaultTools();
   const events: AgentEvent[] = [];
   const emit = async (event: AgentEvent) => {
@@ -44,20 +55,38 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
 
   const maxSteps = options.maxSteps ?? 12;
   let finalText = "";
+  const initialBudgetLimit = evaluateBudgetLimit(budgetSnapshot);
+  if (initialBudgetLimit) {
+    await emit({
+      type: "budget_exceeded",
+      reason: initialBudgetLimit.reason,
+      message: initialBudgetLimit.message,
+      budget: budgetSnapshot
+    });
+    const content = `${initialBudgetLimit.message} The session stopped before requesting a model response.`;
+    await emit({ type: "final", content });
+    return { sessionId, finalText: content, events };
+  }
 
   for (let index = 1; index <= maxSteps; index += 1) {
     await emit({ type: "step", index, maxSteps });
     const response = await client.chat(messages, tools.map((tool) => tool.definition));
+    let usageEvent: Extract<AgentEvent, { type: "model_usage" }> | undefined;
     if (response.usage) {
       const promptTokens = response.usage.prompt_tokens ?? 0;
       const completionTokens = response.usage.completion_tokens ?? 0;
-      await emit({
+      usageEvent = {
         type: "model_usage",
         model: client.model,
         promptTokens,
         completionTokens,
         totalTokens: response.usage.total_tokens ?? promptTokens + completionTokens
-      });
+      };
+      await emit(usageEvent);
+      budgetSnapshot = addModelUsageToBudget(budgetSnapshot, usageEvent, budgetPolicy);
+      if (budgetEnabled) {
+        await emit({ type: "budget_updated", budget: budgetSnapshot });
+      }
     }
     const assistant = response.choices[0]?.message;
     if (!assistant) {
@@ -71,6 +100,24 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
     if (text.trim()) {
       await emit({ type: "assistant_message", content: text });
       finalText = text;
+    }
+
+    const budgetLimit = evaluateBudgetLimit(budgetSnapshot);
+    if (budgetLimit) {
+      await emit({
+        type: "budget_exceeded",
+        reason: budgetLimit.reason,
+        message: budgetLimit.message,
+        budget: budgetSnapshot
+      });
+      const content =
+        toolCalls.length === 0 && (finalText || text)
+          ? finalText || text
+          : `${budgetLimit.message} The session stopped before additional tool or model work.\n\n${formatBudgetSnapshot(
+              budgetSnapshot
+            )}`;
+      await emit({ type: "final", content });
+      return { sessionId, finalText: content, events };
     }
 
     if (toolCalls.length === 0) {

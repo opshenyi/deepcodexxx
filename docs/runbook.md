@@ -29,10 +29,14 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_WORKSPACE` | Optional. | Current working directory. | Used by the server and CLI when a request does not pass a workspace path. |
 | `DEEPCODEX_DENIED_PATHS` | Optional. | Built-in defaults. | Comma-separated deny patterns such as `secrets,private/*.json`. Extends the default list. |
 | `DEEPCODEX_MAX_FILE_BYTES` | Optional. | `524288` | Maximum UTF-8 file size for read, write, edit, and search tools. Set `0` to block non-empty file content. |
+| `DEEPCODEX_MAX_SESSION_TOKENS` | Optional. | Empty. | Stops a run when cumulative provider token usage reaches this limit. |
+| `DEEPCODEX_MAX_SESSION_USD` | Optional. | Empty. | Stops a run when estimated provider cost reaches this USD limit. Requires both pricing variables below. |
+| `DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS` | Optional. | Empty. | Input token price used for local cost estimates. Prices are external configuration, not hard-coded. |
+| `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS` | Optional. | Empty. | Output token price used for local cost estimates. Prices are external configuration, not hard-coded. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
-When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output.
+When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
 ## Verify Configuration
 
@@ -45,6 +49,7 @@ Expected checks:
 
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
+- Budget variables print when they are configured.
 - Node version prints without crashing.
 
 ## Web Client
@@ -69,7 +74,8 @@ Recommended demo flow:
 4. Set `Tool approvals` to `Manual` when demonstrating write, shell, or memory safety gates.
 5. Watch the event stream for approvals, tool starts, tool results, errors, and final answer.
 6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-7. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+7. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+8. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -131,6 +137,18 @@ Run a bounded write-mode task on a disposable workspace:
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --max-steps 12 "Make a small documentation improvement and summarize the change."
 ```
 
+Run with a token budget:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-tokens 20000 "Inspect this repository and summarize the safest next step."
+```
+
+Run with a cost budget, using caller-provided sample pricing:
+
+```powershell
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-usd 0.25 --input-usd-per-million-tokens 0.10 --output-usd-per-million-tokens 0.20 "Inspect this repository and summarize the safest next step."
+```
+
 Approval modes:
 
 | Mode | File writes | Shell | Intended use |
@@ -161,3 +179,5 @@ Approval audit events record request time, decision time, decision latency, and 
 | Unexpected memory file appears. | Memory was loaded explicitly or the run used `workspace-write` / `full-access`. | Use `suggest` for strict inspection runs. |
 | A file is denied unexpectedly. | The file matches the built-in denied list or `DEEPCODEX_DENIED_PATHS`. | Review the deny pattern before loosening it. |
 | A file is skipped or rejected as too large. | It exceeds `DEEPCODEX_MAX_FILE_BYTES` or the built-in 512 KiB default. | Raise the limit only for trusted workspaces and keep large generated assets out of model context. |
+| Cost budget is rejected. | `DEEPCODEX_MAX_SESSION_USD` or `--max-session-usd` was set without input and output token prices. | Configure both pricing values or use a token-only budget. |
+| Budget stops a run before tools execute. | The provider usage metadata reached the configured budget. | Raise the session budget or rerun a narrower prompt. |

@@ -135,6 +135,26 @@ describe("agent approval risk", () => {
       })
     );
   });
+
+  it("stops before tool execution when the session token budget is reached", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "deepcodex-"));
+    const events: AgentEvent[] = [];
+
+    await runDeepCodexAgent({
+      prompt: "write a file",
+      workspace: tempDir,
+      budget: { maxTokens: 10 },
+      chatClient: budgetedToolClient(),
+      onEvent: (event) => {
+        events.push(event);
+      }
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({ type: "budget_updated" }));
+    expect(events).toContainEqual(expect.objectContaining({ type: "budget_exceeded", reason: "tokens" }));
+    expect(events.some((event) => event.type === "tool_started")).toBe(false);
+    await expect(readFile(path.join(tempDir, "budget.txt"), "utf8")).rejects.toThrow();
+  });
 });
 
 function scriptedWriteClient(): AgentChatClient {
@@ -203,6 +223,41 @@ function finalOnlyClient(): AgentChatClient {
           prompt_tokens: 10,
           completion_tokens: 5,
           total_tokens: 15
+        }
+      };
+    }
+  };
+}
+
+function budgetedToolClient(): AgentChatClient {
+  return {
+    model: "test-model",
+    async chat(): Promise<DeepSeekChatResponse> {
+      return {
+        id: "test-budget-tool-call",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: "tool-call-budget",
+                  type: "function",
+                  function: {
+                    name: "write_file",
+                    arguments: JSON.stringify({ path: "budget.txt", content: "should not write\n" })
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 8,
+          completion_tokens: 2,
+          total_tokens: 10
         }
       };
     }

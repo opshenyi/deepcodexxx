@@ -1,4 +1,5 @@
 export * from "./agent.js";
+export * from "./budget.js";
 export * from "./deepseek.js";
 export * from "./memory.js";
 export * from "./safety.js";

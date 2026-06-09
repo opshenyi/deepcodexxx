@@ -8,6 +8,8 @@ type ToolApprovalMode = "auto" | "manual" | "deny";
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
   | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
+  | { type: "budget_updated"; budget: BudgetSnapshot }
+  | { type: "budget_exceeded"; reason: "tokens" | "cost"; message: string; budget: BudgetSnapshot }
   | { type: "assistant_message"; content: string }
   | {
       type: "tool_approval_requested";
@@ -35,7 +37,7 @@ type AgentEvent =
   | { type: "final"; content: string }
   | { type: "error"; message: string };
 
-type LogKind = "Session" | "Step" | "Usage" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
+type LogKind = "Session" | "Step" | "Usage" | "Budget" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
 type LogTone = "plain" | "muted" | "good" | "bad" | "accent";
 type MemoryState = "idle" | "loading" | "ready" | "error";
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -57,6 +59,24 @@ type TokenUsageSummary = {
   totalTokens: number;
 };
 
+type BudgetPolicy = {
+  maxTokens?: number;
+  maxEstimatedUsd?: number;
+  inputUsdPerMillionTokens?: number;
+  outputUsdPerMillionTokens?: number;
+};
+
+type BudgetSnapshot = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  maxTokens?: number;
+  remainingTokens?: number;
+  estimatedUsd?: number;
+  maxEstimatedUsd?: number;
+  remainingUsd?: number;
+};
+
 type SessionSummary = {
   sessionId: string;
   workspace: string;
@@ -67,6 +87,7 @@ type SessionSummary = {
   eventCount: number;
   lastEventType?: AgentEvent["type"];
   tokenUsage?: TokenUsageSummary;
+  budget?: BudgetSnapshot;
   finalContent?: string;
   errorMessage?: string;
 };
@@ -91,6 +112,10 @@ type PendingApproval = {
 };
 
 const defaultWorkspace = localStorage.getItem("deepcodex.workspace") ?? "";
+const defaultMaxSessionTokens = localStorage.getItem("deepcodex.maxSessionTokens") ?? "";
+const defaultMaxSessionUsd = localStorage.getItem("deepcodex.maxSessionUsd") ?? "";
+const defaultInputUsdPerMillionTokens = localStorage.getItem("deepcodex.inputUsdPerMillionTokens") ?? "";
+const defaultOutputUsdPerMillionTokens = localStorage.getItem("deepcodex.outputUsdPerMillionTokens") ?? "";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -147,6 +172,11 @@ function App() {
   const [prompt, setPrompt] = useState("Inspect this repository and propose the safest next implementation step.");
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
   const [approvalMode, setApprovalMode] = useState<ToolApprovalMode>("manual");
+  const [maxSessionTokens, setMaxSessionTokens] = useState(defaultMaxSessionTokens);
+  const [maxSessionUsd, setMaxSessionUsd] = useState(defaultMaxSessionUsd);
+  const [inputUsdPerMillionTokens, setInputUsdPerMillionTokens] = useState(defaultInputUsdPerMillionTokens);
+  const [outputUsdPerMillionTokens, setOutputUsdPerMillionTokens] = useState(defaultOutputUsdPerMillionTokens);
+  const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [items, setItems] = useState<LogItem[]>([]);
   const [finalText, setFinalText] = useState("");
@@ -206,14 +236,25 @@ function App() {
     setIsRunning(true);
     setFinalText("");
     setItems([]);
+    setBudgetSnapshot(null);
     setPendingApprovals([]);
     localStorage.setItem("deepcodex.workspace", workspace);
+    localStorage.setItem("deepcodex.maxSessionTokens", maxSessionTokens);
+    localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
+    localStorage.setItem("deepcodex.inputUsdPerMillionTokens", inputUsdPerMillionTokens);
+    localStorage.setItem("deepcodex.outputUsdPerMillionTokens", outputUsdPerMillionTokens);
 
     try {
+      const budget = createBudgetPayload({
+        maxSessionTokens,
+        maxSessionUsd,
+        inputUsdPerMillionTokens,
+        outputUsdPerMillionTokens
+      });
       const response = await fetch(`${serverUrl}/api/agent/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, workspace, mode, approvalMode, maxSteps: 12 })
+        body: JSON.stringify({ prompt, workspace, mode, approvalMode, maxSteps: 12, budget })
       });
 
       if (!response.ok) {
@@ -423,6 +464,10 @@ function App() {
       case "tool_approval_resolved":
         setPendingApprovals((current) => current.filter((approval) => approval.approvalId !== event.approvalId));
         break;
+      case "budget_updated":
+      case "budget_exceeded":
+        setBudgetSnapshot(event.budget);
+        break;
       case "final":
         setFinalText(event.content);
         break;
@@ -504,6 +549,66 @@ function App() {
           </div>
         </section>
 
+        <section className="panel">
+          <div className="panelHeading">
+            <label>Budget</label>
+            <span className="fieldStatus">{formatBudgetStatus(budgetSnapshot)}</span>
+          </div>
+          <div className="budgetFields">
+            <label className="budgetField" htmlFor="max-session-tokens">
+              <span>Token cap</span>
+              <input
+                id="max-session-tokens"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={maxSessionTokens}
+                onChange={(event) => setMaxSessionTokens(event.target.value)}
+                placeholder="120000"
+              />
+            </label>
+            <label className="budgetField" htmlFor="max-session-usd">
+              <span>USD cap</span>
+              <input
+                id="max-session-usd"
+                type="number"
+                min="0"
+                step="0.000001"
+                inputMode="decimal"
+                value={maxSessionUsd}
+                onChange={(event) => setMaxSessionUsd(event.target.value)}
+                placeholder="0.50"
+              />
+            </label>
+            <label className="budgetField" htmlFor="input-usd-per-million-tokens">
+              <span>Input USD / 1M</span>
+              <input
+                id="input-usd-per-million-tokens"
+                type="number"
+                min="0"
+                step="0.000001"
+                inputMode="decimal"
+                value={inputUsdPerMillionTokens}
+                onChange={(event) => setInputUsdPerMillionTokens(event.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+            <label className="budgetField" htmlFor="output-usd-per-million-tokens">
+              <span>Output USD / 1M</span>
+              <input
+                id="output-usd-per-million-tokens"
+                type="number"
+                min="0"
+                step="0.000001"
+                inputMode="decimal"
+                value={outputUsdPerMillionTokens}
+                onChange={(event) => setOutputUsdPerMillionTokens(event.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+          </div>
+        </section>
+
         <section className="panel metrics" aria-label="Session metrics">
           <div className="metric">
             <span>Status</span>
@@ -520,6 +625,14 @@ function App() {
           <div className="metric">
             <span>Tokens</span>
             <strong>{counts.tokens}</strong>
+          </div>
+          <div className="metric">
+            <span>Budget</span>
+            <strong>{formatTokenBudgetMetric(budgetSnapshot, maxSessionTokens)}</strong>
+          </div>
+          <div className="metric">
+            <span>Cost</span>
+            <strong>{formatCostMetric(budgetSnapshot)}</strong>
           </div>
           <div className="metric">
             <span>Errors</span>
@@ -644,6 +757,10 @@ function App() {
                     <div>
                       <span>Tokens</span>
                       <strong>{selectedSession.tokenUsage?.totalTokens ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>Cost</span>
+                      <strong>{formatCostMetric(selectedSession.budget ?? null)}</strong>
                     </div>
                     <div>
                       <span>Created</span>
@@ -834,6 +951,43 @@ function App() {
   );
 }
 
+function createBudgetPayload(input: {
+  maxSessionTokens: string;
+  maxSessionUsd: string;
+  inputUsdPerMillionTokens: string;
+  outputUsdPerMillionTokens: string;
+}): BudgetPolicy | undefined {
+  const budget: BudgetPolicy = {
+    maxTokens: readOptionalBudgetNumber(input.maxSessionTokens, "Token cap"),
+    maxEstimatedUsd: readOptionalBudgetNumber(input.maxSessionUsd, "USD cap"),
+    inputUsdPerMillionTokens: readOptionalBudgetNumber(input.inputUsdPerMillionTokens, "Input USD / 1M"),
+    outputUsdPerMillionTokens: readOptionalBudgetNumber(input.outputUsdPerMillionTokens, "Output USD / 1M")
+  };
+  const enabled = Object.values(budget).some((value) => value !== undefined);
+  if (!enabled) {
+    return undefined;
+  }
+  if (
+    budget.maxEstimatedUsd !== undefined &&
+    (budget.inputUsdPerMillionTokens === undefined || budget.outputUsdPerMillionTokens === undefined)
+  ) {
+    throw new Error("USD cap requires both input and output token prices.");
+  }
+  return budget;
+}
+
+function readOptionalBudgetNumber(value: string, label: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${label} must be a non-negative number.`);
+  }
+  return parsed;
+}
+
 async function readResponseError(response: Response) {
   const fallback = `${response.status} ${response.statusText}`.trim();
   const contentType = response.headers.get("content-type") ?? "";
@@ -851,6 +1005,61 @@ function formatBody(value: unknown) {
   }
   const serialized = JSON.stringify(value, null, 2);
   return serialized ?? String(value);
+}
+
+function formatBudgetStatus(budget: BudgetSnapshot | null): string {
+  if (!budget) {
+    return "Optional";
+  }
+  if (budget.maxTokens !== undefined) {
+    return `${budget.remainingTokens ?? 0} tokens left`;
+  }
+  if (budget.maxEstimatedUsd !== undefined) {
+    return `${formatUsd(budget.remainingUsd ?? 0)} left`;
+  }
+  return `${budget.totalTokens} tokens`;
+}
+
+function formatTokenBudgetMetric(budget: BudgetSnapshot | null, configuredMaxTokens: string): string {
+  if (budget?.maxTokens !== undefined) {
+    return `${budget.remainingTokens ?? 0}/${budget.maxTokens}`;
+  }
+  const configured = configuredMaxTokens.trim();
+  return configured ? `0/${configured}` : "Off";
+}
+
+function formatCostMetric(budget: BudgetSnapshot | null): string {
+  if (!budget?.estimatedUsd && budget?.estimatedUsd !== 0) {
+    return "Off";
+  }
+  if (budget.maxEstimatedUsd !== undefined) {
+    return `${formatUsd(budget.estimatedUsd)} / ${formatUsd(budget.maxEstimatedUsd)}`;
+  }
+  return formatUsd(budget.estimatedUsd);
+}
+
+function formatBudgetBody(budget: BudgetSnapshot): string {
+  const lines = [
+    `Prompt tokens: ${budget.promptTokens}`,
+    `Completion tokens: ${budget.completionTokens}`,
+    `Total tokens: ${budget.totalTokens}`
+  ];
+  if (budget.maxTokens !== undefined) {
+    lines.push(`Token budget: ${budget.totalTokens} / ${budget.maxTokens}`);
+    lines.push(`Remaining tokens: ${budget.remainingTokens ?? 0}`);
+  }
+  if (budget.estimatedUsd !== undefined) {
+    lines.push(`Estimated cost: ${formatUsd(budget.estimatedUsd)}`);
+  }
+  if (budget.maxEstimatedUsd !== undefined) {
+    lines.push(`Cost budget: ${formatUsd(budget.estimatedUsd ?? 0)} / ${formatUsd(budget.maxEstimatedUsd)}`);
+    lines.push(`Remaining cost: ${formatUsd(budget.remainingUsd ?? 0)}`);
+  }
+  return lines.join("\n");
+}
+
+function formatUsd(value: number): string {
+  return `$${value.toFixed(6)}`;
 }
 
 function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string): LogItem {
@@ -875,6 +1084,26 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         meta: `${event.totalTokens} tokens`,
         body: `Model: ${event.model}\nPrompt tokens: ${event.promptTokens}\nCompletion tokens: ${event.completionTokens}\nTotal tokens: ${event.totalTokens}`,
         tokens: event.totalTokens
+      };
+    case "budget_updated":
+      return {
+        id,
+        timestamp,
+        kind: "Budget",
+        tone: "muted",
+        title: "Budget updated",
+        meta: formatBudgetStatus(event.budget),
+        body: formatBudgetBody(event.budget)
+      };
+    case "budget_exceeded":
+      return {
+        id,
+        timestamp,
+        kind: "Budget",
+        tone: "bad",
+        title: "Budget limit reached",
+        meta: event.reason,
+        body: `${event.message}\n\n${formatBudgetBody(event.budget)}`
       };
     case "step":
       return {

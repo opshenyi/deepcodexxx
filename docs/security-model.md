@@ -9,7 +9,7 @@ DeepCodex is a local development product. Its current safety model is designed f
 | Local user to DeepCodex server | Server binds to `127.0.0.1` and exposes local HTTP APIs. | Add authentication before any non-local deployment. |
 | DeepCodex to workspace files | File tools resolve paths under one workspace root, enforce denied paths and file-size limits, return unified diffs for write/edit operations, and can be paused by manual tool approval with recorded decision metadata. | Add approval file hashes and shell isolation. |
 | DeepCodex to shell | Shell runs with the user's OS privileges from the workspace directory. | Add OS-level sandboxing or isolated execution workers. |
-| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata. | Add secrets management, provider allowlists, pricing policy, and budget enforcement. |
+| DeepCodex to DeepSeek | API key is read from environment and sent as a bearer token to the configured base URL. Token usage is recorded when the provider returns usage metadata, and optional token/cost budgets can stop further work after a limit is reached. | Add secrets management, provider allowlists, and managed pricing policy. |
 | Workspace memory | Memory is stored in `.deepcodex/memory.md` inside the target workspace. | Add retention, review, redaction, and export controls. |
 
 ## Approval Modes
@@ -68,6 +68,13 @@ Current limitations:
 
 DeepCodex itself calls the configured DeepSeek-compatible endpoint for chat completions. There is no general network tool in the default tool registry, and the runtime policy currently sets `allowNetwork: false`.
 
+Provider usage controls:
+
+- Token budgets can be set with `DEEPCODEX_MAX_SESSION_TOKENS`, CLI flags, or the Web Budget panel.
+- Estimated cost budgets can be set with `DEEPCODEX_MAX_SESSION_USD`, but require caller-provided input and output token prices.
+- Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
+- Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.
+
 Current limitations:
 
 - Shell commands can still perform network operations if shell execution is allowed.
@@ -89,6 +96,7 @@ The next security work should prioritize:
 
 - Richer generated-asset handling and file-type policies.
 - Approval file hashes and policy profile metadata.
+- Managed provider pricing profiles for budget policy.
 - Isolated shell execution with filesystem and network controls.
 - Auth, RBAC, and tenant isolation before hosted deployment.
 - Secrets redaction in event streams and saved logs.

@@ -27,6 +27,7 @@ Expected result:
 - Vitest test suite passes.
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
+- CLI `doctor` reports configured budget environment values when present.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
 
 ## Web Demo Verification
@@ -43,6 +44,7 @@ Checklist:
 - `suggest` mode can run a repository inspection prompt.
 - Event stream shows session start, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
+- Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.
 - `Load memory` returns either existing memory or the empty-memory state.
 - `Load sessions` shows recent runs, `Replay` opens a saved timeline, and `Export` creates a Markdown audit file without console errors.
 - A missing API key produces the documented local demo response.
@@ -73,6 +75,7 @@ npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest "Inspect this repository and list the main product surfaces."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-tokens 20000 "Inspect this repository with a token budget."
 ```
 
 Checklist:
@@ -80,6 +83,7 @@ Checklist:
 - CLI prints configuration through `doctor`.
 - `memory` reads workspace memory without crashing.
 - `ask` prints session, step, tool, and final output events.
+- Budgeted `ask` prints budget status when the provider returns usage metadata.
 - `--mode suggest` does not allow shell or file write/edit tools.
 
 ## Write-Mode Demo Verification

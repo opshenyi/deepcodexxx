@@ -26,6 +26,7 @@ npm run build
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-tokens 20000 "Inspect this repository with a token budget."
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 ```
 
@@ -36,6 +37,10 @@ node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 - `DEEPSEEK_MODEL`: Defaults to `deepseek-chat`.
 - `DEEPCODEX_PORT`: Defaults to `17361`.
 - `DEEPCODEX_WORKSPACE`: Optional default workspace path.
+- `DEEPCODEX_MAX_SESSION_TOKENS`: Optional token budget per agent run.
+- `DEEPCODEX_MAX_SESSION_USD`: Optional estimated USD budget per agent run.
+- `DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
+- `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 

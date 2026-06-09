@@ -34,6 +34,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added Markdown/JSON session export through core formatter, server endpoint, Web export button, and CLI `sessions export`.
 - Added binary-aware file handling so read/edit reject binary-looking files and search skips them.
 - Added token usage accounting events and session totals when the provider returns usage metadata; surfaced in Web, CLI, replay, and export.
+- Added run-level token and estimated-cost budget controls across core, server, Web/Desktop, CLI, session replay, exports, docs, and `.env.example`. Cost budgets require caller-provided input/output token prices and stop additional work after provider usage reaches the configured limit.
 
 ## Architecture Decisions
 
@@ -46,8 +47,8 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 ## Next Steps
 
-1. Commit and push the token usage accounting work if it has not already been committed.
-2. Add cost/budget controls that can stop sessions before runaway provider spend.
-3. Add approval file hashes, audit retention controls, generated-asset policies, and shell isolation.
+1. Commit and push the budget controls work if it has not already been committed.
+2. Add approval file hashes so approved writes can be verified after a run.
+3. Add audit retention controls, generated-asset policies, and shell isolation.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

@@ -241,6 +241,31 @@ label,
   box-shadow: inset 0 0 0 1px rgba(240, 84, 35, 0.18);
 }
 
+.budgetFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.budgetField {
+  min-width: 0;
+}
+
+.budgetField span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.budgetField input {
+  padding: 9px 10px;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -968,5 +993,9 @@ pre {
   .modeOption,
   .presetButton {
     min-height: auto;
+  }
+
+  .budgetFields {
+    grid-template-columns: 1fr;
   }
 }

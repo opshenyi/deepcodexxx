@@ -37,9 +37,31 @@ export interface JsonSchema {
   default?: unknown;
 }
 
+export interface BudgetPolicy {
+  maxTokens?: number;
+  maxEstimatedUsd?: number;
+  inputUsdPerMillionTokens?: number;
+  outputUsdPerMillionTokens?: number;
+}
+
+export interface BudgetSnapshot {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  maxTokens?: number;
+  remainingTokens?: number;
+  estimatedUsd?: number;
+  maxEstimatedUsd?: number;
+  remainingUsd?: number;
+}
+
+export type BudgetLimitReason = "tokens" | "cost";
+
 export type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
   | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
+  | { type: "budget_updated"; budget: BudgetSnapshot }
+  | { type: "budget_exceeded"; reason: BudgetLimitReason; message: string; budget: BudgetSnapshot }
   | { type: "assistant_message"; content: string }
   | {
       type: "tool_approval_requested";
@@ -106,6 +128,7 @@ export interface AgentRunOptions {
   maxSteps?: number;
   policy?: ApprovalPolicy;
   model?: string;
+  budget?: BudgetPolicy;
   chatClient?: AgentChatClient;
   onEvent?: AgentEventHandler;
   requestToolApproval?: ToolApprovalHandler;

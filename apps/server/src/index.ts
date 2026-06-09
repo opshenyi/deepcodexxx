@@ -15,6 +15,7 @@ import {
   runDeepCodexAgent
 } from "@deepcodex/core";
 import type { AgentEvent, ApprovalMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
+import type { BudgetPolicy } from "@deepcodex/core";
 
 const app = express();
 const port = Number(process.env.DEEPCODEX_PORT ?? process.env.PORT ?? 17361);
@@ -167,6 +168,7 @@ app.post("/api/agent/run", async (req, res) => {
     mode?: ApprovalMode;
     approvalMode?: RunApprovalMode;
     maxSteps?: number;
+    budget?: BudgetPolicy;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -205,6 +207,7 @@ app.post("/api/agent/run", async (req, res) => {
       workspace: workspace.root,
       maxSteps: body.maxSteps,
       policy,
+      budget: createBudgetPolicy(body.budget),
       requestToolApproval: createToolApprovalHandler(body.approvalMode ?? "auto"),
       onEvent: async (event) => {
         send(event);
@@ -251,6 +254,53 @@ function createRunPolicy(mode: ApprovalMode | undefined) {
     deniedPaths: readDeniedPathsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv()
   };
+}
+
+function createBudgetPolicy(input?: BudgetPolicy): BudgetPolicy | undefined {
+  const merged = removeUndefinedBudgetValues({
+    ...readBudgetPolicyFromEnv(),
+    ...removeUndefinedBudgetValues(readBudgetPolicyFromInput(input))
+  });
+  return Object.values(merged).some((value) => value !== undefined) ? merged : undefined;
+}
+
+function readBudgetPolicyFromEnv(): BudgetPolicy {
+  return {
+    maxTokens: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_TOKENS),
+    maxEstimatedUsd: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_USD),
+    inputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS),
+    outputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS)
+  };
+}
+
+function readBudgetPolicyFromInput(input?: BudgetPolicy): BudgetPolicy {
+  if (!input) {
+    return {};
+  }
+  return {
+    maxTokens: readOptionalNumber(input.maxTokens),
+    maxEstimatedUsd: readOptionalNumber(input.maxEstimatedUsd),
+    inputUsdPerMillionTokens: readOptionalNumber(input.inputUsdPerMillionTokens),
+    outputUsdPerMillionTokens: readOptionalNumber(input.outputUsdPerMillionTokens)
+  };
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value === "string" && !value.trim()) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("Budget values must be non-negative numbers.");
+  }
+  return parsed;
+}
+
+function removeUndefinedBudgetValues(policy: BudgetPolicy): BudgetPolicy {
+  return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as BudgetPolicy;
 }
 
 function readDeniedPathsFromEnv(): string[] | undefined {

@@ -14,7 +14,15 @@ import {
   readWorkspaceMemory,
   runDeepCodexAgent
 } from "@deepcodex/core";
-import type { AgentEvent, ApprovalPolicy, SessionEventRecorder, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
+import type {
+  AgentEvent,
+  ApprovalPolicy,
+  BudgetPolicy,
+  BudgetSnapshot,
+  SessionEventRecorder,
+  ToolApprovalDecision,
+  ToolApprovalRequest
+} from "@deepcodex/core";
 
 const program = new Command();
 
@@ -30,8 +38,24 @@ program
   .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
   .option("--approval <mode>", "auto, prompt, or deny", "auto")
   .option("--max-steps <number>", "Maximum agent loop count", "12")
+  .option("--max-session-tokens <number>", "Stop when cumulative model tokens reach this session limit")
+  .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
+  .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
+  .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
   .action(
-    async (promptParts: string[], options: { workspace: string; mode: string; approval: string; maxSteps: string }) => {
+    async (
+      promptParts: string[],
+      options: {
+        workspace: string;
+        mode: string;
+        approval: string;
+        maxSteps: string;
+        maxSessionTokens?: string;
+        maxSessionUsd?: string;
+        inputUsdPerMillionTokens?: string;
+        outputUsdPerMillionTokens?: string;
+      }
+    ) => {
       const approvalMode = parseCliApprovalMode(options.approval);
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
@@ -43,6 +67,7 @@ program
           workspace: workspace.root,
           maxSteps: Number(options.maxSteps),
           policy,
+          budget: createBudgetPolicy(options),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -58,7 +83,19 @@ program
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
   .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
   .option("--approval <mode>", "auto, prompt, or deny", "auto")
-  .action(async (options: { workspace: string; mode: string; approval: string }) => {
+  .option("--max-session-tokens <number>", "Stop when cumulative model tokens reach this session limit")
+  .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
+  .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
+  .option("--output-usd-per-million-tokens <number>", "Output token price used for cost budget estimates")
+  .action(async (options: {
+    workspace: string;
+    mode: string;
+    approval: string;
+    maxSessionTokens?: string;
+    maxSessionUsd?: string;
+    inputUsdPerMillionTokens?: string;
+    outputUsdPerMillionTokens?: string;
+  }) => {
     const rl = createInterface({ input, output });
     const approvalMode = parseCliApprovalMode(options.approval);
     console.log(chalk.gray("DeepCodex interactive session. Submit an empty line to exit."));
@@ -76,6 +113,7 @@ program
           workspace: workspace.root,
           maxSteps: 12,
           policy,
+          budget: createBudgetPolicy(options),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -162,6 +200,14 @@ program
     console.log(`DeepSeek API key: ${process.env.DEEPSEEK_API_KEY ? "configured" : "missing"}`);
     console.log(`DeepSeek base URL: ${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}`);
     console.log(`DeepSeek model: ${process.env.DEEPSEEK_MODEL ?? "deepseek-chat"}`);
+    console.log(`Max session tokens: ${process.env.DEEPCODEX_MAX_SESSION_TOKENS ?? "not set"}`);
+    console.log(`Max session USD: ${process.env.DEEPCODEX_MAX_SESSION_USD ?? "not set"}`);
+    console.log(
+      `Input USD per million tokens: ${process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
+    );
+    console.log(
+      `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
+    );
     console.log(`Node: ${process.version}`);
   });
 
@@ -180,6 +226,12 @@ function printEvent(event: AgentEvent): void {
           `usage ${event.totalTokens} tokens (${event.promptTokens} prompt / ${event.completionTokens} completion)`
         )
       );
+      break;
+    case "budget_updated":
+      console.log(chalk.gray(formatBudgetLine(event.budget)));
+      break;
+    case "budget_exceeded":
+      console.log(chalk.red(event.message));
       break;
     case "step":
       console.log(chalk.gray(`step ${event.index}/${event.maxSteps}`));
@@ -235,6 +287,66 @@ function createPolicy(mode: string): ApprovalPolicy {
     deniedPaths: readDeniedPathsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv()
   };
+}
+
+function createBudgetPolicy(options: {
+  maxSessionTokens?: string;
+  maxSessionUsd?: string;
+  inputUsdPerMillionTokens?: string;
+  outputUsdPerMillionTokens?: string;
+}): BudgetPolicy | undefined {
+  const merged: BudgetPolicy = {
+    maxTokens: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_TOKENS),
+    maxEstimatedUsd: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_USD),
+    inputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS),
+    outputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS)
+  };
+
+  const cliBudget: BudgetPolicy = {
+    maxTokens: readOptionalNumber(options.maxSessionTokens),
+    maxEstimatedUsd: readOptionalNumber(options.maxSessionUsd),
+    inputUsdPerMillionTokens: readOptionalNumber(options.inputUsdPerMillionTokens),
+    outputUsdPerMillionTokens: readOptionalNumber(options.outputUsdPerMillionTokens)
+  };
+
+  const budget = { ...merged, ...removeUndefinedBudgetValues(cliBudget) };
+  return Object.values(budget).some((value) => value !== undefined) ? budget : undefined;
+}
+
+function removeUndefinedBudgetValues(policy: BudgetPolicy): BudgetPolicy {
+  return Object.fromEntries(Object.entries(policy).filter(([, value]) => value !== undefined)) as BudgetPolicy;
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value === "string" && !value.trim()) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("Budget values must be non-negative numbers.");
+  }
+  return parsed;
+}
+
+function formatBudgetLine(budget: BudgetSnapshot): string {
+  const tokenBudget =
+    budget.maxTokens !== undefined
+      ? `budget ${budget.totalTokens}/${budget.maxTokens} tokens (${budget.remainingTokens ?? 0} remaining)`
+      : `budget ${budget.totalTokens} tokens`;
+  const cost =
+    budget.estimatedUsd !== undefined
+      ? ` / estimated ${formatUsd(budget.estimatedUsd)}${
+          budget.maxEstimatedUsd !== undefined ? ` of ${formatUsd(budget.maxEstimatedUsd)}` : ""
+        }`
+      : "";
+  return `${tokenBudget}${cost}`;
+}
+
+function formatUsd(value: number): string {
+  return `$${value.toFixed(6)}`;
 }
 
 function readDeniedPathsFromEnv(): string[] | undefined {

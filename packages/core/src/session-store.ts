@@ -1,6 +1,6 @@
 import path from "node:path";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import type { AgentEvent, WorkspaceContext } from "./types.js";
+import type { AgentEvent, BudgetSnapshot, WorkspaceContext } from "./types.js";
 
 export type SessionStatus = "running" | "completed" | "errored";
 export type SessionExportFormat = "json" | "markdown";
@@ -27,6 +27,7 @@ export interface SessionHistory {
   eventCount: number;
   events: SessionEventRecord[];
   tokenUsage?: TokenUsageSummary;
+  budget?: BudgetSnapshot;
   finalContent?: string;
   errorMessage?: string;
 }
@@ -41,6 +42,7 @@ export interface SessionSummary {
   eventCount: number;
   lastEventType?: AgentEvent["type"];
   tokenUsage?: TokenUsageSummary;
+  budget?: BudgetSnapshot;
   finalContent?: string;
   errorMessage?: string;
 }
@@ -205,6 +207,10 @@ function applyEventMetadata(history: SessionHistory, event: AgentEvent): void {
     case "model_usage":
       history.tokenUsage = addTokenUsage(history.tokenUsage, event);
       break;
+    case "budget_updated":
+    case "budget_exceeded":
+      history.budget = event.budget;
+      break;
     case "final":
       history.status = "completed";
       history.finalContent = event.content;
@@ -228,6 +234,7 @@ function summarizeSession(session: SessionHistory): SessionSummary {
     eventCount: session.eventCount,
     lastEventType: lastEvent?.type,
     tokenUsage: session.tokenUsage,
+    budget: session.budget,
     finalContent: session.finalContent,
     errorMessage: session.errorMessage
   };
@@ -249,6 +256,7 @@ function parseSessionHistory(raw: string, source: string): SessionHistory {
     eventCount: parsed.events.length,
     events: parsed.events,
     tokenUsage: parsed.tokenUsage,
+    budget: parsed.budget,
     finalContent: parsed.finalContent,
     errorMessage: parsed.errorMessage
   };
@@ -270,6 +278,9 @@ function renderSessionMarkdown(session: SessionHistory): string {
     `- Updated: ${session.updatedAt || "unknown"}`,
     `- Events: ${session.eventCount}`,
     `- Tokens: ${session.tokenUsage?.totalTokens ?? 0}`,
+    `- Estimated Cost: ${formatExportUsd(session.budget?.estimatedUsd)}`,
+    `- Token Budget: ${formatExportBudget(session.budget?.totalTokens, session.budget?.maxTokens)}`,
+    `- Cost Budget: ${formatExportBudget(session.budget?.estimatedUsd, session.budget?.maxEstimatedUsd, formatExportUsd)}`,
     ""
   ];
 
@@ -299,6 +310,10 @@ function eventSummary(event: AgentEvent): string {
       return `Session started with ${event.model}.`;
     case "model_usage":
       return `Model usage for ${event.model}: ${event.totalTokens} tokens.`;
+    case "budget_updated":
+      return `Budget updated: ${event.budget.totalTokens} tokens used.`;
+    case "budget_exceeded":
+      return `Budget limit reached for ${event.reason}: ${event.message}`;
     case "step":
       return `Step ${event.index} of ${event.maxSteps}.`;
     case "assistant_message":
@@ -326,6 +341,10 @@ function eventDetails(event: AgentEvent): string {
       return `workspace: ${event.workspace}\nmodel: ${event.model}`;
     case "model_usage":
       return `model: ${event.model}\npromptTokens: ${event.promptTokens}\ncompletionTokens: ${event.completionTokens}\ntotalTokens: ${event.totalTokens}`;
+    case "budget_updated":
+      return formatEventValue(event.budget);
+    case "budget_exceeded":
+      return `reason: ${event.reason}\nmessage: ${event.message}\nbudget:\n${formatEventValue(event.budget)}`;
     case "assistant_message":
       return event.content;
     case "tool_approval_requested":
@@ -376,4 +395,23 @@ function truncateExportValue(value: string): string {
     return value;
   }
   return `${value.slice(0, limit)}\n[truncated ${value.length - limit} chars]`;
+}
+
+function formatExportBudget(
+  value: number | undefined,
+  limit: number | undefined,
+  formatter: (input: number | undefined) => string = formatExportNumber
+): string {
+  if (limit === undefined) {
+    return "none";
+  }
+  return `${formatter(value ?? 0)} / ${formatter(limit)}`;
+}
+
+function formatExportNumber(value: number | undefined): string {
+  return value === undefined ? "not tracked" : String(value);
+}
+
+function formatExportUsd(value: number | undefined): string {
+  return value === undefined ? "not tracked" : `$${value.toFixed(6)}`;
 }
