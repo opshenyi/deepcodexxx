@@ -14,6 +14,14 @@ DeepCodex is a local development product. Its current safety model is designed f
 
 ## Approval Modes
 
+Reusable profiles:
+
+| Profile | Current enforcement | Recommended demo use |
+| --- | --- | --- |
+| `inspection` | Uses `suggest`, disables shell/file/memory/state writes, and denies mutating approvals. | First repository review and planning prompts. |
+| `guarded-write` | Uses `workspace-write`, minimal shell environment, and manual approval for mutating tools. | Small edits on a disposable branch or sample workspace. |
+| `full-access-review` | Uses `full-access`, minimal shell environment, and manual approval for mutating tools. | Controlled demos that need full command policy. |
+
 | Mode | Current enforcement | Recommended demo use |
 | --- | --- | --- |
 | `suggest` | Shell commands are disabled. File write/edit tools return previews and do not apply changes. Read/search tools remain available. Agent runs do not create `.deepcodex` memory or session state. | Repository inspection, planning, and first-pass interview demo. |

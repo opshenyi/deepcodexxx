@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace path guardrails, generated/build output deny patterns, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
+Core safety features include reusable policy profiles, workspace path guardrails, generated/build output deny patterns, manual tool approvals, event redaction, diff-producing write/edit tools, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, and run-level token or estimated-cost budgets.
 
 ## Quick Start
 
@@ -26,7 +26,9 @@ CLI client:
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex "Inspect this repository and summarize the next safe step."
+node apps/cli/dist/index.js ask --profile inspection --workspace D:\Coding\DeepCodex "Inspect this repository without making changes."
 node apps/cli/dist/index.js ask --approval prompt --workspace D:\Coding\DeepCodex "Make a small safe change and show the checks."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --max-session-tokens 20000 "Inspect this repository with a token budget."
 node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
@@ -44,6 +46,7 @@ node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex
 - `DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
 - `DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS`: Required when enforcing a USD budget.
 - `DEEPCODEX_SHELL_ENV`: Defaults to `minimal`; set `inherit` only for trusted shell tasks that need parent environment variables.
+- `DEEPCODEX_POLICY_PROFILE`: Optional default profile: `inspection`, `guarded-write`, or `full-access-review`.
 
 If `DEEPSEEK_API_KEY` is not set, DeepCodex runs in local demo mode and returns a clear mock response instead of calling DeepSeek. For the current Web client, keep `DEEPCODEX_PORT=17361` because the browser app connects to `http://127.0.0.1:17361`.
 

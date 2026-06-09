@@ -130,6 +130,15 @@ type SessionRetentionResult = {
   dryRun: boolean;
 };
 
+type PolicyProfileOption = {
+  id: "custom" | "inspection" | "guarded-write" | "full-access-review";
+  label: string;
+  detail: string;
+  mode?: ApprovalMode;
+  approvalMode?: ToolApprovalMode;
+  maxSteps?: number;
+};
+
 type PendingApproval = {
   approvalId: string;
   name: string;
@@ -147,6 +156,8 @@ const defaultInputUsdPerMillionTokens = localStorage.getItem("deepcodex.inputUsd
 const defaultOutputUsdPerMillionTokens = localStorage.getItem("deepcodex.outputUsdPerMillionTokens") ?? "";
 const defaultRetentionMaxSessions = localStorage.getItem("deepcodex.retentionMaxSessions") ?? "";
 const defaultRetentionMaxAgeDays = localStorage.getItem("deepcodex.retentionMaxAgeDays") ?? "";
+const defaultPolicyProfile =
+  (localStorage.getItem("deepcodex.policyProfile") as PolicyProfileOption["id"] | null) ?? "custom";
 const serverUrl = import.meta.env.VITE_DEEPCODEX_SERVER_URL ?? "http://127.0.0.1:17361";
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -171,6 +182,38 @@ const approvalOptions: Array<{ value: ToolApprovalMode; label: string; detail: s
   { value: "auto", label: "Auto", detail: "Run requested tools after mode checks" },
   { value: "manual", label: "Manual", detail: "Pause write, shell, and memory tools for review" },
   { value: "deny", label: "Deny", detail: "Reject mutating tool calls for dry runs" }
+];
+
+const policyProfileOptions: PolicyProfileOption[] = [
+  {
+    id: "custom",
+    label: "Custom controls",
+    detail: "Use the sidebar settings exactly as configured."
+  },
+  {
+    id: "inspection",
+    label: "Inspection",
+    detail: "Read-only planning without shell, writes, memory writes, or session state.",
+    mode: "suggest",
+    approvalMode: "deny",
+    maxSteps: 8
+  },
+  {
+    id: "guarded-write",
+    label: "Guarded write",
+    detail: "Workspace-scoped edits with manual review for mutating tools.",
+    mode: "workspace-write",
+    approvalMode: "manual",
+    maxSteps: 12
+  },
+  {
+    id: "full-access-review",
+    label: "Full access review",
+    detail: "Full-access command policy with manual review and minimal shell environment.",
+    mode: "full-access",
+    approvalMode: "manual",
+    maxSteps: 12
+  }
 ];
 
 const taskPresets = [
@@ -201,6 +244,7 @@ const memoryStateLabels: Record<MemoryState, string> = {
 function App() {
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [prompt, setPrompt] = useState("Inspect this repository and propose the safest next implementation step.");
+  const [policyProfileId, setPolicyProfileId] = useState<PolicyProfileOption["id"]>(defaultPolicyProfile);
   const [mode, setMode] = useState<ApprovalMode>("workspace-write");
   const [approvalMode, setApprovalMode] = useState<ToolApprovalMode>("manual");
   const [maxSessionTokens, setMaxSessionTokens] = useState(defaultMaxSessionTokens);
@@ -273,6 +317,7 @@ function App() {
     setBudgetSnapshot(null);
     setPendingApprovals([]);
     localStorage.setItem("deepcodex.workspace", workspace);
+    localStorage.setItem("deepcodex.policyProfile", policyProfileId);
     localStorage.setItem("deepcodex.maxSessionTokens", maxSessionTokens);
     localStorage.setItem("deepcodex.maxSessionUsd", maxSessionUsd);
     localStorage.setItem("deepcodex.inputUsdPerMillionTokens", inputUsdPerMillionTokens);
@@ -288,7 +333,15 @@ function App() {
       const response = await fetch(`${serverUrl}/api/agent/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, workspace, mode, approvalMode, maxSteps: 12, budget })
+        body: JSON.stringify({
+          prompt,
+          workspace,
+          profileId: policyProfileId === "custom" ? undefined : policyProfileId,
+          mode,
+          approvalMode,
+          maxSteps: selectedPolicyProfile()?.maxSteps ?? 12,
+          budget
+        })
       });
 
       if (!response.ok) {
@@ -552,6 +605,21 @@ function App() {
     pushLogItem({ ...item, id: crypto.randomUUID(), timestamp: formatTimestamp() });
   }
 
+  function applyPolicyProfile(profileId: PolicyProfileOption["id"]) {
+    setPolicyProfileId(profileId);
+    const profile = policyProfileOptions.find((entry) => entry.id === profileId);
+    if (profile?.mode) {
+      setMode(profile.mode);
+    }
+    if (profile?.approvalMode) {
+      setApprovalMode(profile.approvalMode);
+    }
+  }
+
+  function selectedPolicyProfile() {
+    return policyProfileOptions.find((entry) => entry.id === policyProfileId);
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar" aria-label="Agent controls">
@@ -574,6 +642,25 @@ function App() {
             placeholder="D:\\Coding\\DeepCodex"
             spellCheck={false}
           />
+        </section>
+
+        <section className="panel">
+          <div className="panelHeading">
+            <label htmlFor="policy-profile">Policy profile</label>
+            <span className="fieldStatus">{selectedPolicyProfile()?.label ?? "Custom controls"}</span>
+          </div>
+          <select
+            id="policy-profile"
+            value={policyProfileId}
+            onChange={(event) => applyPolicyProfile(event.target.value as PolicyProfileOption["id"])}
+          >
+            {policyProfileOptions.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+          <p className="fieldHelp">{selectedPolicyProfile()?.detail}</p>
         </section>
 
         <section className="panel">

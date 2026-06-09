@@ -3,6 +3,7 @@ export * from "./budget.js";
 export * from "./deepseek.js";
 export * from "./file-audit.js";
 export * from "./memory.js";
+export * from "./policy-profile.js";
 export * from "./redaction.js";
 export * from "./safety.js";
 export * from "./session-store.js";

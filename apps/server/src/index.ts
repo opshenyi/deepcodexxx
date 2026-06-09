@@ -9,13 +9,22 @@ import {
   createWorkspaceContext,
   exportSessionHistory,
   listSessionHistories,
+  listPolicyProfiles,
   parseSessionExportFormat,
   pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
+  resolvePolicyProfile,
   runDeepCodexAgent
 } from "@deepcodex/core";
-import type { AgentEvent, ApprovalMode, ShellEnvironmentMode, ToolApprovalDecision, ToolApprovalRequest } from "@deepcodex/core";
+import type {
+  AgentEvent,
+  ApprovalMode,
+  ApprovalPolicy,
+  ShellEnvironmentMode,
+  ToolApprovalDecision,
+  ToolApprovalRequest
+} from "@deepcodex/core";
 import type { BudgetPolicy, SessionRetentionPolicy } from "@deepcodex/core";
 
 const app = express();
@@ -49,6 +58,10 @@ app.get("/api/memory", async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+app.get("/api/policy-profiles", (_req, res) => {
+  res.json({ profiles: listPolicyProfiles(), defaultProfileId: process.env.DEEPCODEX_POLICY_PROFILE ?? "custom" });
 });
 
 app.post("/api/memory", async (req, res, next) => {
@@ -181,6 +194,7 @@ app.post("/api/agent/run", async (req, res) => {
     approvalMode?: RunApprovalMode;
     maxSteps?: number;
     budget?: BudgetPolicy;
+    profileId?: string;
   };
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) {
@@ -200,7 +214,8 @@ app.post("/api/agent/run", async (req, res) => {
   let recordEvent: ((event: AgentEvent) => Promise<void>) | undefined;
 
   try {
-    const policy = createRunPolicy(body.mode);
+    const profile = readPolicyProfile(body.profileId);
+    const policy = createRunPolicy(body.mode, profile);
     const workspace = await createWorkspaceContext(readWorkspace(body.workspace), policy);
     if (policy.allowStateWrite !== false) {
       const recorder = createSessionRecorder(workspace);
@@ -217,10 +232,10 @@ app.post("/api/agent/run", async (req, res) => {
     await runDeepCodexAgent({
       prompt,
       workspace: workspace.root,
-      maxSteps: body.maxSteps,
+      maxSteps: body.maxSteps ?? profile?.maxSteps,
       policy,
-      budget: createBudgetPolicy(body.budget),
-      requestToolApproval: createToolApprovalHandler(body.approvalMode ?? "auto"),
+      budget: createBudgetPolicy(body.budget ?? profile?.budget),
+      requestToolApproval: createToolApprovalHandler(body.approvalMode ?? profile?.approvalMode ?? "auto"),
       onEvent: async (event) => {
         send(event);
         await recordEvent?.(event);
@@ -255,22 +270,31 @@ function readWorkspace(value: unknown): string {
 
 type RunApprovalMode = "auto" | "manual" | "deny";
 
-function createRunPolicy(mode: ApprovalMode | undefined) {
-  const selected = mode ?? "workspace-write";
+function readPolicyProfile(profileId?: string) {
+  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE);
+}
+
+function createRunPolicy(mode: ApprovalMode | undefined, profile: ReturnType<typeof readPolicyProfile>) {
+  const selected = mode ?? profile?.policy.mode ?? "workspace-write";
+  const base: Partial<ApprovalPolicy> = profile?.policy ?? {};
   return {
+    ...base,
     mode: selected,
-    allowShell: selected !== "suggest",
-    allowFileWrite: selected !== "suggest",
+    allowShell: selected !== "suggest" && (base.allowShell ?? true),
+    allowFileWrite: selected !== "suggest" && (base.allowFileWrite ?? true),
     allowNetwork: false,
-    allowStateWrite: selected !== "suggest",
+    allowStateWrite: selected !== "suggest" && (base.allowStateWrite ?? true),
     deniedPaths: readDeniedPathsFromEnv(),
     maxFileBytes: readMaxFileBytesFromEnv(),
-    shellEnvironment: readShellEnvironmentModeFromEnv()
+    shellEnvironment: readShellEnvironmentModeFromEnv() ?? base.shellEnvironment
   };
 }
 
-function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode {
-  const value = process.env.DEEPCODEX_SHELL_ENV ?? "minimal";
+function readShellEnvironmentModeFromEnv(): ShellEnvironmentMode | undefined {
+  const value = process.env.DEEPCODEX_SHELL_ENV;
+  if (!value) {
+    return undefined;
+  }
   if (value === "minimal" || value === "inherit") {
     return value;
   }

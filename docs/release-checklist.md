@@ -29,6 +29,7 @@ Expected result:
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor` reports configured budget environment values when present.
 - CLI `doctor` reports shell environment mode, defaulting to `minimal`.
+- CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
 - API key status is understood: `configured` for live demos, `missing` for local demo mode.
 
 ## Web Demo Verification
@@ -42,6 +43,7 @@ Checklist:
 - `http://127.0.0.1:17361/api/health` returns `ok: true`.
 - `http://127.0.0.1:5173` loads the Web client.
 - Workspace path can be entered and saved in the browser.
+- Policy profile selector can switch between Inspection, Guarded write, and Full access review.
 - `suggest` mode can run a repository inspection prompt.
 - Event stream shows session start, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
@@ -77,8 +79,9 @@ Checklist:
 ```powershell
 npm run build
 node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js memory --workspace D:\Coding\DeepCodex
-node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest "Inspect this repository and list the main product surfaces."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and list the main product surfaces."
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest --max-session-tokens 20000 "Inspect this repository with a token budget."
 ```
 

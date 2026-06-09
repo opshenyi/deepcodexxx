@@ -9,10 +9,12 @@ import {
   createWorkspaceContext,
   exportSessionHistory,
   listSessionHistories,
+  listPolicyProfiles,
   parseSessionExportFormat,
   pruneSessionHistories,
   readSessionHistory,
   readWorkspaceMemory,
+  resolvePolicyProfile,
   runDeepCodexAgent
 } from "@deepcodex/core";
 import type {
@@ -22,6 +24,7 @@ import type {
   BudgetSnapshot,
   FileAuditEntry,
   FileHashSnapshot,
+  PolicyProfile,
   SessionRetentionPolicy,
   ShellEnvironmentMode,
   ToolAuditMetadata,
@@ -41,9 +44,10 @@ program
   .command("ask")
   .argument("<prompt...>", "Task for the coding agent")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
-  .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
-  .option("--approval <mode>", "auto, prompt, or deny", "auto")
-  .option("--max-steps <number>", "Maximum agent loop count", "12")
+  .option("--profile <profile>", "inspection, guarded-write, full-access-review, or custom")
+  .option("--mode <mode>", "suggest, workspace-write, or full-access")
+  .option("--approval <mode>", "auto, prompt/manual, or deny")
+  .option("--max-steps <number>", "Maximum agent loop count")
   .option("--max-session-tokens <number>", "Stop when cumulative model tokens reach this session limit")
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
@@ -54,28 +58,30 @@ program
       promptParts: string[],
       options: {
         workspace: string;
-        mode: string;
-        approval: string;
-        maxSteps: string;
+        mode?: string;
+        approval?: string;
+        maxSteps?: string;
+        profile?: string;
         maxSessionTokens?: string;
         maxSessionUsd?: string;
         inputUsdPerMillionTokens?: string;
         outputUsdPerMillionTokens?: string;
-        shellEnv: string;
+        shellEnv?: string;
       }
     ) => {
-      const approvalMode = parseCliApprovalMode(options.approval);
+      const profile = resolveCliProfile(options.profile);
+      const approvalMode = parseCliApprovalMode(options.approval ?? profile?.approvalMode ?? "auto");
       const rl = approvalMode === "prompt" ? createInterface({ input, output }) : undefined;
       try {
-        const policy = createPolicy(options.mode, options.shellEnv);
+        const policy = createPolicy(options.mode, options.shellEnv, profile);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt: promptParts.join(" "),
           workspace: workspace.root,
-          maxSteps: Number(options.maxSteps),
+          maxSteps: readOptionalInteger(options.maxSteps) ?? profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options),
+          budget: createBudgetPolicy(options, profile?.budget),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -89,8 +95,9 @@ program
   .command("chat")
   .description("Start an interactive DeepCodex session.")
   .option("-w, --workspace <path>", "Workspace path", process.cwd())
-  .option("--mode <mode>", "suggest, workspace-write, or full-access", "workspace-write")
-  .option("--approval <mode>", "auto, prompt, or deny", "auto")
+  .option("--profile <profile>", "inspection, guarded-write, full-access-review, or custom")
+  .option("--mode <mode>", "suggest, workspace-write, or full-access")
+  .option("--approval <mode>", "auto, prompt/manual, or deny")
   .option("--max-session-tokens <number>", "Stop when cumulative model tokens reach this session limit")
   .option("--max-session-usd <number>", "Stop when estimated model cost reaches this USD limit")
   .option("--input-usd-per-million-tokens <number>", "Input token price used for cost budget estimates")
@@ -98,16 +105,18 @@ program
   .option("--shell-env <mode>", "minimal or inherit", process.env.DEEPCODEX_SHELL_ENV ?? "minimal")
   .action(async (options: {
     workspace: string;
-    mode: string;
-    approval: string;
+    mode?: string;
+    approval?: string;
+    profile?: string;
     maxSessionTokens?: string;
     maxSessionUsd?: string;
     inputUsdPerMillionTokens?: string;
     outputUsdPerMillionTokens?: string;
-    shellEnv: string;
+    shellEnv?: string;
   }) => {
     const rl = createInterface({ input, output });
-    const approvalMode = parseCliApprovalMode(options.approval);
+    const profile = resolveCliProfile(options.profile);
+    const approvalMode = parseCliApprovalMode(options.approval ?? profile?.approvalMode ?? "auto");
     console.log(chalk.gray("DeepCodex interactive session. Submit an empty line to exit."));
     try {
       while (true) {
@@ -115,15 +124,15 @@ program
         if (!prompt) {
           break;
         }
-        const policy = createPolicy(options.mode, options.shellEnv);
+        const policy = createPolicy(options.mode, options.shellEnv, profile);
         const workspace = await createWorkspaceContext(options.workspace, policy);
         const recorder = policy.allowStateWrite === false ? undefined : createSessionRecorder(workspace);
         await runDeepCodexAgent({
           prompt,
           workspace: workspace.root,
-          maxSteps: 12,
+          maxSteps: profile?.maxSteps ?? 12,
           policy,
-          budget: createBudgetPolicy(options),
+          budget: createBudgetPolicy(options, profile?.budget),
           requestToolApproval: createCliApprovalHandler(approvalMode, rl),
           onEvent: createCliEventHandler(recorder)
         });
@@ -142,6 +151,30 @@ program
   });
 
 const sessions = program.command("sessions").description("Inspect persisted DeepCodex session history.");
+
+const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
+
+profiles
+  .command("list")
+  .option("--json", "Print JSON output", false)
+  .action((options: { json: boolean }) => {
+    const entries = listPolicyProfiles();
+    if (options.json) {
+      console.log(JSON.stringify(entries, null, 2));
+      return;
+    }
+    for (const profile of entries) {
+      console.log(`${profile.id}  ${profile.label}  ${profile.approvalMode}  ${profile.policy.mode}`);
+      console.log(`  ${profile.description}`);
+    }
+  });
+
+profiles
+  .command("show")
+  .argument("<profile>", "Profile id")
+  .action((profileId: string) => {
+    console.log(JSON.stringify(resolvePolicyProfile(profileId), null, 2));
+  });
 
 sessions
   .command("list")
@@ -240,6 +273,7 @@ program
     console.log(
       `Output USD per million tokens: ${process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS ?? "not set"}`
     );
+    console.log(`Policy profile: ${process.env.DEEPCODEX_POLICY_PROFILE ?? "custom"}`);
     console.log(`Shell environment: ${process.env.DEEPCODEX_SHELL_ENV ?? "minimal"}`);
     console.log(`Node: ${process.version}`);
   });
@@ -310,16 +344,23 @@ function parseMode(value: string): "suggest" | "workspace-write" | "full-access"
   throw new Error("mode must be suggest, workspace-write, or full-access");
 }
 
-function createPolicy(mode: string, shellEnv = process.env.DEEPCODEX_SHELL_ENV ?? "minimal"): ApprovalPolicy {
+function resolveCliProfile(profileId?: string): PolicyProfile | undefined {
+  return resolvePolicyProfile(profileId ?? process.env.DEEPCODEX_POLICY_PROFILE);
+}
+
+function createPolicy(mode: string | undefined, shellEnv: string | undefined, profile?: PolicyProfile): ApprovalPolicy {
+  const selectedMode = mode ? parseMode(mode) : (profile?.policy.mode ?? "workspace-write");
+  const selectedShellEnv = shellEnv ?? process.env.DEEPCODEX_SHELL_ENV ?? profile?.policy.shellEnvironment ?? "minimal";
   return {
-    mode: parseMode(mode),
-    allowFileWrite: mode !== "suggest",
-    allowShell: mode !== "suggest",
+    ...profile?.policy,
+    mode: selectedMode,
+    allowFileWrite: selectedMode !== "suggest" && (profile?.policy.allowFileWrite ?? true),
+    allowShell: selectedMode !== "suggest" && (profile?.policy.allowShell ?? true),
     allowNetwork: false,
-    allowStateWrite: mode !== "suggest",
+    allowStateWrite: selectedMode !== "suggest" && (profile?.policy.allowStateWrite ?? true),
     deniedPaths: readDeniedPathsFromEnv(),
-    maxFileBytes: readMaxFileBytesFromEnv(),
-    shellEnvironment: parseShellEnvironmentMode(shellEnv)
+    maxFileBytes: readMaxFileBytesFromEnv() ?? profile?.policy.maxFileBytes,
+    shellEnvironment: parseShellEnvironmentMode(selectedShellEnv)
   };
 }
 
@@ -352,12 +393,15 @@ function createBudgetPolicy(options: {
   maxSessionUsd?: string;
   inputUsdPerMillionTokens?: string;
   outputUsdPerMillionTokens?: string;
-}): BudgetPolicy | undefined {
+}, profileBudget?: BudgetPolicy): BudgetPolicy | undefined {
   const merged: BudgetPolicy = {
+    ...profileBudget,
+    ...removeUndefinedBudgetValues({
     maxTokens: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_TOKENS),
     maxEstimatedUsd: readOptionalNumber(process.env.DEEPCODEX_MAX_SESSION_USD),
     inputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_INPUT_USD_PER_MILLION_TOKENS),
     outputUsdPerMillionTokens: readOptionalNumber(process.env.DEEPCODEX_OUTPUT_USD_PER_MILLION_TOKENS)
+    })
   };
 
   const cliBudget: BudgetPolicy = {
@@ -445,10 +489,13 @@ function readMaxFileBytesFromEnv(): number | undefined {
 type CliApprovalMode = "auto" | "prompt" | "deny";
 
 function parseCliApprovalMode(value: string): CliApprovalMode {
+  if (value === "manual") {
+    return "prompt";
+  }
   if (value === "auto" || value === "prompt" || value === "deny") {
     return value;
   }
-  throw new Error("approval must be auto, prompt, or deny");
+  throw new Error("approval must be auto, prompt/manual, or deny");
 }
 
 function createCliApprovalHandler(

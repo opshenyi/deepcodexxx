@@ -36,6 +36,7 @@ Edit `.env` or set the same values in the shell before starting the app.
 | `DEEPCODEX_MAX_SESSIONS` | Optional. | Empty. | Default maximum retained session history files for retention pruning. |
 | `DEEPCODEX_SESSION_RETENTION_DAYS` | Optional. | Empty. | Default maximum session age in days for retention pruning. |
 | `DEEPCODEX_SHELL_ENV` | Optional. | `minimal` | `minimal` passes only essential process variables to shell tools; `inherit` passes the parent environment for trusted workspaces. |
+| `DEEPCODEX_POLICY_PROFILE` | Optional. | Empty/custom. | Default reusable policy profile. Supported built-ins are `inspection`, `guarded-write`, and `full-access-review`. |
 
 The current DeepSeek client sends non-streaming chat completion requests with tool definitions, `temperature: 0.2`, `max_tokens: 4096`, and a 120 second timeout. Product events are streamed by the local DeepCodex server even though the model request itself is not streamed.
 
@@ -74,9 +75,9 @@ Runtime endpoints:
 Recommended demo flow:
 
 1. Enter a workspace path such as `D:\Coding\DeepCodex`.
-2. Start in `suggest` mode for inspection-only prompts.
-3. Use `workspace-write` only on a disposable branch or sample workspace.
-4. Set `Tool approvals` to `Manual` when demonstrating write, shell, or memory safety gates.
+2. Start with the `Inspection` policy profile for read-only prompts.
+3. Use `Guarded write` only on a disposable branch or sample workspace.
+4. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
 5. Watch the event stream for approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
 6. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
 7. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
@@ -104,6 +105,12 @@ Configuration check:
 
 ```powershell
 node apps/cli/dist/index.js doctor
+```
+
+List reusable policy profiles:
+
+```powershell
+node apps/cli/dist/index.js profiles list
 ```
 
 Read workspace memory:
@@ -145,7 +152,7 @@ node apps/cli/dist/index.js sessions prune --workspace D:\Coding\DeepCodex --max
 Run an inspection task:
 
 ```powershell
-node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode suggest "Inspect this repository and summarize the safest next step."
+node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --profile inspection "Inspect this repository and summarize the safest next step."
 ```
 
 Run a bounded write-mode task on a disposable workspace:
@@ -153,6 +160,14 @@ Run a bounded write-mode task on a disposable workspace:
 ```powershell
 node apps/cli/dist/index.js ask --workspace D:\Coding\DeepCodex --mode workspace-write --approval prompt --max-steps 12 "Make a small documentation improvement and summarize the change."
 ```
+
+Reusable policy profiles:
+
+| Profile | Mode | Approval default | Intended use |
+| --- | --- | --- | --- |
+| `inspection` | `suggest` | `deny` | Read-only repository planning with no shell, writes, memory writes, or session state. |
+| `guarded-write` | `workspace-write` | `manual` / CLI prompt | Bounded local edits with review gates for mutating tools. |
+| `full-access-review` | `full-access` | `manual` / CLI prompt | Controlled demos that require full command policy but still pause for review. |
 
 Run a shell-capable task while keeping the shell environment minimal:
 

@@ -40,6 +40,7 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 - Added minimal shell environment mode for `run_command`: default `DEEPCODEX_SHELL_ENV=minimal` keeps provider keys and arbitrary parent env vars out of shell child processes; `inherit` remains available for trusted tasks.
 - Added generated/build output path policy: default denied paths now cover nested env files, nested `node_modules`, and common generated folders (`dist`, `build`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.vite`, `.parcel-cache`), with `**` glob support for custom deny patterns like `**/*.map`.
 - Added event redaction for common secret assignments, bearer headers, and token literals before agent events are streamed/persisted; redacted tool output is also sent back into the model loop.
+- Added built-in reusable policy profiles across core/server/Web/Desktop/CLI: `inspection`, `guarded-write`, and `full-access-review`. Profiles bundle execution mode, approval default, max steps, and shell environment, with CLI `profiles list/show` and Web profile selector.
 
 ## Architecture Decisions
 
@@ -54,6 +55,6 @@ Build a commercial-quality DeepSeek coding agent product as an interview project
 
 1. Add OS-level shell sandboxing or isolated execution workers; current shell protection is command filtering plus minimal env, not a full sandbox.
 2. Add richer media/artifact-type policies beyond path-based generated output denial.
-3. Add managed pricing profiles, reusable policy profiles, and project-specific DLP controls.
+3. Add managed pricing profiles, custom team policy profile storage, and project-specific DLP controls.
 4. Continue browser and CLI smoke checks after meaningful product changes.
 5. Continue pushing production-ready increments to `https://github.com/opshenyi/deepcodexxx.git`.

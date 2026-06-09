@@ -8,6 +8,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - DeepSeek-compatible agent loop with function tools.
 - Workspace-scoped file read, write, edit, search, shell, and memory tools.
 - Web, Desktop, and CLI clients using the same core agent.
+- Built-in reusable policy profiles for inspection, guarded write, and full-access review runs.
 - Local event stream for transparent tool execution.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
@@ -52,7 +53,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add reusable policy profiles.
+- Add custom team policy profile storage.
 - Add project-specific DLP policies and richer media/artifact-type handling.
 - Add richer generated-asset handling and file-type policies.
 - Add managed pricing profiles and per-workspace budget policy templates.
