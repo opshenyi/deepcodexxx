@@ -22,6 +22,7 @@ node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js completion json
 node apps/cli/dist/index.js completion powershell
+node apps/cli/dist/index.js providers models --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 ```
 
@@ -32,6 +33,7 @@ Expected result:
 - Build completes for all workspaces with build scripts.
 - CLI `doctor` reports the intended DeepSeek base URL and model.
 - CLI `doctor` reports the effective DeepSeek fallback model count.
+- CLI `providers models --json` emits parseable checked DeepSeek model metadata with `deepseek-v4-flash` as the default and legacy aliases marked for migration.
 - CLI `doctor --json` emits parseable diagnostics with `ok`, `requirementFailures`, and policy-bundle verification detail.
 - CLI `completion json` emits a parseable command spec, and shell-specific completion scripts include top-level commands, subcommands, and options.
 - CLI `doctor --json --require-*` exits non-zero when a requested API-key, workspace-config, or trusted-policy-bundle condition is not met; run the strict flags that match the planned demo workspace.
@@ -58,6 +60,7 @@ Expected result:
 - CLI `profiles list --workspace <path>` includes any workspace-defined team profiles.
 - CLI `profiles list` reports `inspection`, `guarded-write`, and `full-access-review`.
 - CLI `pricing list` reports configured pricing profiles, or clearly says none are configured.
+- CLI `providers models` reports the checked default model, V4 model ids, and legacy alias retirement status.
 - CLI `evals report --json` emits parseable aggregate evidence for recorded eval runs.
 - CLI `release evidence --json` emits parseable readiness evidence across config, policy, evals, security scan, and sessions.
 - CLI `release preflight --json` emits parseable delivery checks for root scripts, client build scripts, CLI bin/completion readiness, Desktop bootstrap safety, built artifacts, docs, and ignored local state.
@@ -80,6 +83,7 @@ Checklist:
 - `Load config` applies `.deepcodex/config.json` defaults when the selected workspace has one.
 - `Load config` displays a short SHA-256 when the selected workspace has a config file.
 - The right-rail Workspace policy panel shows loaded config hash, selected profile, provider allowlist and fallback counts, shell controls, DLP counts, artifact controls, retention, and config path without horizontal overflow.
+- The right-rail Provider catalog panel shows default model, checked source date, V4 model count, legacy alias count, and migration targets without horizontal overflow.
 - The right-rail Policy bundle panel refreshes after `Load config`, can be refreshed independently, and reports missing, trusted, untrusted, or failed bundle status with verification details.
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.
@@ -141,6 +145,7 @@ node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
+node apps/cli/dist/index.js providers models
 node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --max-steps 1
 node apps/cli/dist/index.js evals run repo-map --workspace D:\Coding\DeepCodex --json --max-steps 1 --min-score 0
@@ -161,6 +166,7 @@ Checklist:
 - CLI prints configuration through `doctor`.
 - CLI can show workspace defaults through `config show`.
 - CLI can list workspace-defined team policy profiles through `profiles list --workspace`.
+- CLI can list checked DeepSeek model metadata and show one catalog entry.
 - CLI can list built-in and workspace-defined evals, run `evals run repo-map --json` as a read-only smoke task with score output and optional CI thresholds, list recorded eval history when `--record` has been used, compare two recorded runs, and produce an aggregate eval report.
 - CLI can produce a release evidence report in JSON or Markdown for demo and CI artifacts.
 - CLI can produce a distribution preflight report in JSON or Markdown for delivery gates.

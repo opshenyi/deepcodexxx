@@ -10,12 +10,14 @@ import {
   createDistributionPreflightReport,
   createReleaseEvidenceReport,
   createEvalRunReport,
+  createDeepSeekModelCatalogSummary,
   createSessionRecorder,
   createWorkspaceContext,
   exportDistributionPreflightReport,
   exportSessionHistory,
   exportReleaseEvidenceReport,
   applyPricingProfileToBudget,
+  listDeepSeekModelCatalog,
   listEvalRunRecords,
   listSessionHistories,
   listPolicyProfiles,
@@ -99,6 +101,13 @@ app.get("/api/pricing-profiles", (_req, res) => {
   res.json({
     profiles: readPricingProfilesFromEnv(),
     defaultProfileId: process.env.DEEPCODEX_PRICING_PROFILE ?? "custom"
+  });
+});
+
+app.get("/api/provider/models", (_req, res) => {
+  res.json({
+    summary: createDeepSeekModelCatalogSummary(),
+    models: listDeepSeekModelCatalog()
   });
 });
 

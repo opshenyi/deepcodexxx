@@ -158,6 +158,14 @@ The current DeepSeek client sends non-streaming chat completion requests with to
 
 As of 2026-06-09, official DeepSeek API docs list `deepseek-v4-flash` and `deepseek-v4-pro` for the OpenAI-format chat completions API, and the legacy `deepseek-chat` and `deepseek-reasoner` aliases are scheduled to stop working on 2026-07-24 15:59 UTC. DeepCodex keeps model ids configurable for migration, but new templates use V4 model ids.
 
+DeepCodex exposes this checked model metadata through the CLI, API, and Web/Desktop right rail. The catalog is descriptive product metadata for model selection and migration review; pricing remains caller-managed configuration.
+
+```powershell
+node apps/cli/dist/index.js providers models
+node apps/cli/dist/index.js providers show deepseek-v4-flash --json
+Invoke-RestMethod http://127.0.0.1:17361/api/provider/models
+```
+
 When the configured DeepSeek-compatible provider returns usage metadata, DeepCodex records prompt, completion, and total token counts in the live event stream, session history, replay view, exports, and CLI session output using the actual model that responded. Token and cost budgets are enforced from those provider usage events. A budget can prevent additional tool or model work after the configured limit is reached.
 
 Workspace config reads include a SHA-256 fingerprint of the raw `.deepcodex/config.json` file. CLI `doctor` and Web `Load config` show a short hash, while `config show --json` and `/api/workspace-config` expose the full value for audit records.
@@ -219,6 +227,7 @@ Expected checks:
 - `DeepSeek API key: configured` for live model runs, or `missing` for local demo mode.
 - Base URL and model reflect the shell or `.env` values.
 - Fallback model count reflects `DEEPCODEX_PROVIDER_FALLBACK_MODELS` or workspace `provider.fallbackModels`.
+- `providers models` reports the checked DeepSeek V4 model ids, the default model, and legacy alias migration status.
 - Provider retry settings print with their effective environment/default values.
 - Budget variables print when they are configured.
 - Workspace config path and status print without crashing.
@@ -246,6 +255,7 @@ Runtime endpoints:
 - Web client: `http://127.0.0.1:5173`
 - Local server: `http://127.0.0.1:17361`
 - Health check: `http://127.0.0.1:17361/api/health`
+- Provider catalog API: `http://127.0.0.1:17361/api/provider/models`
 
 The Web sidebar includes a Server field. It defaults to `VITE_DEEPCODEX_SERVER_URL` or `http://127.0.0.1:17361`, normalizes host-only values such as `127.0.0.1:17361`, and saves the selected API base in browser local storage.
 
@@ -258,15 +268,16 @@ Recommended demo flow:
 3. Use `Guarded write` only on a disposable branch or sample workspace.
 4. Use `Load config` when the workspace has `.deepcodex/config.json`, then confirm profile, approval, max steps, budget, pricing, and retention values.
 5. Review the Workspace policy panel for config hash, provider allowlists, shell controls, DLP counts, artifact controls, retention, and config path.
-6. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
-7. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
-8. Watch the event stream for provider fallback selection, approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
-9. Use the Release evidence and Distribution preflight `Download` buttons to save Markdown handoff reports.
-10. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
-11. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
-12. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
-13. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
-14. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
+6. Review the Provider catalog panel for default model, source checked date, V4 model count, legacy alias count, and migration targets.
+7. Check the Policy bundle panel when demonstrating signed workspace policy; it should show missing, trusted, untrusted, or failed with the verification reason.
+8. Keep `Tool approvals` on `Manual` when demonstrating write, shell, or memory safety gates.
+9. Watch the event stream for provider fallback selection, approvals, file hash audit metadata, tool starts, tool results, errors, and final answer.
+10. Use the Release evidence and Distribution preflight `Download` buttons to save Markdown handoff reports.
+11. Use `Load report` in Eval evidence to show recorded eval totals, score averages, and recent run summaries.
+12. Use `Run scan` in Security scan to show existing probable-secret findings without revealing secret values.
+13. Use `Load memory` to show `.deepcodex/memory.md` content for the selected workspace.
+14. Set a token cap or USD cap in the Budget panel when demonstrating cost controls.
+15. Use `Load sessions`, then `Replay` or `Export`, to show the persisted audit timeline for a previous run.
 
 ## Desktop Client
 
@@ -345,6 +356,13 @@ List configured pricing profiles:
 
 ```powershell
 node apps/cli/dist/index.js pricing list
+```
+
+List checked DeepSeek model metadata:
+
+```powershell
+node apps/cli/dist/index.js providers models
+node apps/cli/dist/index.js providers show deepseek-v4-pro
 ```
 
 List and run built-in or workspace-defined smoke evals:

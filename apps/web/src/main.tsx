@@ -204,6 +204,35 @@ type PricingProfile = {
   outputUsdPerMillionTokens: number;
 };
 
+type DeepSeekModelStatus = "recommended" | "supported" | "legacy";
+
+type DeepSeekModelCatalogEntry = {
+  id: string;
+  label: string;
+  status: DeepSeekModelStatus;
+  defaultModel: boolean;
+  fallbackEligible: boolean;
+  supportsToolCalls: boolean;
+  notes: string;
+  migrationTarget?: string;
+  retiresAt?: string;
+};
+
+type DeepSeekModelCatalogSummary = {
+  generatedAt: string;
+  sourceCheckedAt: string;
+  recommended: number;
+  supported: number;
+  legacy: number;
+  defaultModel: string;
+  legacyRetiresAt?: string;
+};
+
+type DeepSeekModelCatalogResponse = {
+  summary: DeepSeekModelCatalogSummary;
+  models: DeepSeekModelCatalogEntry[];
+};
+
 type BudgetSnapshot = {
   promptTokens: number;
   completionTokens: number;
@@ -582,6 +611,9 @@ function App() {
   const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
   const [pricingProfileId, setPricingProfileId] = useState(defaultPricingProfile);
   const [pricingProfiles, setPricingProfiles] = useState<PricingProfile[]>([]);
+  const [providerCatalogState, setProviderCatalogState] = useState<LoadState>("idle");
+  const [providerCatalog, setProviderCatalog] = useState<DeepSeekModelCatalogResponse | null>(null);
+  const [providerCatalogMessage, setProviderCatalogMessage] = useState("");
   const [policyProfileOptions, setPolicyProfileOptions] = useState<PolicyProfileOption[]>(basePolicyProfileOptions);
   const [retentionMaxSessions, setRetentionMaxSessions] = useState(defaultRetentionMaxSessions);
   const [retentionMaxAgeDays, setRetentionMaxAgeDays] = useState(defaultRetentionMaxAgeDays);
@@ -653,6 +685,8 @@ function App() {
   const statusTone = isRunning ? "running" : finalText ? "ready" : "idle";
   const policyBundleStatus = formatPolicyBundleStatus(policyBundle, policyBundleState);
   const policyBundleTone = formatPolicyBundleTone(policyBundle, policyBundleState);
+  const providerCatalogStatus = formatProviderCatalogStatus(providerCatalog, providerCatalogState);
+  const providerCatalogTone = formatProviderCatalogTone(providerCatalog, providerCatalogState);
   const workspaceConfigStatus = formatWorkspaceConfigStatus(workspaceConfigResult, configState);
   const workspaceConfigTone = formatWorkspaceConfigTone(workspaceConfigResult, configState);
   const securityScanStatus = formatSecurityScanStatus(securityScan, securityScanState);
@@ -682,6 +716,7 @@ function App() {
 
   useEffect(() => {
     void loadPricingProfiles();
+    void loadProviderCatalog();
     void loadPolicyProfiles();
   }, [serverUrl]);
 
@@ -820,7 +855,28 @@ function App() {
     setServerMessage(`Using ${normalized}`);
     if (normalized === serverUrl) {
       void loadPricingProfiles(normalized);
+      void loadProviderCatalog(normalized);
       void loadPolicyProfiles(workspace, normalized);
+    }
+  }
+
+  async function loadProviderCatalog(baseUrl = serverUrl) {
+    setProviderCatalogState("loading");
+    setProviderCatalogMessage("");
+    try {
+      const response = await fetch(`${baseUrl}/api/provider/models`);
+      if (!response.ok) {
+        throw new Error(await readResponseError(response));
+      }
+      const body = (await response.json()) as DeepSeekModelCatalogResponse;
+      setProviderCatalog(body);
+      setProviderCatalogMessage(formatProviderCatalogMessage(body));
+      setProviderCatalogState("ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setProviderCatalog(null);
+      setProviderCatalogMessage(message);
+      setProviderCatalogState("error");
     }
   }
 
@@ -2072,6 +2128,70 @@ function App() {
         <section className="railPanel">
           <div className="sectionHeader compact">
             <div>
+              <span className="eyebrow">Provider catalog</span>
+              <h2>Model status</h2>
+            </div>
+            <span className={`outputStatus ${providerCatalogTone}`}>{providerCatalogStatus}</span>
+          </div>
+          <div className="policyBundleBody">
+            <p className={providerCatalogState === "error" ? "policyBundleReason bad" : "policyBundleReason"}>
+              {providerCatalogMessage || "No provider catalog loaded."}
+            </p>
+            {providerCatalog ? (
+              <>
+                <dl className="policyBundleFacts">
+                  <div>
+                    <dt>Default</dt>
+                    <dd>{providerCatalog.summary.defaultModel}</dd>
+                  </div>
+                  <div>
+                    <dt>V4 models</dt>
+                    <dd>{providerCatalog.summary.recommended + providerCatalog.summary.supported}</dd>
+                  </div>
+                  <div>
+                    <dt>Legacy</dt>
+                    <dd>{providerCatalog.summary.legacy}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{providerCatalog.summary.sourceCheckedAt}</dd>
+                  </div>
+                </dl>
+                <div className="releaseCheckList">
+                  {providerCatalog.models.map((model) => (
+                    <article key={model.id} className="releaseCheck">
+                      <div className="releaseCheckHeader">
+                        <strong>{model.id}</strong>
+                        <span className={`releaseCheckStatus ${formatProviderModelStatusClass(model.status)}`}>
+                          {model.status}
+                        </span>
+                      </div>
+                      <p>{model.notes}</p>
+                      <p>{formatProviderModelCapabilities(model)}</p>
+                      {model.migrationTarget ? (
+                        <p>
+                          Migration target: {model.migrationTarget}
+                          {model.retiresAt ? ` before ${formatStoredDateTime(model.retiresAt)}` : ""}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="secondary policyBundleButton"
+              onClick={() => loadProviderCatalog()}
+              disabled={providerCatalogState === "loading"}
+            >
+              {providerCatalogState === "loading" ? "Loading catalog" : "Refresh catalog"}
+            </button>
+          </div>
+        </section>
+        <section className="railPanel">
+          <div className="sectionHeader compact">
+            <div>
               <span className="eyebrow">Release evidence</span>
               <h2>Readiness report</h2>
             </div>
@@ -3093,6 +3213,50 @@ function formatPolicyBundleStatus(
     return policyBundle.trusted ? "Failed" : "Untrusted";
   }
   return "Failed";
+}
+
+function formatProviderCatalogStatus(catalog: DeepSeekModelCatalogResponse | null, state: LoadState): string {
+  if (state === "loading") {
+    return "Loading";
+  }
+  if (state === "error") {
+    return "Error";
+  }
+  if (!catalog) {
+    return "Not loaded";
+  }
+  return catalog.summary.legacy > 0 ? `${catalog.summary.legacy} legacy` : "Ready";
+}
+
+function formatProviderCatalogTone(catalog: DeepSeekModelCatalogResponse | null, state: LoadState): string {
+  if (state === "loading") {
+    return "loading";
+  }
+  if (state === "error") {
+    return "error";
+  }
+  if (!catalog) {
+    return "idle";
+  }
+  return catalog.summary.legacy > 0 ? "loading" : "ready";
+}
+
+function formatProviderCatalogMessage(catalog: DeepSeekModelCatalogResponse): string {
+  const activeModels = catalog.summary.recommended + catalog.summary.supported;
+  const legacyText = catalog.summary.legacyRetiresAt
+    ? ` ${catalog.summary.legacy} legacy aliases retire ${formatStoredDateTime(catalog.summary.legacyRetiresAt)}.`
+    : ` ${catalog.summary.legacy} legacy aliases tracked.`;
+  return `${catalog.summary.defaultModel} is the default. ${activeModels} V4 model ids are tracked.${legacyText}`;
+}
+
+function formatProviderModelStatusClass(status: DeepSeekModelStatus): "pass" | "warn" {
+  return status === "legacy" ? "warn" : "pass";
+}
+
+function formatProviderModelCapabilities(model: DeepSeekModelCatalogEntry): string {
+  const fallback = model.fallbackEligible ? "fallback eligible" : "not fallback eligible";
+  const toolCalls = model.supportsToolCalls ? "tool calls" : "tool calls not recommended";
+  return `${fallback} / ${toolCalls}`;
 }
 
 function formatSecurityScanStatus(scan: SecurityScanResult | null, state: LoadState): string {

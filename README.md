@@ -2,7 +2,7 @@
 
 DeepCodex is a DeepSeek-powered coding agent product with Web, Desktop, and CLI clients. It is designed as a commercial interview project: clean architecture, transparent tool execution, persistent memory, and a restrained enterprise UI.
 
-Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists with approved fallback models, visible provider fallback events, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
+Core safety features include workspace-level configuration with SHA-256 provenance and optional signed policy-bundle verification, reusable policy profiles, provider/model allowlists with approved fallback models, a checked DeepSeek V4 model catalog, visible provider fallback events, saved Web workspace profiles, Web/Desktop workspace policy summaries, workspace path guardrails, generated/build output deny patterns, media/artifact extension policies, safe artifact metadata inspection, default-off archive listing and PDF text extraction, workspace security scanning for probable secrets, manual tool approvals, event redaction, write-time DLP blocking for probable secrets, diff-producing write/edit tools, Web unified/split diff review, file hash audit metadata, session replay/export, retention pruning, minimal shell environment mode, network-aware and workspace-configurable shell command policy, run-level token or estimated-cost budgets, release evidence reports, distribution preflight checks, Web/Desktop Markdown evidence downloads, and CLI CI diagnostics.
 
 ## Quick Start
 
@@ -31,6 +31,7 @@ node apps/cli/dist/index.js doctor --json
 node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js profiles list
 node apps/cli/dist/index.js pricing list
+node apps/cli/dist/index.js providers models
 node apps/cli/dist/index.js evals list --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js evals report --workspace D:\Coding\DeepCodex
 node apps/cli/dist/index.js release evidence --workspace D:\Coding\DeepCodex --json
@@ -91,8 +92,10 @@ Detailed setup and smoke-test steps are in `docs/runbook.md`.
 - Desktop production-like smoke: `npm run start:desktop`.
 - CLI: `npm run build`, then run `node apps/cli/dist/index.js doctor`.
 - CLI completion: `node apps/cli/dist/index.js completion powershell`, `completion bash`, or `completion zsh`.
+- Provider catalog: `node apps/cli/dist/index.js providers models` or open `http://127.0.0.1:17361/api/provider/models`.
 - Workspace config: `node apps/cli/dist/index.js config show --workspace D:\Coding\DeepCodex`.
 - Web/Desktop workspace policy: use `Load config` to review config hash, provider allowlists, fallback-model count, shell controls, DLP counts, artifact controls, retention, and config path.
+- Web/Desktop provider catalog: review the right-rail Model status panel for default V4 model, legacy alias count, source date, and migration targets.
 - Web/Desktop evidence: use the right-rail `Download` buttons to save Markdown release evidence and distribution preflight reports.
 - Session audit: `node apps/cli/dist/index.js sessions list --workspace D:\Coding\DeepCodex`.
 - Health check: `http://127.0.0.1:17361/api/health`.

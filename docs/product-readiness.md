@@ -13,6 +13,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Web client can use the default local API base, `VITE_DEEPCODEX_SERVER_URL`, a saved runtime Server URL from the sidebar, or saved local workspace profiles for repeated workspace/server/policy setup.
 - Server CORS can remain permissive for local development or be restricted by `DEEPCODEX_CORS_ORIGINS` for controlled demos.
 - Workspace-level `.deepcodex/config.json` defaults for model, provider base URL, provider/model allowlists, approved fallback models, custom team policy profiles, workspace eval tasks, default policy profile, approval mode, max steps, budget, pricing profile, file policy additions, custom redaction/DLP patterns, secret-write policy, archive listing policy, PDF text extraction policy, shell environment, shell network access, shell command allow/deny patterns, and retention.
+- Checked DeepSeek provider model catalog across core, CLI, server API, and Web/Desktop, showing the current default V4 model, V4 model ids, legacy alias count, source checked date, and migration targets without hard-coded prices.
 - Workspace config SHA-256 fingerprints in CLI/API/Web config loading for policy provenance.
 - Optional signed policy-bundle verification for the active workspace config SHA-256 through core, CLI, and server API.
 - CLI policy-bundle key generation and signing workflow for creating an Ed25519 keypair and signing `.deepcodex/policy-bundle.json` from the active workspace config with an external private key.
@@ -75,6 +76,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 | Roadmap | `docs/roadmap.md` | Sequenced path from interview artifact to pilot and hosted product. |
 | Reference survey | `docs/reference-agents.md` | Clean-room research notes and product influences. |
 | Eval evidence | `docs/evals.md` | Repeatable built-in and workspace-defined read-only smoke tasks, scoring behavior, CI thresholds, optional local history, cross-run comparison, CLI/API report aggregation, Web/Desktop visibility, and current scoring limits. |
+| Provider catalog | `deepcodex providers models`, `/api/provider/models`, and Web/Desktop right rail | Checked DeepSeek V4/legacy model metadata for migration review and fallback policy discussions. |
 | Release evidence report | `deepcodex release evidence` and Web/Desktop right rail | Single readiness artifact spanning config, policy, evals, security scan, provider-key status, and recent sessions. |
 | Distribution preflight report | `deepcodex release preflight` and Web/Desktop right rail | Delivery gate for scripts, three-client/server build coverage, CLI bin/completion readiness, Desktop bootstrap safety, docs, artifacts, and ignored local state. |
 
@@ -89,7 +91,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 
 ## Next Commercial Milestones
 
-- Add managed trust package distribution channels, provider registry metadata, and stronger hosted operations.
+- Add managed trust package distribution channels, hosted provider registry operations, and stronger hosted operations.
 - Add richer DLP classification and policy-controlled OCR.
 - Add richer generated-asset handling and file-type policies.
 - Add kernel-level shell sandboxing or remote isolated execution workers.

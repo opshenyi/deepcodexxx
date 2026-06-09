@@ -16,7 +16,9 @@ import {
   exportSessionHistory,
   evalScoreFailed,
   applyPricingProfileToBudget,
+  createDeepSeekModelCatalogSummary,
   listEvalRunRecords,
+  listDeepSeekModelCatalog,
   listSessionHistories,
   listPolicyProfiles,
   parseSessionExportFormat,
@@ -30,6 +32,7 @@ import {
   resolveEvalTask,
   resolveEvalTasks,
   resolvePolicyProfile,
+  getDeepSeekModelCatalogEntry,
   scanWorkspaceSensitiveText,
   scoreEvalResult,
   verifyWorkspacePolicyBundle,
@@ -71,6 +74,8 @@ import type {
   EvalRunReport,
   EvalScore,
   EvalTask,
+  DeepSeekModelCatalogEntry,
+  DeepSeekModelCatalogSummary,
   SensitiveTextScanResult
 } from "@deepcodex/core";
 
@@ -262,6 +267,7 @@ const sessions = program.command("sessions").description("Inspect persisted Deep
 const evals = program.command("evals").description("Run DeepCodex smoke evaluation tasks.");
 const profiles = program.command("profiles").description("Inspect reusable DeepCodex policy profiles.");
 const pricing = program.command("pricing").description("Inspect configured DeepCodex pricing profiles.");
+const providers = program.command("providers").description("Inspect DeepSeek-compatible provider model metadata.");
 const config = program.command("config").description("Inspect or create workspace-level DeepCodex defaults.");
 const security = program.command("security").description("Run local workspace security checks.");
 const release = program.command("release").description("Collect release and demo readiness evidence.");
@@ -364,6 +370,36 @@ release
       }
     }
   );
+
+providers
+  .command("models")
+  .description("List known DeepSeek model ids and migration status.")
+  .option("--json", "Print JSON output", false)
+  .action((options: { json: boolean }) => {
+    const models = listDeepSeekModelCatalog();
+    const summary = createDeepSeekModelCatalogSummary();
+    if (options.json) {
+      console.log(JSON.stringify({ summary, models }, null, 2));
+      return;
+    }
+    printDeepSeekModelCatalog(models, summary);
+  });
+
+providers
+  .command("show")
+  .argument("<model>", "DeepSeek model id")
+  .option("--json", "Print JSON output", false)
+  .action((model: string, options: { json: boolean }) => {
+    const entry = getDeepSeekModelCatalogEntry(model);
+    if (!entry) {
+      throw new Error(`Unknown DeepSeek model in catalog: ${model}`);
+    }
+    if (options.json) {
+      console.log(JSON.stringify(entry, null, 2));
+      return;
+    }
+    printDeepSeekModelEntry(entry);
+  });
 
 evals
   .command("list")
@@ -1284,6 +1320,42 @@ function printSensitiveScanResult(result: SensitiveTextScanResult): void {
   for (const finding of result.findings) {
     console.log(`${finding.path}:${finding.line}  ${finding.type}:${finding.label}`);
   }
+}
+
+function printDeepSeekModelCatalog(models: DeepSeekModelCatalogEntry[], summary: DeepSeekModelCatalogSummary): void {
+  console.log(chalk.bold("DeepSeek model catalog"));
+  console.log(`Default: ${summary.defaultModel}`);
+  console.log(`Source checked: ${summary.sourceCheckedAt}`);
+  if (summary.legacyRetiresAt) {
+    console.log(`Legacy aliases retire: ${summary.legacyRetiresAt}`);
+  }
+  for (const model of models) {
+    console.log(
+      `${model.id}  ${model.status}${model.defaultModel ? "  default" : ""}${
+        model.fallbackEligible ? "  fallback-ok" : ""
+      }`
+    );
+    console.log(`  ${model.notes}`);
+    if (model.migrationTarget) {
+      console.log(`  migrate to ${model.migrationTarget}${model.retiresAt ? ` before ${model.retiresAt}` : ""}`);
+    }
+  }
+}
+
+function printDeepSeekModelEntry(model: DeepSeekModelCatalogEntry): void {
+  console.log(chalk.bold(model.id));
+  console.log(`Label: ${model.label}`);
+  console.log(`Status: ${model.status}`);
+  console.log(`Default: ${model.defaultModel ? "yes" : "no"}`);
+  console.log(`Fallback eligible: ${model.fallbackEligible ? "yes" : "no"}`);
+  console.log(`Tool calls: ${model.supportsToolCalls ? "yes" : "no"}`);
+  if (model.migrationTarget) {
+    console.log(`Migration target: ${model.migrationTarget}`);
+  }
+  if (model.retiresAt) {
+    console.log(`Retires at: ${model.retiresAt}`);
+  }
+  console.log(model.notes);
 }
 
 function formatEvalScore(score: EvalScore): string {
