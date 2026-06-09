@@ -9,6 +9,7 @@ type DiffViewMode = "unified" | "split";
 
 type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
+  | { type: "provider_fallback"; primaryModel: string; model: string }
   | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "budget_updated"; budget: BudgetSnapshot }
   | { type: "budget_exceeded"; reason: "tokens" | "cost"; message: string; budget: BudgetSnapshot }
@@ -41,7 +42,17 @@ type AgentEvent =
   | { type: "final"; content: string }
   | { type: "error"; message: string };
 
-type LogKind = "Session" | "Step" | "Usage" | "Budget" | "Assistant" | "Approval" | "Tool" | "Final" | "Error";
+type LogKind =
+  | "Session"
+  | "Provider"
+  | "Step"
+  | "Usage"
+  | "Budget"
+  | "Assistant"
+  | "Approval"
+  | "Tool"
+  | "Final"
+  | "Error";
 type LogTone = "plain" | "muted" | "good" | "bad" | "accent";
 type MemoryState = "idle" | "loading" | "ready" | "error";
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -3399,6 +3410,16 @@ function createLogItemFromEvent(event: AgentEvent, timestamp: string, id: string
         title: "Session started",
         meta: `${event.sessionId.slice(0, 8)} / ${event.model}`,
         body: event.workspace
+      };
+    case "provider_fallback":
+      return {
+        id,
+        timestamp,
+        kind: "Provider",
+        tone: "accent",
+        title: "Provider fallback",
+        meta: event.model,
+        body: `Primary model: ${event.primaryModel}\nFallback model: ${event.model}`
       };
     case "model_usage":
       return {

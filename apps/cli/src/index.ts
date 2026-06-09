@@ -1377,6 +1377,9 @@ function printEvent(event: AgentEvent): void {
       console.log(chalk.gray(`workspace ${event.workspace}`));
       console.log(chalk.gray(`model ${event.model}`));
       break;
+    case "provider_fallback":
+      console.log(chalk.gray(`provider fallback ${event.primaryModel} -> ${event.model}`));
+      break;
     case "model_usage":
       console.log(
         chalk.gray(

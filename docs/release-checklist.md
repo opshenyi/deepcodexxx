@@ -84,7 +84,7 @@ Checklist:
 - Policy profile selector can switch between Inspection, Guarded write, Full access review, and workspace-defined team profiles.
 - Shell execution selector can switch between direct workspace and temporary-copy execution.
 - `suggest` mode can run a repository inspection prompt.
-- Event stream shows session start, steps, tool calls, and final output.
+- Event stream shows session start, provider fallback selection when it occurs, steps, tool calls, and final output.
 - Manual approval events show decision source and latency when a mutating tool is approved or denied.
 - Write/edit approval and tool result events show file hash audit metadata when a file path is involved.
 - Budget controls can be set in the sidebar and budget events appear when provider usage metadata is available.

@@ -104,7 +104,7 @@ Provider usage controls:
 - Pricing profiles can be configured with `DEEPCODEX_PRICING_PROFILES` and selected through CLI, server, or Web budget controls.
 - `.deepcodex/config.json` can provide workspace defaults for model, provider base URL, approved fallback models, provider/model allowlists, custom team policy profiles, policy profile, pricing profile, max steps, token/cost budget, shell environment, shell network access, shell command allow/deny patterns, and retention.
 - Provider allowlists block agent runs when the resolved base URL, primary model, or fallback model is not approved by the workspace policy.
-- Provider calls retry 429, 500, 502, 503, 504, and network failures with bounded exponential backoff. Retry exhaustion can move to the next approved fallback model; request errors and invalid JSON are not retried or hidden by fallback.
+- Provider calls retry 429, 500, 502, 503, 504, and network failures with bounded exponential backoff. Retry exhaustion can move to the next approved fallback model and emits a persisted `provider_fallback` event; request errors and invalid JSON are not retried or hidden by fallback.
 - Budget state is emitted in the live event stream, persisted in session history, replayable in Web, and included in exports.
 - Budget enforcement happens after provider usage metadata is returned, so it prevents additional work rather than preempting an in-flight model request.
 

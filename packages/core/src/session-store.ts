@@ -295,6 +295,9 @@ function applyEventMetadata(history: SessionHistory, event: AgentEvent): void {
     case "model_usage":
       history.tokenUsage = addTokenUsage(history.tokenUsage, event);
       break;
+    case "provider_fallback":
+      history.model = event.model;
+      break;
     case "budget_updated":
     case "budget_exceeded":
       history.budget = event.budget;
@@ -400,6 +403,8 @@ function eventSummary(event: AgentEvent): string {
   switch (event.type) {
     case "session_started":
       return `Session started with ${event.model}.`;
+    case "provider_fallback":
+      return `Provider fallback selected ${event.model} after retryable failures for ${event.primaryModel}.`;
     case "model_usage":
       return `Model usage for ${event.model}: ${event.totalTokens} tokens.`;
     case "budget_updated":
@@ -431,6 +436,8 @@ function eventDetails(event: AgentEvent): string {
   switch (event.type) {
     case "session_started":
       return `workspace: ${event.workspace}\nmodel: ${event.model}`;
+    case "provider_fallback":
+      return `primaryModel: ${event.primaryModel}\nmodel: ${event.model}`;
     case "model_usage":
       return `model: ${event.model}\npromptTokens: ${event.promptTokens}\ncompletionTokens: ${event.completionTokens}\ntotalTokens: ${event.totalTokens}`;
     case "budget_updated":

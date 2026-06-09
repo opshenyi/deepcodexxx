@@ -185,6 +185,13 @@ describe("agent approval risk", () => {
 
     expect(events).toContainEqual(
       expect.objectContaining({
+        type: "provider_fallback",
+        primaryModel: "primary-model",
+        model: "fallback-model"
+      })
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
         type: "model_usage",
         model: "fallback-model",
         promptTokens: 3,

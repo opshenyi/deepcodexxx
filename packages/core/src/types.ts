@@ -104,6 +104,7 @@ export interface ShellAuditEntry {
 
 export type AgentEvent =
   | { type: "session_started"; sessionId: string; workspace: string; model: string }
+  | { type: "provider_fallback"; primaryModel: string; model: string }
   | { type: "model_usage"; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "budget_updated"; budget: BudgetSnapshot }
   | { type: "budget_exceeded"; reason: BudgetLimitReason; message: string; budget: BudgetSnapshot }

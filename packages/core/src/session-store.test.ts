@@ -127,6 +127,11 @@ describe("session store", () => {
       model: "deepseek-chat"
     });
     await recorder.record({
+      type: "provider_fallback",
+      primaryModel: "deepseek-chat",
+      model: "deepseek-reasoner"
+    });
+    await recorder.record({
       type: "tool_approval_requested",
       approvalId: "approval-1",
       name: "write_file",
@@ -180,9 +185,12 @@ describe("session store", () => {
     await recorder.record({ type: "final", content: "done" });
 
     const session = await readSessionHistory(workspace, "session-export");
+    expect(session.model).toBe("deepseek-reasoner");
     const markdown = exportSessionHistory(session, "markdown");
     expect(markdown).toContain("# DeepCodex Session Export");
     expect(markdown).toContain("session-export");
+    expect(markdown).toContain("- Model: deepseek-reasoner");
+    expect(markdown).toContain("Provider fallback selected deepseek-reasoner");
     expect(markdown).toContain("Approval approved for write_file by test-suite in 1250ms.");
     expect(markdown).toContain("fileAudits");
     expect(markdown).toContain("Wrote README.md");
@@ -191,7 +199,7 @@ describe("session store", () => {
 
     const json = JSON.parse(exportSessionHistory(session, "json")) as { sessionId: string; eventCount: number };
     expect(json.sessionId).toBe("session-export");
-    expect(json.eventCount).toBe(5);
+    expect(json.eventCount).toBe(6);
   });
 
   it("parses session export formats", () => {

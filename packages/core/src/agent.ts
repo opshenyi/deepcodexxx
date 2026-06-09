@@ -77,13 +77,17 @@ export async function runDeepCodexAgent(options: AgentRunOptions): Promise<Agent
   for (let index = 1; index <= maxSteps; index += 1) {
     await emit({ type: "step", index, maxSteps });
     const response = await client.chat(messages, tools.map((tool) => tool.definition));
+    const activeModel = client.lastModel ?? client.model;
+    if (activeModel !== client.model) {
+      await emit({ type: "provider_fallback", primaryModel: client.model, model: activeModel });
+    }
     let usageEvent: Extract<AgentEvent, { type: "model_usage" }> | undefined;
     if (response.usage) {
       const promptTokens = response.usage.prompt_tokens ?? 0;
       const completionTokens = response.usage.completion_tokens ?? 0;
       usageEvent = {
         type: "model_usage",
-        model: client.lastModel ?? client.model,
+        model: activeModel,
         promptTokens,
         completionTokens,
         totalTokens: response.usage.total_tokens ?? promptTokens + completionTokens

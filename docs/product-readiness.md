@@ -23,7 +23,7 @@ DeepCodex is currently an interview-ready local product slice. It is suitable fo
 - Policy-bundle trust policy supports multiple trusted public keys, bundle revocation, signing-key revocation, and trusted issuer allowlists.
 - Built-in reusable policy profiles for inspection, guarded write, and full-access review runs, plus workspace-defined team policy profiles.
 - Provider/model allowlists that block unapproved base URLs, primary models, or fallback model selections before an agent run.
-- Local event stream for transparent tool execution.
+- Local event stream for transparent tool execution and provider fallback visibility.
 - Persisted local session history and audit files under `.deepcodex/state/sessions`.
 - Web session replay for inspecting saved event timelines from recent runs.
 - Structured Web diff rendering for live event output, approval details, and session replay, with multi-file unified diffs split into readable blocks and a split before/after review mode for focused file changes.
